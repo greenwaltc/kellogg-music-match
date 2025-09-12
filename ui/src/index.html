@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Kellogg Music Match</title>
+  <base href="/">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; margin:0; background:#121212; color:#eee; }
+  </style>
+  <script>
+    // Runtime configuration loader (config.json served next to index.html)
+    window.__kmmConfig = { apiBaseUrl: '' };
+    fetch('config.json',{cache:'no-store'}).then(r=> r.ok ? r.json():{}).then(cfg=>{ if(cfg && typeof cfg.apiBaseUrl==='string'){ window.__kmmConfig.apiBaseUrl = cfg.apiBaseUrl; } }).catch(()=>{});
+  </script>
+</head>
+<body>
+  <app-root>Loading...</app-root>
+</body>
+</html>

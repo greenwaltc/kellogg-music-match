@@ -1,0 +1,20 @@
+<div class="wrapper">
+  <header class="topbar">
+    <h1 class="brand">{{ title }}</h1>
+    <nav *ngIf="isLoggedIn(); else loggedOut" class="nav">
+      <a routerLink="/artists" routerLinkActive="active">Artists</a>
+      <a routerLink="/matches" routerLinkActive="active">Matches</a>
+      <button type="button" class="ghost" (click)="toggleTheme()" aria-label="Toggle theme">{{ theme.mode() === 'dark' ? '🌞' : '🌙' }}</button>
+      <button type="button" (click)="logout()">Logout</button>
+    </nav>
+    <ng-template #loggedOut>
+      <nav class="nav">
+        <button type="button" class="ghost" (click)="toggleTheme()" aria-label="Toggle theme">{{ theme.mode() === 'dark' ? '🌞' : '🌙' }}</button>
+      </nav>
+    </ng-template>
+  </header>
+  <main>
+    <router-outlet></router-outlet>
+  </main>
+  <footer class="site-footer">Made by Cameron Greenwalt</footer>
+</div>
