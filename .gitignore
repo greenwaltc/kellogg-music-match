@@ -1,0 +1,75 @@
+# ---- OS / Editor ----
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+*.code-workspace
+
+# ---- Node / Angular ----
+node_modules/
+ui/node_modules/
+ui/dist/
+ui/.angular/cache/
+ui/.angular/
+#! Keeping package-lock.json tracked for deterministic Node builds.
+
+
+# Angular build outputs
+/dist/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Coverage & reports
+coverage/
+ui/coverage/
+
+# ---- Go ----
+**/*.exe
+**/*.exe~
+**/*.dll
+**/*.so
+**/*.dylib
+**/*.test
+**/*.out
+bin/
+#! Keeping go.sum tracked for Go module integrity.
+
+# ---- Pulumi ----
+.pulumi/
+Pulumi.*.yaml
+# Keep Pulumi.yaml (project definition) but ignore stack state
+!Pulumi.yaml
+
+# Local env / secrets
+.env
+.env.*
+*.local
+
+# ---- Docker / Build Artifacts ----
+*.tar
+*.img
+.cache/
+
+# ---- Logs ----
+backend/*.log
+pulumi/*.log
+
+# ---- IDE caches ----
+*.iml
+.gradle/
+
+# ---- Misc ----
+*.tmp
+*.temp
+~$*
+
+# ---- Generated runtime config ----
+ui/src/config.json
+
+# ---- Images built locally (tags) ----
+**/*.sha256
+
