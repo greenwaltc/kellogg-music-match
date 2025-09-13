@@ -1,7 +1,10 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"log"
 	"math"
 	"net/http"
@@ -12,17 +15,33 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type User struct {
-	Email    string   `json:"email"`
-	FullName string   `json:"fullName"`
-	Artists  []string `json:"artists,omitempty"`
+	ID           string   `json:"id"`
+	Username     string   `json:"username"`
+	Email        string   `json:"email"`
+	FullName     string   `json:"fullName"`
+	PasswordHash string   `json:"-"` // Never return password hash in JSON
+	Artists      []string `json:"artists,omitempty"`
 }
 
 type LoginRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+type RegisterRequest struct {
+	Username string `json:"username"`
 	Email    string `json:"email"`
 	FullName string `json:"fullName"`
+	Password string `json:"password"`
+}
+
+type AuthResponse struct {
+	User  User   `json:"user"`
+	Token string `json:"token,omitempty"`
 }
 
 type ArtistsRequest struct {
@@ -37,29 +56,97 @@ type MatchUser struct {
 
 type memoryStore struct {
 	mu    sync.RWMutex
-	users map[string]*User // key=email
+	users map[string]*User // key=username
 }
 
 var store = memoryStore{users: make(map[string]*User)}
 
-func (s *memoryStore) upsertUser(email, fullName string) *User {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	u, ok := s.users[email]
-	if !ok {
-		u = &User{Email: email, FullName: fullName}
-		s.users[email] = u
-	} else {
-		// update full name if changed
-		u.FullName = fullName
-	}
-	return u
+// Password hashing utilities
+func hashPassword(password string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	return string(bytes), err
 }
 
-func (s *memoryStore) updateArtists(email string, artists []string) {
+func checkPassword(password, hash string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
+}
+
+// Generate a simple user ID
+func generateUserID() string {
+	bytes := make([]byte, 16)
+	rand.Read(bytes)
+	return hex.EncodeToString(bytes)
+}
+
+func (s *memoryStore) createUser(username, email, fullName, password string) (*User, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if u, ok := s.users[email]; ok {
+
+	// Check if username already exists
+	if _, exists := s.users[username]; exists {
+		return nil, fmt.Errorf("username already exists")
+	}
+
+	// Check if email already exists
+	for _, u := range s.users {
+		if u.Email == email {
+			return nil, fmt.Errorf("email already exists")
+		}
+	}
+
+	// Hash password
+	hashedPassword, err := hashPassword(password)
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash password")
+	}
+
+	// Create user
+	user := &User{
+		ID:           generateUserID(),
+		Username:     username,
+		Email:        email,
+		FullName:     fullName,
+		PasswordHash: hashedPassword,
+		Artists:      []string{},
+	}
+
+	s.users[username] = user
+	return user, nil
+}
+
+func (s *memoryStore) authenticateUser(username, password string) (*User, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	user, exists := s.users[username]
+	if !exists {
+		return nil, fmt.Errorf("user not found")
+	}
+
+	if !checkPassword(password, user.PasswordHash) {
+		return nil, fmt.Errorf("invalid password")
+	}
+
+	return user, nil
+}
+
+func (s *memoryStore) getUserByUsername(username string) (*User, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	user, exists := s.users[username]
+	if !exists {
+		return nil, fmt.Errorf("user not found")
+	}
+
+	return user, nil
+}
+
+func (s *memoryStore) updateArtists(username string, artists []string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if u, ok := s.users[username]; ok {
 		u.Artists = artists
 	}
 }
@@ -69,7 +156,13 @@ func (s *memoryStore) snapshotUsers() []*User {
 	defer s.mu.RUnlock()
 	out := make([]*User, 0, len(s.users))
 	for _, u := range s.users {
-		out = append(out, &User{Email: u.Email, FullName: u.FullName, Artists: append([]string(nil), u.Artists...)})
+		out = append(out, &User{
+			ID:       u.ID,
+			Username: u.Username,
+			Email:    u.Email,
+			FullName: u.FullName,
+			Artists:  append([]string(nil), u.Artists...),
+		})
 	}
 	return out
 }
@@ -79,7 +172,7 @@ func main() {
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"http://localhost:4200", "http://127.0.0.1:4200", "*"},
 		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token", "X-User-Email"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token", "X-User-Username"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: false,
 		MaxAge:           300, // Maximum value not ignored by any of major browsers
@@ -91,11 +184,53 @@ func main() {
 	})
 
 	r.Post("/login", handleLogin)
+	r.Post("/register", handleRegister)
 	r.Post("/findMusicMatches", handleFindMatches)
 
 	addr := ":8080"
 	log.Printf("backend listening on %s", addr)
 	log.Fatal(http.ListenAndServe(addr, r))
+}
+
+func handleRegister(w http.ResponseWriter, r *http.Request) {
+	var req RegisterRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+
+	// Validate input
+	req.Username = strings.TrimSpace(req.Username)
+	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
+	req.FullName = strings.TrimSpace(req.FullName)
+
+	if req.Username == "" || req.Email == "" || req.FullName == "" || req.Password == "" {
+		writeError(w, http.StatusBadRequest, "username, email, fullName, and password are required")
+		return
+	}
+
+	if !strings.Contains(req.Email, "@") {
+		writeError(w, http.StatusBadRequest, "invalid email format")
+		return
+	}
+
+	if len(req.Password) < 6 {
+		writeError(w, http.StatusBadRequest, "password must be at least 6 characters")
+		return
+	}
+
+	// Create user
+	user, err := store.createUser(req.Username, req.Email, req.FullName, req.Password)
+	if err != nil {
+		writeError(w, http.StatusConflict, err.Error())
+		return
+	}
+
+	// Return response
+	response := AuthResponse{
+		User: *user,
+	}
+	writeJSON(w, http.StatusCreated, response)
 }
 
 func handleLogin(w http.ResponseWriter, r *http.Request) {
@@ -104,13 +239,27 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
-	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
-	if req.Email == "" || req.FullName == "" || !strings.Contains(req.Email, "@") {
-		writeError(w, http.StatusBadRequest, "email and fullName required")
+
+	// Validate input
+	req.Username = strings.TrimSpace(req.Username)
+
+	if req.Username == "" || req.Password == "" {
+		writeError(w, http.StatusBadRequest, "username and password are required")
 		return
 	}
-	u := store.upsertUser(req.Email, req.FullName)
-	writeJSON(w, http.StatusOK, map[string]any{"email": u.Email, "fullName": u.FullName, "artists": u.Artists})
+
+	// Authenticate user
+	user, err := store.authenticateUser(req.Username, req.Password)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, "invalid username or password")
+		return
+	}
+
+	// Return response
+	response := AuthResponse{
+		User: *user,
+	}
+	writeJSON(w, http.StatusOK, response)
 }
 
 func handleFindMatches(w http.ResponseWriter, r *http.Request) {
@@ -128,8 +277,8 @@ func handleFindMatches(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "no valid artists provided")
 		return
 	}
-	// For demo we piggy-back on an X-User-Email header OR first existing user with no artists
-	caller := strings.TrimSpace(strings.ToLower(r.Header.Get("X-User-Email")))
+	// For demo we piggy-back on an X-User-Username header OR first existing user with no artists
+	caller := strings.TrimSpace(r.Header.Get("X-User-Username"))
 	if caller == "" {
 		// No auth: treat as anonymous ephemeral user (not stored) unless already logged in previously via /login.
 	}
@@ -172,7 +321,7 @@ func computeMatches(target []string, caller string, users []*User) []MatchUser {
 	}
 	res := make([]MatchUser, 0)
 	for _, u := range users {
-		if caller != "" && u.Email == caller { // skip self if we know caller
+		if caller != "" && u.Username == caller { // skip self if we know caller
 			continue
 		}
 		if len(u.Artists) == 0 { // skip users without preferences

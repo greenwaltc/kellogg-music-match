@@ -43,7 +43,7 @@ bin/
 Pulumi.*.yaml
 # Keep Pulumi.yaml (project definition) but ignore stack state
 !Pulumi.yaml
-kellogg-music-match/
+kellogg-music-match
 
 # Local env / secrets
 .env

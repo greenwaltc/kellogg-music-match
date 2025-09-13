@@ -9,7 +9,7 @@ export interface MatchUser { name: string; [k: string]: any }
 export class MatchService {
   matches = signal<MatchUser[] | null>(null);
   loading = signal(false);
-  private apiBase = environment.apiBaseUrl;
+  private apiBase = window.__kmmConfig?.apiBaseUrl || environment.apiBaseUrl;
 
   constructor(private http: HttpClient, private auth: AuthService) {}
 
