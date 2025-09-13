@@ -7,7 +7,8 @@ export interface User {
   id?: string;
   username: string; 
   email: string; 
-  fullName: string; 
+  firstName: string;
+  lastName: string;
   artists?: string[]; 
 }
 
@@ -19,7 +20,8 @@ export interface LoginRequest {
 export interface RegisterRequest {
   username: string;
   email: string;
-  fullName: string;
+  firstName: string;
+  lastName: string;
   password: string;
 }
 
@@ -45,7 +47,7 @@ export class AuthService {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as User;
-        if (parsed?.email && parsed?.fullName) {
+        if (parsed?.email && parsed?.firstName && parsed?.lastName) {
           this.user.set(parsed);
         }
       }

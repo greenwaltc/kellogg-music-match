@@ -4,12 +4,15 @@ import { ReactiveFormsModule, FormBuilder, Validators, FormGroup, FormControl } 
 import { Router } from '@angular/router';
 import { AuthService } from './auth.service';
 import { MatchService } from './match.service';
+import { passwordComplexityValidator, confirmPasswordValidator, getPasswordStrength, PasswordComplexity } from './password-validators';
 
 interface LoginFormShape { 
   username: FormControl<string | null>; 
   email: FormControl<string | null>; 
-  fullName: FormControl<string | null>; 
+  firstName: FormControl<string | null>; 
+  lastName: FormControl<string | null>;
   password: FormControl<string | null>; 
+  confirmPassword: FormControl<string | null>;
 }
 
 @Component({
@@ -52,19 +55,87 @@ interface LoginFormShape {
           <div class="error" *ngIf="form.get('email')?.touched && form.get('email')?.invalid">Valid email required</div>
         </div>
 
-        <div class="field" *ngIf="isRegisterMode">
-          <label for="fullName">Full Name</label>
-          <input id="fullName" type="text" formControlName="fullName" placeholder="Full Name" />
-          <div class="error" *ngIf="form.get('fullName')?.touched && form.get('fullName')?.invalid">Name required (min 2 chars)</div>
+        <div class="name-fields" *ngIf="isRegisterMode">
+          <div class="field">
+            <label for="firstName">First Name</label>
+            <input id="firstName" type="text" formControlName="firstName" placeholder="First Name" />
+            <div class="error" *ngIf="form.get('firstName')?.touched && form.get('firstName')?.invalid">First name required</div>
+          </div>
+          
+          <div class="field">
+            <label for="lastName">Last Name</label>
+            <input id="lastName" type="text" formControlName="lastName" placeholder="Last Name" />
+            <div class="error" *ngIf="form.get('lastName')?.touched && form.get('lastName')?.invalid">Last name required</div>
+          </div>
         </div>
 
         <div class="field">
           <label for="password">Password</label>
-          <input id="password" type="password" formControlName="password" placeholder="Password" />
-          <div class="error" *ngIf="form.get('password')?.touched && form.get('password')?.invalid">Password required (min 6 chars)</div>
+          <div class="password-input-container">
+            <input id="password" [type]="showPassword ? 'text' : 'password'" formControlName="password" placeholder="Password" (input)="onPasswordInput()" />
+            <button type="button" class="password-toggle" (click)="togglePasswordVisibility()">
+              {{ showPassword ? 'Hide' : 'Show' }}
+            </button>
+          </div>
+          
+          <!-- Password requirements (only show during registration) -->
+          <div class="password-requirements" *ngIf="isRegisterMode">
+            <div class="requirement-header">Password Requirements:</div>
+            <div class="requirements-list">
+              <div class="requirement" [class.met]="passwordComplexity.minLength">
+                <span class="requirement-icon">{{ passwordComplexity.minLength ? '✓' : '○' }}</span>
+                At least 8 characters
+              </div>
+              <div class="requirement" [class.met]="passwordComplexity.hasUpperCase">
+                <span class="requirement-icon">{{ passwordComplexity.hasUpperCase ? '✓' : '○' }}</span>
+                One uppercase letter
+              </div>
+              <div class="requirement" [class.met]="passwordComplexity.hasLowerCase">
+                <span class="requirement-icon">{{ passwordComplexity.hasLowerCase ? '✓' : '○' }}</span>
+                One lowercase letter
+              </div>
+              <div class="requirement" [class.met]="passwordComplexity.hasNumber">
+                <span class="requirement-icon">{{ passwordComplexity.hasNumber ? '✓' : '○' }}</span>
+                One number
+              </div>
+              <div class="requirement" [class.met]="passwordComplexity.hasSpecialChar">
+                <span class="requirement-icon">{{ passwordComplexity.hasSpecialChar ? '✓' : '○' }}</span>
+                One special character (!&#64;#$%^&*_)
+              </div>
+            </div>
+            
+            <!-- Password strength indicator -->
+            <div class="password-strength" *ngIf="passwordStrength.score > 0">
+              <div class="strength-bar">
+                <div class="strength-fill" 
+                     [style.width.%]="(passwordStrength.score / 5) * 100"
+                     [style.background-color]="passwordStrength.color"></div>
+              </div>
+              <span class="strength-label" [style.color]="passwordStrength.color">
+                {{ passwordStrength.label }}
+              </span>
+            </div>
+          </div>
+          
+          <div class="error" *ngIf="form.get('password')?.touched && form.get('password')?.invalid && !isRegisterMode">
+            Password required (min 6 chars)
+          </div>
         </div>
 
-        <button type="submit" class="primary-btn" [disabled]="auth.loading()">
+        <div class="field" *ngIf="isRegisterMode">
+          <label for="confirmPassword">Confirm Password</label>
+          <div class="password-input-container">
+            <input id="confirmPassword" [type]="showConfirmPassword ? 'text' : 'password'" formControlName="confirmPassword" placeholder="Confirm Password" (input)="onConfirmPasswordInput()" />
+            <button type="button" class="password-toggle" (click)="toggleConfirmPasswordVisibility()">
+              {{ showConfirmPassword ? 'Hide' : 'Show' }}
+            </button>
+          </div>
+          <div class="error" *ngIf="showPasswordMismatchError()">
+            Passwords do not match
+          </div>
+        </div>
+
+        <button type="submit" class="primary-btn" [disabled]="auth.loading() || (isRegisterMode && !isPasswordValid())">
           {{ auth.loading() ? 'Processing...' : (isRegisterMode ? 'Create Account' : 'Sign In') }}
         </button>
         
@@ -91,9 +162,36 @@ interface LoginFormShape {
   .auth-form h2 { margin:0 0 1.25rem; font-size:1.05rem; letter-spacing:0.11em; text-transform:uppercase; font-weight:600; color:var(--color-text-muted); }
     .field { margin-bottom:1rem; }
     .field input { width:100%; }
+    
+  /* Name fields side by side */
+  .name-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+  .name-fields .field { margin-bottom: 0; }
+  
+  /* Password input with toggle */
+  .password-input-container { position: relative; }
+  .password-input-container input { padding-right: 4rem; }
+  .password-toggle { position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 0.8rem; color: var(--color-text-muted); transition: color 0.2s ease; font-weight: 500; }
+  .password-toggle:hover { color: var(--color-text); }
+  .password-toggle:focus { outline: none; color: var(--color-accent); }
+  
+  /* Password requirements styling */
+  .password-requirements { margin-top: 0.75rem; padding: 0.75rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px; font-size: 0.85rem; }
+  .requirement-header { font-weight: 600; color: var(--color-text); margin-bottom: 0.5rem; }
+  .requirements-list { display: flex; flex-direction: column; gap: 0.25rem; }
+  .requirement { display: flex; align-items: center; gap: 0.5rem; color: var(--color-text-muted); transition: color 0.2s ease; }
+  .requirement.met { color: var(--color-accent); }
+  .requirement-icon { font-weight: bold; width: 1rem; text-align: center; }
+  
+  /* Password strength indicator */
+  .password-strength { margin-top: 0.75rem; }
+  .strength-bar { height: 4px; background: var(--color-border); border-radius: 2px; overflow: hidden; margin-bottom: 0.25rem; }
+  .strength-fill { height: 100%; transition: width 0.3s ease, background-color 0.3s ease; border-radius: 2px; }
+  .strength-label { font-size: 0.75rem; font-weight: 600; }
+  
   .primary-btn { width:100%; justify-content:center; background:linear-gradient(135deg,var(--color-accent),var(--color-accent-alt)); box-shadow:0 4px 18px -6px rgba(0,0,0,0.5); transition: transform .25s ease, box-shadow .25s ease; }
   .primary-btn:hover:not([disabled]) { transform:translateY(-2px); box-shadow:0 8px 24px -8px rgba(0,0,0,0.55); }
   .primary-btn:active { transform:translateY(0); }
+  .primary-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
   .legal { margin-top:1.25rem; font-size:0.7rem; color:var(--color-text-muted); letter-spacing:0.05em; }
   .fade-in { animation: fade-in .8s ease; }
   .slide-down { animation: slide-down .7s cubic-bezier(.25,.7,.3,1); }
@@ -101,13 +199,28 @@ interface LoginFormShape {
   @keyframes slide-down { from { transform:translateY(-18px); opacity:0; } to { transform:translateY(0); opacity:1; } }
   @keyframes float-in { from { transform:translateY(18px) scale(.98); opacity:0; } to { transform:translateY(0) scale(1); opacity:1; } }
     .form-error { margin-top:0.75rem; text-align:center; }
-    @media (max-width:600px){ .hero-inner h1 { font-size:1.9rem; } .auth-form { padding:1.5rem 1.25rem 1.75rem; } }
+    @media (max-width:600px){ 
+      .hero-inner h1 { font-size:1.9rem; } 
+      .auth-form { padding:1.5rem 1.25rem 1.75rem; } 
+      .name-fields { grid-template-columns: 1fr; gap: 0; }
+      .name-fields .field { margin-bottom: 1rem; }
+    }
     `
   ]
 })
 export class LoginComponent {
   form!: FormGroup<LoginFormShape>;
   isRegisterMode = false;
+  showPassword = false;
+  showConfirmPassword = false;
+  passwordComplexity: PasswordComplexity = {
+    minLength: false,
+    hasUpperCase: false,
+    hasLowerCase: false,
+    hasNumber: false,
+    hasSpecialChar: false
+  };
+  passwordStrength = { score: 0, label: 'Enter password', color: '#6b7280' };
 
   constructor(private fb: FormBuilder, public auth: AuthService, private router: Router, private matches: MatchService) {
     this.initializeForm();
@@ -117,8 +230,10 @@ export class LoginComponent {
     this.form = this.fb.group<LoginFormShape>({
       username: this.fb.control<string | null>('', [Validators.required, Validators.minLength(3)]),
       email: this.fb.control<string | null>('', [Validators.required, Validators.email]),
-      fullName: this.fb.control<string | null>('', [Validators.required, Validators.minLength(2)]),
-      password: this.fb.control<string | null>('', [Validators.required, Validators.minLength(6)])
+      firstName: this.fb.control<string | null>('', [Validators.required, Validators.minLength(2)]),
+      lastName: this.fb.control<string | null>('', [Validators.required, Validators.minLength(2)]),
+      password: this.fb.control<string | null>('', [Validators.required, Validators.minLength(6)]),
+      confirmPassword: this.fb.control<string | null>('', [Validators.required])
     });
     this.updateValidators();
   }
@@ -127,23 +242,76 @@ export class LoginComponent {
     this.isRegisterMode = isRegister;
     this.auth.error.set(null);
     this.form.reset();
+    this.passwordComplexity = {
+      minLength: false,
+      hasUpperCase: false,
+      hasLowerCase: false,
+      hasNumber: false,
+      hasSpecialChar: false
+    };
+    this.passwordStrength = { score: 0, label: 'Enter password', color: '#6b7280' };
     this.updateValidators();
   }
 
   private updateValidators(): void {
     const emailControl = this.form.get('email');
-    const fullNameControl = this.form.get('fullName');
+    const firstNameControl = this.form.get('firstName');
+    const lastNameControl = this.form.get('lastName');
+    const passwordControl = this.form.get('password');
+    const confirmPasswordControl = this.form.get('confirmPassword');
     
     if (this.isRegisterMode) {
       emailControl?.setValidators([Validators.required, Validators.email]);
-      fullNameControl?.setValidators([Validators.required, Validators.minLength(2)]);
+      firstNameControl?.setValidators([Validators.required, Validators.minLength(2)]);
+      lastNameControl?.setValidators([Validators.required, Validators.minLength(2)]);
+      passwordControl?.setValidators([Validators.required, passwordComplexityValidator()]);
+      confirmPasswordControl?.setValidators([Validators.required, confirmPasswordValidator('password')]);
     } else {
       emailControl?.clearValidators();
-      fullNameControl?.clearValidators();
+      firstNameControl?.clearValidators();
+      lastNameControl?.clearValidators();
+      passwordControl?.setValidators([Validators.required, Validators.minLength(6)]);
+      confirmPasswordControl?.clearValidators();
     }
     
     emailControl?.updateValueAndValidity();
-    fullNameControl?.updateValueAndValidity();
+    firstNameControl?.updateValueAndValidity();
+    lastNameControl?.updateValueAndValidity();
+    passwordControl?.updateValueAndValidity();
+    confirmPasswordControl?.updateValueAndValidity();
+  }
+
+  onPasswordInput(): void {
+    const password = this.form.get('password')?.value || '';
+    
+    this.passwordComplexity = {
+      minLength: password.length >= 8,
+      hasUpperCase: /[A-Z]/.test(password),
+      hasLowerCase: /[a-z]/.test(password),
+      hasNumber: /[0-9]/.test(password),
+      hasSpecialChar: /[!@#$%^&*(),.?":{}|<>_]/.test(password)
+    };
+
+    this.passwordStrength = getPasswordStrength(password);
+
+    // Trigger validation for confirm password if it has a value
+    const confirmPasswordControl = this.form.get('confirmPassword');
+    if (confirmPasswordControl?.value) {
+      confirmPasswordControl.updateValueAndValidity();
+    }
+  }
+
+  isPasswordValid(): boolean {
+    if (!this.isRegisterMode) return true;
+    
+    const passwordControl = this.form.get('password');
+    const confirmPasswordControl = this.form.get('confirmPassword');
+    
+    return !!(
+      passwordControl?.valid && 
+      confirmPasswordControl?.valid &&
+      Object.values(this.passwordComplexity).every(req => req)
+    );
   }
 
   submit(): void {
@@ -152,13 +320,14 @@ export class LoginComponent {
       return; 
     }
     
-    const { username, email, fullName, password } = this.form.value;
+    const { username, email, firstName, lastName, password } = this.form.value;
     
     if (this.isRegisterMode) {
       const registerData = {
         username: username || '',
         email: email || '',
-        fullName: fullName || '',
+        firstName: firstName || '',
+        lastName: lastName || '',
         password: password || ''
       };
       
@@ -183,5 +352,29 @@ export class LoginComponent {
         }
       });
     }
+  }
+
+  onConfirmPasswordInput(): void {
+    // Trigger validation for confirm password
+    const confirmPasswordControl = this.form.get('confirmPassword');
+    if (confirmPasswordControl) {
+      confirmPasswordControl.updateValueAndValidity();
+    }
+  }
+
+  showPasswordMismatchError(): boolean {
+    const password = this.form.get('password')?.value;
+    const confirmPassword = this.form.get('confirmPassword')?.value;
+    
+    // Show error if confirm password has content and doesn't match password
+    return !!(confirmPassword && password !== confirmPassword);
+  }
+
+  togglePasswordVisibility(): void {
+    this.showPassword = !this.showPassword;
+  }
+
+  toggleConfirmPasswordVisibility(): void {
+    this.showConfirmPassword = !this.showConfirmPassword;
   }
 }

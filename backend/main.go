@@ -22,7 +22,8 @@ type User struct {
 	ID           string   `json:"id"`
 	Username     string   `json:"username"`
 	Email        string   `json:"email"`
-	FullName     string   `json:"fullName"`
+	FirstName    string   `json:"firstName"`
+	LastName     string   `json:"lastName"`
 	PasswordHash string   `json:"-"` // Never return password hash in JSON
 	Artists      []string `json:"artists,omitempty"`
 }
@@ -33,10 +34,11 @@ type LoginRequest struct {
 }
 
 type RegisterRequest struct {
-	Username string `json:"username"`
-	Email    string `json:"email"`
-	FullName string `json:"fullName"`
-	Password string `json:"password"`
+	Username  string `json:"username"`
+	Email     string `json:"email"`
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
+	Password  string `json:"password"`
 }
 
 type AuthResponse struct {
@@ -79,7 +81,7 @@ func generateUserID() string {
 	return hex.EncodeToString(bytes)
 }
 
-func (s *memoryStore) createUser(username, email, fullName, password string) (*User, error) {
+func (s *memoryStore) createUser(username, email, firstName, lastName, password string) (*User, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -106,7 +108,8 @@ func (s *memoryStore) createUser(username, email, fullName, password string) (*U
 		ID:           generateUserID(),
 		Username:     username,
 		Email:        email,
-		FullName:     fullName,
+		FirstName:    firstName,
+		LastName:     lastName,
 		PasswordHash: hashedPassword,
 		Artists:      []string{},
 	}
@@ -157,11 +160,12 @@ func (s *memoryStore) snapshotUsers() []*User {
 	out := make([]*User, 0, len(s.users))
 	for _, u := range s.users {
 		out = append(out, &User{
-			ID:       u.ID,
-			Username: u.Username,
-			Email:    u.Email,
-			FullName: u.FullName,
-			Artists:  append([]string(nil), u.Artists...),
+			ID:        u.ID,
+			Username:  u.Username,
+			Email:     u.Email,
+			FirstName: u.FirstName,
+			LastName:  u.LastName,
+			Artists:   append([]string(nil), u.Artists...),
 		})
 	}
 	return out
@@ -202,10 +206,11 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 	// Validate input
 	req.Username = strings.TrimSpace(req.Username)
 	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
-	req.FullName = strings.TrimSpace(req.FullName)
+	req.FirstName = strings.TrimSpace(req.FirstName)
+	req.LastName = strings.TrimSpace(req.LastName)
 
-	if req.Username == "" || req.Email == "" || req.FullName == "" || req.Password == "" {
-		writeError(w, http.StatusBadRequest, "username, email, fullName, and password are required")
+	if req.Username == "" || req.Email == "" || req.FirstName == "" || req.LastName == "" || req.Password == "" {
+		writeError(w, http.StatusBadRequest, "username, email, firstName, lastName, and password are required")
 		return
 	}
 
@@ -220,7 +225,7 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create user
-	user, err := store.createUser(req.Username, req.Email, req.FullName, req.Password)
+	user, err := store.createUser(req.Username, req.Email, req.FirstName, req.LastName, req.Password)
 	if err != nil {
 		writeError(w, http.StatusConflict, err.Error())
 		return
@@ -341,7 +346,7 @@ func computeMatches(target []string, caller string, users []*User) []MatchUser {
 		jaccard := float64(ov) / union
 		// Weighted score: overlap weight 0.7 + jaccard 0.3
 		score := 0.7*float64(ov)/float64(len(set)) + 0.3*jaccard
-		res = append(res, MatchUser{Name: u.FullName, Overlap: ov, Score: math.Round(score*1000) / 1000})
+		res = append(res, MatchUser{Name: u.FirstName + " " + u.LastName, Overlap: ov, Score: math.Round(score*1000) / 1000})
 	}
 	// sort by score desc, then overlap desc, then name
 	sort.Slice(res, func(i, j int) bool {

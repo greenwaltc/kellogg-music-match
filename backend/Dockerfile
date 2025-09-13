@@ -18,7 +18,8 @@ COPY . .
 
 # Build with security hardening flags
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
-    go build -ldflags='-s -w -extldflags "-static"' -a -installsuffix cgo -o server .
+    go build -ldflags='-s -w -extldflags "-static"' -a -installsuffix cgo -o server . && \
+    chmod +x server
 
 # 2. Runtime stage
 FROM gcr.io/distroless/static-debian12:nonroot
@@ -27,7 +28,7 @@ FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 WORKDIR /app
-COPY --from=build --chmod=755 /app/server /app/server
+COPY --from=build /app/server /app/server
 
 EXPOSE 8080
 USER nonroot
