@@ -1,8 +1,6 @@
 # Backend Dockerfile
 # 1. Build stage
 FROM golang:1.22-alpine AS build
-ARG TARGETOS=linux
-ARG TARGETARCH=amd64
 
 # Install ca-certificates for HTTPS requests
 RUN apk --no-cache add ca-certificates
@@ -16,9 +14,9 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build with security hardening flags
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
-    go build -ldflags='-s -w -extldflags "-static"' -a -installsuffix cgo -o server . && \
+# Build with security hardening flags  
+RUN CGO_ENABLED=0 \
+    go build -ldflags='-s -w -extldflags "-static"' -a -installsuffix cgo -o server ./cmd && \
     chmod +x server
 
 # 2. Runtime stage

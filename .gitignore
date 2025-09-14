@@ -36,6 +36,7 @@ ui/coverage/
 **/*.test
 **/*.out
 bin/
+backend/generated/**/*
 #! Keeping go.sum tracked for Go module integrity.
 
 # ---- Pulumi ----

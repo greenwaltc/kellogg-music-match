@@ -1,0 +1,448 @@
+openapi: 3.0.3
+info:
+  title: Kellogg Music Match API
+  description: |
+    REST API for the Kellogg Music Match application that enables users to register, authenticate, 
+    and find music taste matches based on favorite artists.
+    
+    ## Features
+    - User registration with password validation
+    - Secure authentication with bcrypt password hashing
+    - Artist preference management
+    - Music taste matching algorithm with overlap scoring
+    - In-memory data storage (suitable for prototyping)
+  version: 1.0.0
+  contact:
+    name: Kellogg Music Match Team
+    url: https://github.com/greenwaltc/kellogg-music-match
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+  - url: https://api.kellogg-music-match.com
+    description: Production server
+
+tags:
+  - name: Authentication
+    description: User registration and login operations
+  - name: Matching
+    description: Music taste matching and artist management
+  - name: Health
+    description: Service health and monitoring
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check endpoint
+      description: Returns the current status and timestamp of the service
+      operationId: getHealth
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+                    description: Service status indicator
+                  time:
+                    type: string
+                    format: date-time
+                    example: "2025-09-13T04:32:51Z"
+                    description: Current server timestamp in ISO 8601 format
+                required:
+                  - status
+                  - time
+
+  /register:
+    post:
+      tags:
+        - Authentication
+      summary: Register a new user
+      description: |
+        Creates a new user account with secure password hashing. All fields are required.
+        Username and email must be unique across all users.
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            examples:
+              validUser:
+                summary: Valid user registration
+                value:
+                  username: "student123"
+                  email: "student@kellogg.northwestern.edu"
+                  firstName: "Jane"
+                  lastName: "Doe"
+                  password: "SecurePass123!"
+      responses:
+        '201':
+          description: User successfully created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missingFields:
+                  summary: Missing required fields
+                  value:
+                    message: "username, email, firstName, lastName, and password are required"
+                invalidEmail:
+                  summary: Invalid email format
+                  value:
+                    message: "invalid email format"
+                shortPassword:
+                  summary: Password too short
+                  value:
+                    message: "password must be at least 6 characters"
+        '409':
+          description: Username or email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                usernameExists:
+                  summary: Username already taken
+                  value:
+                    message: "username already exists"
+                emailExists:
+                  summary: Email already registered
+                  value:
+                    message: "email already exists"
+
+  /login:
+    post:
+      tags:
+        - Authentication
+      summary: Authenticate user
+      description: |
+        Authenticates a user with username and password. Returns user information 
+        including any previously saved artist preferences.
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            examples:
+              validLogin:
+                summary: Valid login credentials
+                value:
+                  username: "student123"
+                  password: "SecurePass123!"
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Invalid request format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missingCredentials:
+                  summary: Missing username or password
+                  value:
+                    message: "username and password are required"
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidCredentials:
+                  summary: Invalid username or password
+                  value:
+                    message: "invalid username or password"
+
+  /findMusicMatches:
+    post:
+      tags:
+        - Matching
+      summary: Find music taste matches
+      description: |
+        Finds users with similar music taste based on artist overlap. Returns up to 5 best matches
+        ranked by a combination of overlap count and Jaccard similarity score.
+        
+        ## Scoring Algorithm
+        - **Overlap**: Number of shared artists between users
+        - **Jaccard Similarity**: Intersection over union of artist sets
+        - **Final Score**: 70% overlap weight + 30% Jaccard weight
+        
+        Results are sorted by score (desc), then overlap (desc), then name (asc).
+      operationId: findMusicMatches
+      parameters:
+        - name: X-User-Username
+          in: header
+          required: false
+          description: |
+            Optional username to associate the submitted artists with a registered user.
+            If provided, the user's artist preferences will be updated with the submitted list.
+          schema:
+            type: string
+          example: "student123"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ArtistsRequest'
+            examples:
+              typicalRequest:
+                summary: Typical artist list
+                value:
+                  artists: ["Taylor Swift", "The Beatles", "Radiohead", "Beyoncé"]
+              singleArtist:
+                summary: Single artist
+                value:
+                  artists: ["Ed Sheeran"]
+      responses:
+        '200':
+          description: Matches found successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MatchUser'
+                maxItems: 5
+                description: Up to 5 best matching users, sorted by score
+              examples:
+                withMatches:
+                  summary: Found matching users
+                  value:
+                    - name: "Alice Johnson"
+                      overlap: 3
+                      score: 0.812
+                    - name: "Bob Smith" 
+                      overlap: 2
+                      score: 0.667
+                    - name: "Carol Davis"
+                      overlap: 1
+                      score: 0.445
+                noMatches:
+                  summary: No matches found
+                  value: []
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                noArtists:
+                  summary: No artists provided
+                  value:
+                    message: "artists required"
+                invalidArtists:
+                  summary: No valid artists after cleanup
+                  value:
+                    message: "no valid artists provided"
+
+components:
+  schemas:
+    User:
+      type: object
+      description: User profile information
+      properties:
+        id:
+          type: string
+          description: Unique user identifier (hex-encoded UUID)
+          example: "a1b2c3d4e5f6789012345678901234567890abcd"
+        username:
+          type: string
+          description: Unique username for authentication
+          minLength: 1
+          example: "student123"
+        email:
+          type: string
+          format: email
+          description: User's email address (unique)
+          example: "student@kellogg.northwestern.edu"
+        firstName:
+          type: string
+          description: User's first name
+          minLength: 1
+          example: "Jane"
+        lastName:
+          type: string
+          description: User's last name
+          minLength: 1
+          example: "Doe"
+        artists:
+          type: array
+          items:
+            type: string
+          description: List of user's favorite artists (can be empty)
+          example: ["Taylor Swift", "The Beatles", "Radiohead"]
+      required:
+        - id
+        - username
+        - email
+        - firstName
+        - lastName
+        - artists
+
+    RegisterRequest:
+      type: object
+      description: User registration data
+      properties:
+        username:
+          type: string
+          description: Desired username (must be unique)
+          minLength: 1
+          example: "student123"
+        email:
+          type: string
+          format: email
+          description: Email address (must be unique and valid)
+          example: "student@kellogg.northwestern.edu"
+        firstName:
+          type: string
+          description: User's first name
+          minLength: 1
+          example: "Jane"
+        lastName:
+          type: string
+          description: User's last name
+          minLength: 1
+          example: "Doe"
+        password:
+          type: string
+          description: Password (minimum 6 characters, recommend 8+ with complexity)
+          minLength: 6
+          format: password
+          example: "SecurePass123!"
+      required:
+        - username
+        - email
+        - firstName
+        - lastName
+        - password
+
+    LoginRequest:
+      type: object
+      description: User authentication credentials
+      properties:
+        username:
+          type: string
+          description: Username for authentication
+          minLength: 1
+          example: "student123"
+        password:
+          type: string
+          description: User password
+          minLength: 1
+          format: password
+          example: "SecurePass123!"
+      required:
+        - username
+        - password
+
+    AuthResponse:
+      type: object
+      description: Authentication response containing user information
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        token:
+          type: string
+          description: Authentication token (currently unused, reserved for JWT implementation)
+          nullable: true
+          example: null
+      required:
+        - user
+
+    ArtistsRequest:
+      type: object
+      description: Request to find music matches based on artist preferences
+      properties:
+        artists:
+          type: array
+          items:
+            type: string
+            minLength: 1
+          description: |
+            List of favorite artists. Duplicates and empty strings are automatically removed.
+            Artist names are case-insensitive for matching purposes.
+          minItems: 1
+          example: ["Taylor Swift", "The Beatles", "Radiohead", "Beyoncé"]
+      required:
+        - artists
+
+    MatchUser:
+      type: object
+      description: A user with similar music taste
+      properties:
+        name:
+          type: string
+          description: Full name of the matching user (firstName + lastName)
+          example: "Alice Johnson"
+        overlap:
+          type: integer
+          description: Number of shared artists between the query and this user
+          minimum: 1
+          example: 3
+        score:
+          type: number
+          format: float
+          description: |
+            Similarity score calculated from overlap count and Jaccard similarity.
+            Range is typically 0.0 to 1.0, with higher values indicating better matches.
+          minimum: 0
+          maximum: 1
+          example: 0.812
+      required:
+        - name
+        - overlap
+        - score
+
+    ErrorResponse:
+      type: object
+      description: Standard error response format
+      properties:
+        message:
+          type: string
+          description: Human-readable error description
+          example: "username already exists"
+      required:
+        - message
+
+  securitySchemes:
+    # Reserved for future JWT implementation
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token authentication (not currently implemented)
+
+# Global security (currently none, but reserved for future JWT)
+security: []
+
+externalDocs:
+  description: Project Repository
+  url: https://github.com/greenwaltc/kellogg-music-match
