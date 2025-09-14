@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+
 	appsv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/apps/v1"
 	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/core/v1"
 	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
@@ -10,6 +12,16 @@ import (
 
 func main() {
 	pulumi.Run(func(ctx *pulumi.Context) error {
+		// Read database schema and init script files
+		schemaContent, err := os.ReadFile("../DATABASE_SCHEMA.sql")
+		if err != nil {
+			return err
+		}
+
+		initScriptContent, err := os.ReadFile("../init-database.sh")
+		if err != nil {
+			return err
+		}
 		// Create the namespace
 		namespace, err := corev1.NewNamespace(ctx, "kellogg-music-match", &corev1.NamespaceArgs{
 			Metadata: &metav1.ObjectMetaArgs{
@@ -347,6 +359,222 @@ func main() {
 			return err
 		}
 
+		// Create PostgreSQL Secret
+		pgSecret, err := corev1.NewSecret(ctx, "postgres-secret", &corev1.SecretArgs{
+			Metadata: &metav1.ObjectMetaArgs{
+				Name:      pulumi.String("postgres-secret"),
+				Namespace: namespace.Metadata.Name(),
+				Labels: pulumi.StringMap{
+					"app":       pulumi.String("kellogg-music-match"),
+					"component": pulumi.String("database"),
+				},
+			},
+			StringData: pulumi.StringMap{
+				"POSTGRES_USER":     pulumi.String("kellogg_user"),
+				"POSTGRES_PASSWORD": pulumi.String("kellogg_secure_pass_2024"),
+				"POSTGRES_DB":       pulumi.String("kellogg_music_match"),
+			},
+		})
+		if err != nil {
+			return err
+		}
+
+		// Create PostgreSQL ConfigMap with schema and init script
+		pgConfigMap, err := corev1.NewConfigMap(ctx, "postgres-config", &corev1.ConfigMapArgs{
+			Metadata: &metav1.ObjectMetaArgs{
+				Name:      pulumi.String("postgres-config"),
+				Namespace: namespace.Metadata.Name(),
+				Labels: pulumi.StringMap{
+					"app":       pulumi.String("kellogg-music-match"),
+					"component": pulumi.String("database"),
+				},
+			},
+			Data: pulumi.StringMap{
+				"PGDATA":              pulumi.String("/var/lib/postgresql/data/pgdata"),
+				"init-database.sh":    pulumi.String(string(initScriptContent)),
+				"DATABASE_SCHEMA.sql": pulumi.String(string(schemaContent)),
+			},
+		})
+		if err != nil {
+			return err
+		}
+
+		// Create PostgreSQL StatefulSet
+		pgStatefulSet, err := appsv1.NewStatefulSet(ctx, "postgres-statefulset", &appsv1.StatefulSetArgs{
+			Metadata: &metav1.ObjectMetaArgs{
+				Name:      pulumi.String("postgres"),
+				Namespace: namespace.Metadata.Name(),
+				Labels: pulumi.StringMap{
+					"app":       pulumi.String("kellogg-music-match"),
+					"component": pulumi.String("database"),
+				},
+			},
+			Spec: &appsv1.StatefulSetSpecArgs{
+				ServiceName: pulumi.String("postgres"),
+				Replicas:    pulumi.Int(1),
+				Selector: &metav1.LabelSelectorArgs{
+					MatchLabels: pulumi.StringMap{
+						"app":       pulumi.String("kellogg-music-match"),
+						"component": pulumi.String("database"),
+					},
+				},
+				Template: &corev1.PodTemplateSpecArgs{
+					Metadata: &metav1.ObjectMetaArgs{
+						Labels: pulumi.StringMap{
+							"app":       pulumi.String("kellogg-music-match"),
+							"component": pulumi.String("database"),
+						},
+					},
+					Spec: &corev1.PodSpecArgs{
+						ServiceAccountName: serviceAccount.Metadata.Name(),
+						Containers: corev1.ContainerArray{
+							&corev1.ContainerArgs{
+								Name:  pulumi.String("postgres"),
+								Image: pulumi.String("postgres:15-alpine"),
+								Ports: corev1.ContainerPortArray{
+									&corev1.ContainerPortArgs{
+										ContainerPort: pulumi.Int(5432),
+										Name:          pulumi.String("postgres"),
+									},
+								},
+								EnvFrom: corev1.EnvFromSourceArray{
+									&corev1.EnvFromSourceArgs{
+										SecretRef: &corev1.SecretEnvSourceArgs{
+											Name: pgSecret.Metadata.Name(),
+										},
+									},
+									&corev1.EnvFromSourceArgs{
+										ConfigMapRef: &corev1.ConfigMapEnvSourceArgs{
+											Name: pgConfigMap.Metadata.Name(),
+										},
+									},
+								},
+								VolumeMounts: corev1.VolumeMountArray{
+									&corev1.VolumeMountArgs{
+										Name:      pulumi.String("postgres-storage"),
+										MountPath: pulumi.String("/var/lib/postgresql/data"),
+									},
+									&corev1.VolumeMountArgs{
+										Name:      pulumi.String("init-scripts"),
+										MountPath: pulumi.String("/docker-entrypoint-initdb.d"),
+										ReadOnly:  pulumi.Bool(true),
+									},
+								},
+								Resources: &corev1.ResourceRequirementsArgs{
+									Requests: pulumi.StringMap{
+										"cpu":    pulumi.String("100m"),
+										"memory": pulumi.String("256Mi"),
+									},
+									Limits: pulumi.StringMap{
+										"cpu":    pulumi.String("500m"),
+										"memory": pulumi.String("512Mi"),
+									},
+								},
+								LivenessProbe: &corev1.ProbeArgs{
+									Exec: &corev1.ExecActionArgs{
+										Command: pulumi.StringArray{
+											pulumi.String("pg_isready"),
+											pulumi.String("-U"),
+											pulumi.String("kellogg_user"),
+											pulumi.String("-d"),
+											pulumi.String("kellogg_music_match"),
+										},
+									},
+									InitialDelaySeconds: pulumi.Int(30),
+									PeriodSeconds:       pulumi.Int(10),
+									TimeoutSeconds:      pulumi.Int(5),
+									FailureThreshold:    pulumi.Int(3),
+								},
+								ReadinessProbe: &corev1.ProbeArgs{
+									Exec: &corev1.ExecActionArgs{
+										Command: pulumi.StringArray{
+											pulumi.String("pg_isready"),
+											pulumi.String("-U"),
+											pulumi.String("kellogg_user"),
+											pulumi.String("-d"),
+											pulumi.String("kellogg_music_match"),
+										},
+									},
+									InitialDelaySeconds: pulumi.Int(5),
+									PeriodSeconds:       pulumi.Int(5),
+									TimeoutSeconds:      pulumi.Int(3),
+									FailureThreshold:    pulumi.Int(3),
+								},
+							},
+						},
+						Volumes: corev1.VolumeArray{
+							&corev1.VolumeArgs{
+								Name: pulumi.String("init-scripts"),
+								ConfigMap: &corev1.ConfigMapVolumeSourceArgs{
+									Name: pgConfigMap.Metadata.Name(),
+									Items: corev1.KeyToPathArray{
+										&corev1.KeyToPathArgs{
+											Key:  pulumi.String("init-database.sh"),
+											Path: pulumi.String("init-database.sh"),
+											Mode: pulumi.Int(0755),
+										},
+										&corev1.KeyToPathArgs{
+											Key:  pulumi.String("DATABASE_SCHEMA.sql"),
+											Path: pulumi.String("DATABASE_SCHEMA.sql"),
+											Mode: pulumi.Int(0644),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				VolumeClaimTemplates: corev1.PersistentVolumeClaimTypeArray{
+					&corev1.PersistentVolumeClaimTypeArgs{
+						Metadata: &metav1.ObjectMetaArgs{
+							Name: pulumi.String("postgres-storage"),
+						},
+						Spec: &corev1.PersistentVolumeClaimSpecArgs{
+							AccessModes: pulumi.StringArray{
+								pulumi.String("ReadWriteOnce"),
+							},
+							Resources: &corev1.VolumeResourceRequirementsArgs{
+								Requests: pulumi.StringMap{
+									"storage": pulumi.String("10Gi"),
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+		if err != nil {
+			return err
+		}
+
+		// Create PostgreSQL Service
+		pgService, err := corev1.NewService(ctx, "postgres-service", &corev1.ServiceArgs{
+			Metadata: &metav1.ObjectMetaArgs{
+				Name:      pulumi.String("postgres"),
+				Namespace: namespace.Metadata.Name(),
+				Labels: pulumi.StringMap{
+					"app":       pulumi.String("kellogg-music-match"),
+					"component": pulumi.String("database"),
+				},
+			},
+			Spec: &corev1.ServiceSpecArgs{
+				Selector: pulumi.StringMap{
+					"app":       pulumi.String("kellogg-music-match"),
+					"component": pulumi.String("database"),
+				},
+				Ports: corev1.ServicePortArray{
+					&corev1.ServicePortArgs{
+						Name:       pulumi.String("postgres"),
+						Port:       pulumi.Int(5432),
+						TargetPort: pulumi.String("postgres"),
+					},
+				},
+			},
+		})
+		if err != nil {
+			return err
+		}
+
 		// Export useful information
 		ctx.Export("namespaceName", namespace.Metadata.Name())
 		ctx.Export("serviceAccountName", serviceAccount.Metadata.Name())
@@ -355,6 +583,9 @@ func main() {
 		ctx.Export("uiDeploymentName", uiDeployment.Metadata.Name())
 		ctx.Export("uiServiceName", uiService.Metadata.Name())
 		ctx.Export("ingressName", ingress.Metadata.Name())
+		ctx.Export("postgresStatefulSetName", pgStatefulSet.Metadata.Name())
+		ctx.Export("postgresServiceName", pgService.Metadata.Name())
+		ctx.Export("postgresSecretName", pgSecret.Metadata.Name())
 
 		// Export application URLs
 		ctx.Export("uiUrl", pulumi.String("http://kmm-ui.traefik.me"))

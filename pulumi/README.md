@@ -73,9 +73,24 @@ The Pulumi program creates the following Kubernetes resources:
 - **Replicas**: 2
 - **Port**: 8080
 - **Health Checks**: `/health` endpoint
+- **Database Environment Variables**: Pre-configured for PostgreSQL connection
 - **Resources**: 
   - Requests: 100m CPU, 128Mi memory
   - Limits: 500m CPU, 512Mi memory
+
+### PostgreSQL Database
+- **StatefulSet**: `postgres`
+- **Service**: `postgres`
+- **Image**: `postgres:15-alpine`
+- **Port**: 5432
+- **Storage**: 10Gi persistent volume
+- **Database**: `kellogg_music_match`
+- **User**: `kellogg_user`
+- **Secret**: `postgres-secret` (contains credentials)
+- **Health Checks**: `pg_isready` probes
+- **Resources**:
+  - Requests: 100m CPU, 256Mi memory
+  - Limits: 500m CPU, 1Gi memory
 
 ### UI Deployment & Service
 - **Deployment**: `kellogg-music-match-ui`
@@ -155,6 +170,42 @@ Check ingress:
 ```bash
 kubectl describe ingress -n kellogg-music-match
 ```
+
+## Database Access
+
+### PostgreSQL Connection Information
+After deployment, use these connection details:
+
+- **Host**: `postgres.kellogg-music-match.svc.cluster.local`
+- **Port**: `5432`
+- **Database**: `kellogg_music_match`
+- **Username**: `kellogg_user`
+- **Password**: Retrieved from `postgres-secret`
+
+### Port Forward for Local Access
+```bash
+# Forward PostgreSQL port for administration
+kubectl port-forward -n kellogg-music-match service/postgres 5432:5432
+
+# Connect with psql
+psql -h localhost -p 5432 -U kellogg_user -d kellogg_music_match
+```
+
+### Direct Pod Access
+```bash
+# Execute psql in the PostgreSQL pod
+kubectl exec -it -n kellogg-music-match postgres-0 -- psql -U kellogg_user -d kellogg_music_match
+```
+
+### Database Outputs
+The Pulumi stack exports these database-related outputs:
+- `databaseHost`: Internal cluster hostname
+- `databasePort`: PostgreSQL port (5432)
+- `databaseName`: Database name
+- `databaseUser`: Database username
+- `postgresStatefulSetName`: StatefulSet resource name
+- `postgresServiceName`: Service resource name
+- `postgresSecretName`: Secret containing credentials
 
 ## Cleanup
 
