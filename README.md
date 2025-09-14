@@ -1,99 +1,349 @@
-# kellogg-music-match
+# 🎵 Kellogg Music Match
 
-Monorepo containing:
+A professional full-stack music taste matching application with Go backend, Angular frontend, and automated infrastructure deployment.
 
-- `ui/` – Angular front-end (Kellogg Music Match app)
-- `backend/` – Go REST API server (in-memory demo)
-- `pulumi/` – Kubernetes infrastructure as code
+## 🏗️ Architecture Overview
 
-## Quick Start with Docker Compose
+```
+kellogg-music-match/
+├── backend/          # Go backend with OpenAPI generation
+├── ui/              # Angular frontend application
+├── pulumi/          # Infrastructure as Code (Pulumi)
+├── Makefile         # Top-level orchestration
+└── docker-compose.yml  # Local development environment
+```
 
-The fastest way to run the entire application:
+### 🔧 Backend
+- **Go 1.22+** with OpenAPI-generated server
+- **Clean Architecture** - Generated code separated from business logic
+- **REST API** with authentication, user management, and music matching
+- **Docker** containerization with multi-stage builds
 
+### 🎨 Frontend  
+- **Angular 17+** with reactive forms and modern UI
+- **Real-time validation** for password complexity and user input
+- **Responsive design** optimized for music discovery
+- **Docker** containerization with Nginx
+
+### ☁️ Infrastructure
+- **Pulumi** Infrastructure as Code
+- **Cloud deployment** ready (AWS/Azure/GCP)
+- **Automated provisioning** and configuration management
+
+## 🚀 Quick Start
+
+### Prerequisites
+- **Go 1.22+**
+- **Node.js 18+** 
+- **Docker & Docker Compose**
+- **Make**
+
+### 1. Initial Setup
 ```bash
-docker compose up --build
+# Clone and setup the project
+git clone <repository-url>
+cd kellogg-music-match
+make setup
 ```
 
-Then visit http://localhost:4200
-
-- Frontend: http://localhost:4200
-- Backend API: http://localhost:8080
-
-## Backend (Go) API
-
-Run the server locally:
-
+### 2. Development Environment
 ```bash
-cd backend
-go mod tidy
-go run .
+# Option 1: Full Docker environment (recommended)
+make docker-run
+
+# Option 2: Local development with live reload
+make dev
+
+# Option 3: Component-specific development
+make backend-dev  # Backend only
+make ui-dev       # Frontend only
 ```
 
-Server listens on `:8080` by default.
+### 3. Access the Application
+- **Frontend:** http://localhost:4200
+- **Backend API:** http://localhost:8080  
+- **Health Check:** http://localhost:8080/health
 
-### Endpoints
+## 🛠️ Development Commands
 
-`POST /register`
-Request JSON:
-```json
-{ 
-  "username": "student123", 
-  "email": "student@example.com", 
-  "firstName": "Student", 
-  "lastName": "Name",
-  "password": "SecurePass123!"
-}
-```
-Response JSON:
-```json
-{ 
-  "user": {
-    "username": "student123",
-    "email": "student@example.com", 
-    "firstName": "Student", 
-    "lastName": "Name",
-    "artists": []
-  }
-}
+### 📋 General Operations
+```bash
+make help           # Show all available commands
+make info           # Project information
+make status         # Application status
+make health         # Health check
 ```
 
-`POST /login`
-Request JSON:
-```json
-{ "username": "student123", "password": "SecurePass123!" }
-```
-Response JSON:
-```json
-{ 
-  "user": {
-    "username": "student123",
-    "email": "student@example.com", 
-    "firstName": "Student", 
-    "lastName": "Name",
-    "artists": ["...saved artists..."]
-  }
-}
+### 🏗️ Build & Test
+```bash
+make build          # Build both backend and UI
+make test           # Run all tests
+make check          # Run all checks (lint, test, format)
+make clean          # Clean all build artifacts
 ```
 
-`POST /findMusicMatches`
-Request JSON:
-```json
-{ "artists": ["Artist A", "Artist B", "..."] }
-```
-Optional header: `X-User-Email: student@example.com` to associate submitted artists with an existing user (persisting them for future login responses).
-
-Response JSON (top 5 matches):
-```json
-[
-	{ "name": "Peer 1", "overlap": 3, "score": 0.812 },
-	{ "name": "Peer 2", "overlap": 2, "score": 0.667 }
-]
+### 🐳 Docker Operations
+```bash
+make docker-build       # Build all Docker images
+make docker-run         # Start full application
+make docker-stop        # Stop all services
+make docker-logs        # View application logs
+make docker-restart     # Restart services
 ```
 
-Scoring mixes overlap count and a Jaccard-like ratio, then sorts by score, overlap, and name.
+### 🔧 Backend Development
+```bash
+make backend-help           # Backend-specific commands
+make backend-generate       # Generate OpenAPI code
+make backend-build          # Build backend
+make backend-test           # Run backend tests
+make backend-dev            # Development with live reload
+```
 
-`GET /health`
-Simple health check returning status + timestamp.
+### 🎨 Frontend Development  
+```bash
+make ui-build          # Build UI for production
+make ui-dev            # Start development server
+make ui-test           # Run UI tests
+make ui-lint           # Lint UI code
+```
+
+### ☁️ Infrastructure Management
+```bash
+make infra-preview     # Preview infrastructure changes
+make infra-deploy      # Deploy infrastructure
+make infra-destroy     # Destroy infrastructure
+make infra-output      # Show infrastructure outputs
+```
+
+## 🔄 Development Workflows
+
+### Quick Development Cycle
+```bash
+# 1. Make changes to code
+# 2. Test locally
+make dev
+
+# 3. Run checks
+make check
+
+# 4. Test with Docker
+make docker-run
+```
+
+### Backend API Development
+```bash
+# 1. Update OpenAPI specification
+vim backend/openapi.yaml
+
+# 2. Regenerate server code
+make backend-generate
+
+# 3. Implement business logic
+vim backend/business/*.go
+
+# 4. Test changes
+make backend-test
+make backend-run
+```
+
+### Frontend Development
+```bash
+# 1. Start development server
+make ui-dev
+
+# 2. Make changes with live reload
+# 3. Run tests
+make ui-test
+
+# 4. Build for production
+make ui-build
+```
+
+### Infrastructure Changes
+```bash
+# 1. Preview changes
+make infra-preview
+
+# 2. Deploy to staging
+make deploy-staging
+
+# 3. Deploy to production
+make deploy-prod
+```
+
+## 🧪 Testing Strategy
+
+### Unit Tests
+```bash
+make test-unit         # Run all unit tests
+make backend-test      # Backend unit tests
+make ui-test          # Frontend unit tests
+```
+
+### Integration Tests
+```bash
+make test-integration  # Full integration test suite
+```
+
+### End-to-End Tests
+```bash
+make test-e2e         # Complete user workflow tests
+```
+
+## 🚢 Deployment
+
+### Local Development
+```bash
+make docker-run       # Full local environment
+```
+
+### Staging Environment
+```bash
+make deploy-staging   # Deploy to staging with full checks
+```
+
+### Production Environment
+```bash
+make deploy-prod      # Production deployment workflow
+```
+
+## 📊 Monitoring & Maintenance
+
+### Health Monitoring
+```bash
+make status           # Full application status
+make health           # Backend health check
+make logs             # View application logs
+```
+
+### Maintenance Tasks
+```bash
+make clean            # Clean all artifacts
+make docker-clean     # Clean Docker resources
+make infra-refresh    # Refresh infrastructure state
+```
+
+## 🔧 Configuration
+
+### Environment Variables
+- **Backend:** Configuration in `backend/go.mod` and Dockerfile
+- **Frontend:** Build-time configuration in `ui/src/environments/`
+- **Infrastructure:** Pulumi configuration in `pulumi/`
+
+### Docker Configuration
+- **Backend:** `backend/Dockerfile` with multi-stage build
+- **Frontend:** `ui/Dockerfile` with Nginx serving
+- **Compose:** `docker-compose.yml` for local development
+
+## 📁 Project Structure Details
+
+### Backend (`backend/`)
+```
+backend/
+├── Makefile              # Backend-specific automation
+├── openapi.yaml          # API specification
+├── generated/            # OpenAPI generated code
+├── business/             # Custom business logic
+├── cmd/                  # Application entry point
+└── README.md             # Backend documentation
+```
+
+### Frontend (`ui/`)
+```
+ui/
+├── src/                  # Angular application source
+├── docker/               # Docker configuration
+├── package.json          # Node.js dependencies
+└── Dockerfile           # Container configuration
+```
+
+### Infrastructure (`pulumi/`)
+```
+pulumi/
+├── main.go              # Infrastructure definition
+├── Pulumi.yaml          # Pulumi project configuration
+└── README.md            # Infrastructure documentation
+```
+
+## 🤝 Contributing
+
+1. **Setup development environment:**
+   ```bash
+   make setup
+   ```
+
+2. **Make changes following the architecture:**
+   - Backend business logic in `backend/business/`
+   - Frontend components in `ui/src/app/`
+   - Infrastructure in `pulumi/`
+
+3. **Test changes:**
+   ```bash
+   make check
+   ```
+
+4. **Submit for review:**
+   ```bash
+   make ci  # Run full CI workflow
+   ```
+
+## 📋 Available Make Targets
+
+Run `make help` for a complete list of available commands organized by category:
+
+- **🏗️ Build & Development:** `build`, `dev`, `test`, `check`, `clean`
+- **🐳 Docker Operations:** `docker-build`, `docker-run`, `docker-stop`
+- **🔧 Backend:** `backend-*` (forwarded to backend Makefile)
+- **🎨 Frontend:** `ui-build`, `ui-dev`, `ui-test`, `ui-lint`
+- **☁️ Infrastructure:** `infra-deploy`, `infra-preview`, `infra-destroy`
+- **📊 Monitoring:** `status`, `health`, `logs`
+- **🚀 Deployment:** `deploy-local`, `deploy-staging`, `deploy-prod`
+
+## 🆘 Troubleshooting
+
+### Common Issues
+
+**Port conflicts:**
+```bash
+make docker-stop    # Stop all services
+make status         # Check what's running
+```
+
+**Docker issues:**
+```bash
+make docker-clean   # Clean Docker resources
+make docker-build   # Rebuild images
+```
+
+**Build failures:**
+```bash
+make clean          # Clean all artifacts
+make deps           # Update dependencies
+make build          # Rebuild
+```
+
+### Getting Help
+- `make help` - All available commands
+- `make info` - Project information  
+- `make status` - Current application status
+- Component-specific help: `make backend-help`, etc.
+
+---
+
+## 🔍 API Documentation
+
+The backend uses OpenAPI 3.0 specification located in `backend/openapi.yaml`. The API includes:
+
+### Authentication Endpoints
+- `POST /register` - User registration with comprehensive validation
+- `POST /login` - User authentication with bcrypt password verification
+
+### Matching Endpoints  
+- `POST /findMusicMatches` - Find users with similar music taste
+
+### Health Endpoints
+- `GET /health` - Service health check
 
 ### Authentication & Security
 
@@ -107,27 +357,9 @@ Simple health check returning status + timestamp.
 - **Password Hashing**: Uses bcrypt for secure password storage
 - **Form Validation**: Real-time password complexity feedback and confirmation matching
 
-### Notes
+For complete API documentation, see `backend/openapi.yaml` or run the development server and visit the API explorer.
 
-- Storage is in-memory only (resets on restart).
-- Authentication uses bcrypt password hashing for security
-- CORS is configured for local development.
-- User data includes separate firstName/lastName fields for better personalization
-- Extend by replacing in-memory store with a database (e.g., Postgres) and adding JWT tokens.
-
-## Front-End (Angular)
-
-Run the development server:
-
-```bash
-cd ui
-npm install
-npm start
-```
-
-Visit http://localhost:4200
-
-### Features
+## 🎨 Frontend Features
 
 - **User Registration**: Comprehensive form with real-time validation
   - Username, email, first name, last name fields
@@ -142,135 +374,23 @@ Visit http://localhost:4200
 
 ### Password Requirements
 
-The application enforces strong password security:
-- **Length**: Minimum 8 characters
-- **Uppercase**: At least one uppercase letter (A-Z)
-- **Lowercase**: At least one lowercase letter (a-z)  
-- **Numbers**: At least one digit (0-9)
-- **Special Characters**: At least one symbol (!@#$%^&*(),.?":{}|<>_)
+The application enforces strong password security with real-time visual indicators showing which requirements are met as you type.
 
-Real-time visual indicators show which requirements are met as you type.
-
-## Docker
-
-### Quick Start
-
-Run both services with Docker Compose:
-
-```bash
-docker compose up --build
-```
-
-This will:
-- Build both backend and frontend images
-- Start backend on http://localhost:8080
-- Start frontend on http://localhost:4200
-- Configure proper API connectivity between services
-
-### Building Images Individually
-
-```bash
-# Backend
-docker build -t kellogg-music-match-backend:latest ./backend
-
-# Frontend (with correct API URL)
-docker build --build-arg API_BASE_URL=http://localhost:8080 -t kellogg-music-match-ui:latest ./ui
-```
-
-### Manual Container Run
-
-```bash
-# Start backend
-docker run -d -p 8080:8080 --name kmm-backend kellogg-music-match-backend:latest
-
-# Start frontend (connected to backend)
-docker run -d -p 4200:80 --name kmm-ui kellogg-music-match-ui:latest
-```
-
-### Multi-arch build (example linux/amd64 + linux/arm64)
-
-```bash
-docker buildx create --name kmm-builder --use --bootstrap
-docker buildx build --platform linux/amd64,linux/arm64 -t yourrepo/kmm-backend:latest ./backend --push
-docker buildx build --platform linux/amd64,linux/arm64 -t yourrepo/kmm-ui:latest ./ui --push
-```
-
-### Runtime API URL Override
-
-The UI image serves a `config.json` file that can be overridden at runtime for different environments:
-
-```bash
-docker run -d -p 4200:80 \
-	-v $(pwd)/my-config.json:/usr/share/nginx/html/config.json:ro \
-	kellogg-music-match-ui:latest
-```
-
-`my-config.json` example:
-```json
-{ "apiBaseUrl": "https://api.example.com" }
-```
-
-## Kubernetes Deployment
-
-Deploy to Kubernetes using Pulumi:
-
-```bash
-cd pulumi
-pulumi up
-```
-
-This creates:
-- Backend deployment and service
-- Frontend deployment and service  
-- Ingress configuration with traefik.me DNS
-- Proper service networking and load balancing
-
-See `pulumi/README.md` for detailed deployment instructions.
-
-## Development Setup
-
-### Prerequisites
-- Node.js 18+ and npm
-- Go 1.22+
-- Docker and Docker Compose
-- (Optional) kubectl and Pulumi for Kubernetes deployment
-
-### Local Development Workflow
-
-1. **Start Backend**:
-   ```bash
-   cd backend
-   go mod tidy
-   go run .
-   ```
-
-2. **Start Frontend** (in another terminal):
-   ```bash
-   cd ui
-   npm install
-   npm start
-   ```
-
-3. **Access Application**:
-   - Frontend: http://localhost:4200
-   - Backend API: http://localhost:8080
-   - Health Check: http://localhost:8080/health
-
-## Architecture
+## 🏗️ Architecture
 
 ```
 ┌─────────────────┐    HTTP/REST    ┌─────────────────┐
 │   Angular UI    │◄───────────────►│   Go Backend    │
 │   (Port 4200)   │                 │   (Port 8080)   │
 │                 │                 │                 │
-│ • Registration  │                 │ • User Auth     │
-│ • Login         │                 │ • Password Hash │
-│ • Artist Mgmt   │                 │ • Music Match   │
+│ • Registration  │                 │ • OpenAPI Gen   │
+│ • Login         │                 │ • Business Logic│
+│ • Artist Mgmt   │                 │ • Clean Arch    │
 │ • Match Results │                 │ • In-Memory DB  │
 └─────────────────┘                 └─────────────────┘
 ```
 
-## Future Improvements
+## 🚀 Future Improvements
 
 - **Database Integration**: Replace in-memory storage with PostgreSQL/MongoDB
 - **JWT Authentication**: Add token-based auth for stateless API access  
