@@ -6,6 +6,10 @@ RETURNING *;
 -- name: GetUserByUsername :one
 SELECT * FROM users WHERE username = $1 LIMIT 1;
 
+-- name: GetUserByUsernameWithPassword :one
+SELECT id, username, email, first_name, last_name, password_hash, created_at, updated_at 
+FROM users WHERE username = $1 LIMIT 1;
+
 -- name: GetUserByEmail :one
 SELECT * FROM users WHERE email = $1 LIMIT 1;
 

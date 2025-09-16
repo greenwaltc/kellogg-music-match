@@ -49,7 +49,7 @@ func (m *MatchingEngine) ComputeMatches(target []string, caller string, users []
 		return []generated.MatchUser{}
 	}
 
-	var results []generated.MatchUser
+	results := make([]generated.MatchUser, 0)
 
 	for _, user := range users {
 		// Skip the caller

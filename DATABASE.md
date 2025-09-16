@@ -1,21 +1,66 @@
 # 🗄️ Database Setup - PostgreSQL
 
-This document describes the PostgreSQL database setup for the Kellogg Music Match application, deployed as a Kubernetes StatefulSet for cloud-agnostic persistence.
+This document describes the PostgreSQL database setup for the Kellogg Music Match application, including local development and production deployment configurations.
 
 ## 📋 Database Overview
 
-### Database Configuration
+### Local Development Configuration
 - **Database Name**: `kellogg_music_match`
 - **Username**: `kellogg_user`
-- **Password**: `secure_password_123` (stored in Kubernetes Secret)
+- **Password**: `kellogg_secure_pass_2024`
+- **Host**: `localhost` (or `postgres` in Docker Compose)
 - **Port**: `5432`
+
+### Production Configuration (Kubernetes)
+- **Database Name**: `kellogg_music_match`
+- **Username**: `kellogg_user`
+- **Password**: Stored in Kubernetes Secret
 - **Host**: `postgres.kellogg-music-match.svc.cluster.local` (internal cluster DNS)
+- **Port**: `5432`
+
+### Architecture Features
+- **SQLC Integration**: Type-safe Go code generated from SQL queries
+- **Multi-file Schema**: Schema managed in `backend/db/schema/*.sql` files
+- **UserRepository Pattern**: Clean database abstraction layer
+- **UUID Support**: Proper UUID format with performance indexes
+- **Normalized Design**: Artists and user relationships properly structured
 
 ### Storage Configuration
 - **Persistent Volume**: 10Gi storage allocated per StatefulSet replica
 - **Access Mode**: ReadWriteOnce
 - **Storage Class**: Uses cluster default storage class
 - **Data Directory**: `/var/lib/postgresql/data/pgdata`
+
+## 🏗️ Database Schema Management
+
+### Schema Files Organization
+```
+backend/db/
+├── schema/                    # Source schema files (single source of truth)
+│   ├── 001_initial.sql       # Initial schema with users, artists, user_artists
+│   └── [future migrations]   # Additional schema changes
+├── queries/                  # SQLC query definitions
+│   └── queries.sql          # Type-safe SQL queries for Go code generation
+└── sqlc/                    # Generated Go code (do not edit directly)
+    ├── db.go               # Database interface and configuration
+    ├── models.go           # Go structs for database tables
+    ├── querier.go          # Query interface
+    └── queries.sql.go      # Generated query methods
+```
+
+### Schema Synchronization
+The project uses a multi-file schema system with automatic synchronization:
+
+1. **Source Files**: Make schema changes in `backend/db/schema/*.sql`
+2. **Synchronization**: Run `make schema-sync` to update `DATABASE_SCHEMA.sql`
+3. **Code Generation**: Run `make backend-sqlc` to regenerate Go code
+4. **Version Control**: Commit both schema files and generated code
+
+### SQLC Integration
+- **Type Safety**: All database operations use generated Go structs
+- **Query Validation**: SQL queries are validated at code generation time
+- **Performance**: No reflection overhead, direct SQL execution
+- **Maintainability**: Changes to schema automatically update Go types
 
 ## 🏗️ Kubernetes Resources
 
@@ -58,9 +103,40 @@ Type: Opaque
 
 ## 🔌 Backend Integration
 
-The backend deployment is pre-configured with database environment variables for future migration:
+### Local Development Environment
+The backend uses Docker Compose for local development:
 
-### Environment Variables
+#### Environment Variables (Local)
+```bash
+DB_HOST=postgres                  # Docker Compose service name
+DB_PORT=5432
+DB_NAME=kellogg_music_match
+DB_USER=kellogg_user
+DB_PASSWORD=kellogg_secure_pass_2024
+DB_SSLMODE=disable
+```
+
+#### UserRepository Pattern
+```go
+// Clean database abstraction layer
+type UserRepository interface {
+    CreateUser(ctx context.Context, id uuid.UUID, username, email, firstName, lastName, passwordHash string) (*generated.User, error)
+    GetUserByUsername(ctx context.Context, username string) (*generated.User, error)
+    SetUserArtists(ctx context.Context, userID uuid.UUID, artists []string) error
+    GetAllUsersWithArtists(ctx context.Context) ([]GetUsersWithArtistsRow, error)
+}
+
+// PostgreSQL implementation with SQLC
+type PostgreSQLUserRepository struct {
+    db *sql.DB
+    queries *Queries  // Generated SQLC queries
+}
+```
+
+### Production Environment (Kubernetes)
+The backend deployment is pre-configured with database environment variables:
+
+#### Environment Variables (Production)
 ```bash
 DB_HOST=postgres.kellogg-music-match.svc.cluster.local
 DB_PORT=5432
@@ -83,9 +159,30 @@ dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 )
 ```
 
-## 🚀 Deployment Commands
+## 🚀 Development & Deployment Commands
 
-### Deploy Database
+### Local Development
+```bash
+# Start PostgreSQL database
+docker-compose up -d postgres
+
+# Check database status
+docker-compose ps postgres
+
+# Connect to database
+docker-compose exec postgres psql -U kellogg_user -d kellogg_music_match
+
+# View database logs
+docker-compose logs postgres
+
+# Generate SQLC code after schema changes
+make backend-sqlc
+
+# Synchronize schema files
+make schema-sync
+```
+
+### Production Deployment
 ```bash
 # Deploy with Pulumi
 cd pulumi

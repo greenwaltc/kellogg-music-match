@@ -27,6 +27,7 @@ type Querier interface {
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
+	GetUserByUsernameWithPassword(ctx context.Context, username string) (User, error)
 	// Matching queries
 	GetUsersWithArtists(ctx context.Context) ([]GetUsersWithArtistsRow, error)
 	RemoveUserArtist(ctx context.Context, arg RemoveUserArtistParams) error

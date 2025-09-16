@@ -1,31 +1,46 @@
 # Kellogg Music Match Backend
 
-A Go backend server generated from OpenAPI specifications with PostgreSQL database integration and clean architecture separation.
+A Go backend server with PostgreSQL database integration, SQLC type-safe queries, OpenAPI specification, and clean repository architecture.
 
 ## 🏗️ Architecture
 
 - **`generated/`** - OpenAPI generated code (controllers, models, routing)
-- **`business/`** - Custom business logic (authentication, matching, storage)  
+- **`business/`** - Custom business logic (authentication, matching, database repository)  
 - **`cmd/`** - Application entry point and service wrappers
+- **`db/`** - Database layer with SQLC integration
+  - **`schema/`** - PostgreSQL schema definition files
+  - **`queries/`** - SQLC query definitions
+  - **`sqlc/`** - Generated type-safe Go code
 - **`openapi.yaml`** - API specification
+- **`sqlc.yaml`** - SQLC configuration
 - **`Makefile`** - Build automation and development tasks
 
 ## 🗄️ Database Integration
 
-The backend integrates with PostgreSQL database for:
+The backend uses PostgreSQL with SQLC for type-safe database operations:
+
+### Repository Pattern
+- **UserRepository Interface**: Clean abstraction for database operations
+- **PostgreSQL Implementation**: Full CRUD operations with proper error handling
+- **SQLC Integration**: Type-safe Go code generated from SQL queries
+- **UUID Support**: Proper UUID handling with database constraints
+
+### Database Features
 - **User Management**: Registration, authentication with bcrypt password hashing
-- **Music Preferences**: Artist storage and user-artist relationships
+- **Music Preferences**: Normalized artist storage and user-artist relationships  
 - **Matching Algorithm**: Music taste similarity calculations using Jaccard similarity
+- **Transaction Support**: Proper error handling and data consistency
+- **Performance Optimization**: Indexes and optimized queries for common operations
 
 ### Database Configuration
 The backend uses these environment variables for database connection:
 ```bash
-KELLOGG_MUSIC_MATCH_DATABASE_HOST=localhost
-KELLOGG_MUSIC_MATCH_DATABASE_PORT=5432
-KELLOGG_MUSIC_MATCH_DATABASE_NAME=kellogg_music_match
-KELLOGG_MUSIC_MATCH_DATABASE_USER=postgres
-KELLOGG_MUSIC_MATCH_DATABASE_PASSWORD=postgres123
-KELLOGG_MUSIC_MATCH_DATABASE_SSL_MODE=disable
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=kellogg_music_match
+DB_USER=kellogg_user
+DB_PASSWORD=kellogg_secure_pass_2024
+DB_SSLMODE=disable
 ```
 
 > **Note**: These match the Docker Compose configuration for seamless local development.
@@ -42,20 +57,20 @@ KELLOGG_MUSIC_MATCH_DATABASE_SSL_MODE=disable
 1. **Start the database:**
    ```bash
    # From project root
-   ./dev.sh db-only
+   docker-compose up -d postgres
    ```
 
-2. **View available commands:**
+2. **Generate SQLC code:**
    ```bash
-   make help
+   make sqlc-generate
    ```
 
-3. **Generate OpenAPI code from specification:**
+3. **Generate OpenAPI code:**
    ```bash
    make generate
    ```
 
-4. **Build and run locally (with database):**
+4. **Build and run locally:**
    ```bash
    make run
    ```
@@ -75,14 +90,26 @@ KELLOGG_MUSIC_MATCH_DATABASE_SSL_MODE=disable
 
 ### Code Generation
 ```bash
-# Validate OpenAPI spec
-make openapi-validate
+# Generate SQLC code from queries
+make sqlc-generate
 
-# Generate server code
+# Generate OpenAPI server code  
 make generate
 
-# Generate documentation
+# View OpenAPI documentation
 make openapi-docs
+```
+
+### Database Operations
+```bash
+# Sync schema files (from project root)
+make schema-sync
+
+# Connect to database
+docker-compose exec postgres psql -U kellogg_user -d kellogg_music_match
+
+# View database logs
+docker-compose logs postgres
 ```
 
 ### Development

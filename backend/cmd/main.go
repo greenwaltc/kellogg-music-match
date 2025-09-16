@@ -11,14 +11,18 @@ import (
 func main() {
 	log.Printf("Server started")
 
-	// Initialize business logic components
-	store := business.NewStore()
+	// Initialize database components
+	userRepo, err := business.NewUserRepository()
+	if err != nil {
+		log.Fatalf("Failed to initialize user repository: %v", err)
+	}
+	
 	matchingEngine := business.NewMatchingEngine()
 
 	// Initialize business services
-	authService := business.NewAuthService(store)
+	authService := business.NewAuthService(userRepo)
 	healthService := business.NewHealthService()
-	matchingService := business.NewMatchingService(store, matchingEngine)
+	matchingService := business.NewMatchingService(userRepo, matchingEngine)
 
 	// Create service wrappers that implement the OpenAPI service interfaces
 	authAPIService := NewAuthAPIServiceWrapper(authService)

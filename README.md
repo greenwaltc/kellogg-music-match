@@ -19,16 +19,21 @@ kellogg-music-match/
 ### 🔧 Backend
 - **Go 1.22+** with OpenAPI-generated server
 - **Clean Architecture** - Generated code separated from business logic
+- **PostgreSQL Integration** - Complete database migration with SQLC for type-safe queries
+- **UserRepository Interface** - Clean abstraction layer for database operations
 - **REST API** with authentication, user management, and music matching
-- **PostgreSQL** database integration with comprehensive schema
 - **Docker** containerization with multi-stage builds
 
 ### 🗄️ Database
 - **PostgreSQL 15** with normalized schema design
+- **SQLC Integration** - Type-safe Go code generated from SQL queries
+- **Multi-file Schema Management** - Automatic synchronization from backend/db/schema/*.sql
+- **User Repository Pattern** - Clean database abstraction layer
+- **UUID Support** - Proper UUID format with performance indexes
 - **Automatic initialization** with sample data for development
 - **User management** with bcrypt password hashing
 - **Music matching** with artist relationships and similarity scoring
-- **Performance optimized** with indexes and views
+- **Performance optimized** with indexes and comprehensive foreign key constraints
 
 ### 🎨 Frontend  
 - **Angular 17+** with reactive forms and modern UI
@@ -64,27 +69,20 @@ make setup
 #### Option A: Full Docker Environment (Recommended)
 ```bash
 # Start everything (database, backend, frontend)
-./dev.sh start
+make dev
 
-# Or use Make
-make docker-run
+# Or use docker-compose directly
+docker-compose up -d
 ```
 
-#### Option B: Database + Local Development
+#### Option B: Individual Services
 ```bash
 # Start only PostgreSQL database
-./dev.sh db-only
+docker-compose up -d postgres
 
 # In separate terminals:
 make backend-dev  # Backend with live reload
 make ui-dev       # Frontend with live reload
-```
-
-#### Option C: Individual Services
-```bash
-./dev.sh db-only      # Database only
-make backend-dev      # Backend only  
-make ui-dev          # Frontend only
 ```
 
 ### 3. Access the Application
@@ -95,12 +93,24 @@ make ui-dev          # Frontend only
 
 ### 4. Test the Setup
 ```bash
-# Run comprehensive tests
-./dev.sh test
+# Health check
+curl http://localhost:8080/health
 
-# Or run specific tests
-make test              # Application tests
-make docker-test       # Docker environment tests
+# Test user registration
+curl -X POST http://localhost:8080/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"testuser","email":"test@example.com","password":"TestPassword123!","firstName":"Test","lastName":"User"}'
+
+# Test user login  
+curl -X POST http://localhost:8080/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"testuser","password":"TestPassword123!"}'
+
+# Test music matching
+curl -X POST http://localhost:8080/findMusicMatches \
+  -H "Content-Type: application/json" \
+  -H "X-User-Username: testuser" \
+  -d '{"artists":["The Beatles","Taylor Swift"]}'
 ```
 
 ## 🛠️ Development Commands
@@ -115,15 +125,24 @@ make health         # Health check
 
 ### 🗄️ Database Operations
 ```bash
-./dev.sh start           # Start all services (including database)
-./dev.sh db-only         # Start PostgreSQL database only
-./dev.sh status          # Show service status
-./dev.sh logs            # View logs
-./dev.sh cleanup         # Stop and remove all data
-./dev.sh test            # Run database tests
+# Start all services (including database)
+make dev
+# or
+docker-compose up -d
 
-# Direct database access
-psql -h localhost -p 5432 -U kellogg_user -d kellogg_music_match
+# Start PostgreSQL database only
+docker-compose up -d postgres
+
+# View logs
+docker-compose logs backend
+docker-compose logs postgres
+
+# Database access
+docker-compose exec postgres psql -U kellogg_user -d kellogg_music_match
+
+# Stop and cleanup
+docker-compose down
+docker-compose down -v  # Remove volumes too
 ```
 
 ### 🏗️ Build & Test
@@ -132,26 +151,27 @@ make build          # Build both backend and UI
 make test           # Run all tests
 make check          # Run all checks (lint, test, format)
 make clean          # Clean all build artifacts
+make schema-sync    # Synchronize database schema files
 ```
 
 ### 🐳 Docker Operations
 ```bash
-make docker-build       # Build all Docker images
-make docker-run         # Start full application
-make docker-stop        # Stop all services
-make docker-logs        # View application logs
-make docker-restart     # Restart services
-make docker-db          # Start database only
-make docker-test        # Test Docker environment
+make dev                # Start all services (recommended)
+docker-compose up -d    # Start all services
+docker-compose ps       # Show service status
+docker-compose logs     # View application logs
+docker-compose down     # Stop all services
+docker-compose build    # Rebuild images
 ```
 
 ### 🔧 Backend Development
 ```bash
 make backend-help           # Backend-specific commands
-make backend-generate       # Generate OpenAPI code
+make backend-generate       # Generate SQLC and OpenAPI code
 make backend-build          # Build backend
 make backend-test           # Run backend tests
 make backend-dev            # Development with live reload
+make backend-sqlc           # Generate SQLC code from queries
 ```
 
 ### 🎨 Frontend Development  
@@ -175,11 +195,19 @@ make infra-output      # Show infrastructure outputs
 ### Database Schema
 The application uses PostgreSQL with a comprehensive schema including:
 
-- **Users Table**: Authentication and profile management with bcrypt password hashing
-- **Artists Table**: Normalized artist storage with automatic name normalization
-- **User-Artists Table**: Many-to-many relationships for music preferences
-- **Views**: Optimized queries for user profiles and music matching
-- **Indexes**: Performance optimization for common operations
+- **Users Table**: Authentication and profile management with bcrypt password hashing and UUID primary keys
+- **Artists Table**: Normalized artist storage with automatic name normalization and conflict resolution
+- **User-Artists Table**: Many-to-many relationships for music preferences with cascade deletes
+- **SQLC Integration**: Type-safe Go code generated from SQL queries in backend/db/queries/
+- **Schema Management**: Multi-file schema system with automatic synchronization
+- **Indexes**: Performance optimization for common operations including UUID lookups
+- **Constraints**: Data integrity with foreign keys, check constraints, and unique indexes
+
+### Database Architecture
+- **UserRepository Interface**: Clean abstraction layer separating business logic from database operations
+- **PostgreSQL Implementation**: Full CRUD operations with proper error handling and transactions
+- **Type Safety**: SQLC generates type-safe Go structs and methods from SQL queries
+- **Environment Variables**: Configurable connection parameters (DB_HOST, DB_PORT, DB_NAME, etc.)
 
 ### Sample Data
 The development database includes:
@@ -206,6 +234,9 @@ Password: [from kubernetes secret]
 
 ### Database Files
 - **`DATABASE_SCHEMA.sql`**: Complete PostgreSQL schema with tables, indexes, functions, and sample data
+- **`backend/db/schema/*.sql`**: Multi-file schema source (single source of truth)
+- **`backend/db/queries/queries.sql`**: SQLC query definitions for type-safe Go code generation
+- **`backend/sqlc.yaml`**: SQLC configuration for code generation
 - **`init-database.sh`**: Initialization script for automatic setup
 - **`DATABASE_SCHEMA.md`**: Comprehensive documentation with examples and queries
 

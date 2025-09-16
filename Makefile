@@ -1,5 +1,11 @@
-# Kellogg Music Match - Top-Level Makefile
-# Orchestrates backend, UI, and infrastructure deployment
+# Kellogg Music Match - Top-Level Mdev: ## Start full development environment
+	@echo "🚀 Starting full development environment..."
+	@echo "📋 Using docker-compose for reliable service management"
+	@docker-compose up -d
+
+dev-stop: ## Stop development servers
+	@echo "🛑 Stopping development servers..."
+	@docker-compose down# Orchestrates backend, UI, and infrastructure deployment
 
 .PHONY: help backend-% ui-% infra-% docker-% dev-% clean-% check status logs
 
@@ -16,7 +22,7 @@ help: ## Show this help message
 	@echo "  infra-*       Infrastructure operations (make infra-deploy, infra-destroy, etc.)"
 	@echo ""
 	@echo "Schema management:"
-	@echo "  sync-schema       Sync DATABASE_SCHEMA.sql from backend/db/schema/*.sql"
+	@echo "  schema-sync       Sync DATABASE_SCHEMA.sql from backend/db/schema/*.sql"
 	@echo "  check-schema-sync Verify schema files are synchronized"
 	@echo "  create-migration  Create new migration file (make create-migration name=add_feature)"
 	@echo ""
@@ -45,7 +51,7 @@ dev-stop: ## Stop development servers
 test: backend-test ui-test ## Run all tests
 	@echo "✅ All tests complete!"
 
-check: backend-check ui-check check-schema-sync ## Run all checks (lint, test, format, schema sync)
+check: backend-check ui-check schema-sync ## Run all checks (lint, test, format, schema sync)
 	@echo "✅ All checks passed!"
 
 clean: backend-clean ui-clean docker-clean ## Clean all build artifacts
@@ -91,7 +97,8 @@ docker-logs: ## Show Docker logs
 
 docker-db: ## Start PostgreSQL database only
 	@echo "🗄️ Starting PostgreSQL database..."
-	@./dev.sh db-only
+	@docker-compose up -d postgres
+	@echo "✅ PostgreSQL database started!"
 
 docker-test: ## Test Docker environment
 	@echo "🧪 Testing Docker environment..."
@@ -103,9 +110,19 @@ docker-clean: ## Clean Docker resources
 	@docker system prune -f 2>/dev/null || true
 	@echo "✅ Docker cleanup complete!"
 
+status: ## Show status of all services
+	@echo "📊 Service Status:"
+	@docker-compose ps
+
+logs: ## Show logs for all services
+	@echo "📋 Service Logs:"
+	@docker-compose logs
+
 ## =============================================================================
 ## 🗄️  DATABASE OPERATIONS
 ## =============================================================================
+
+schema-sync: sync-schema ## Alias for sync-schema
 
 sync-schema: ## Synchronize DATABASE_SCHEMA.sql from all backend schema files
 	@echo "🔄 Synchronizing schema files..."

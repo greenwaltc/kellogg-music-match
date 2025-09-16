@@ -2,23 +2,23 @@ package business
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"net/http"
 
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
+	sqlc "github.com/greenwaltc/kellogg-music-match/backend/db/sqlc"
 	"github.com/greenwaltc/kellogg-music-match/backend/generated"
 )
 
 // AuthService implements the business logic for authentication
 type AuthService struct {
-	store *Store
+	userRepo UserRepository
 }
 
 // NewAuthService creates a new authentication service
-func NewAuthService(store *Store) *AuthService {
+func NewAuthService(userRepo UserRepository) *AuthService {
 	return &AuthService{
-		store: store,
+		userRepo: userRepo,
 	}
 }
 
@@ -34,22 +34,32 @@ func (s *AuthService) RegisterUser(ctx context.Context, registerRequest generate
 	}
 
 	// Check if user already exists
-	if s.store.UserExists(registerRequest.Username) {
+	userExists, err := s.userRepo.UserExistsByUsername(ctx, registerRequest.Username)
+	if err != nil {
+		return generated.Response(http.StatusInternalServerError, generated.ErrorResponse{
+			Message: "failed to check username availability",
+		}), nil
+	}
+	if userExists {
 		return generated.Response(http.StatusConflict, generated.ErrorResponse{
 			Message: "username already exists",
 		}), nil
 	}
 
-	if s.store.EmailExists(registerRequest.Email) {
+	emailExists, err := s.userRepo.UserExistsByEmail(ctx, registerRequest.Email)
+	if err != nil {
+		return generated.Response(http.StatusInternalServerError, generated.ErrorResponse{
+			Message: "failed to check email availability",
+		}), nil
+	}
+	if emailExists {
 		return generated.Response(http.StatusConflict, generated.ErrorResponse{
 			Message: "email already exists", 
 		}), nil
 	}
 
 	// Generate unique ID
-	idBytes := make([]byte, 16)
-	rand.Read(idBytes)
-	userID := hex.EncodeToString(idBytes)
+	userID := uuid.New()
 
 	// Hash password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(registerRequest.Password), bcrypt.DefaultCost)
@@ -60,20 +70,29 @@ func (s *AuthService) RegisterUser(ctx context.Context, registerRequest generate
 	}
 
 	// Create user
-	user := &generated.User{
-		Id:        userID,
-		Username:  registerRequest.Username,
-		Email:     registerRequest.Email,
-		FirstName: registerRequest.FirstName,
-		LastName:  registerRequest.LastName,
-		Artists:   []string{},
-	}
-
-	err = s.store.CreateUser(user, string(hashedPassword))
+	dbUser, err := s.userRepo.CreateUser(
+		ctx,
+		userID,
+		registerRequest.Username,
+		registerRequest.Email,
+		registerRequest.FirstName,
+		registerRequest.LastName,
+		string(hashedPassword),
+	)
 	if err != nil {
 		return generated.Response(http.StatusInternalServerError, generated.ErrorResponse{
 			Message: "failed to create user",
 		}), nil
+	}
+
+	// Convert database user to API user
+	user := &generated.User{
+		Id:        dbUser.ID.String(), // Standard UUID format with dashes
+		Username:  dbUser.Username,
+		Email:     dbUser.Email,
+		FirstName: dbUser.FirstName,
+		LastName:  dbUser.LastName,
+		Artists:   []string{}, // Will be populated when user sets artists
 	}
 
 	// Return response
@@ -96,11 +115,48 @@ func (s *AuthService) LoginUser(ctx context.Context, loginRequest generated.Logi
 	}
 
 	// Authenticate user
-	user, err := s.store.AuthenticateUser(username, password)
+	dbUser, err := s.userRepo.GetUserByUsernameWithPassword(ctx, username)
+	if err != nil {
+		return generated.Response(http.StatusInternalServerError, generated.ErrorResponse{
+			Message: "authentication failed",
+		}), nil
+	}
+
+	if dbUser == nil {
+		return generated.Response(http.StatusUnauthorized, generated.ErrorResponse{
+			Message: "invalid username or password",
+		}), nil
+	}
+
+	// Verify password
+	err = bcrypt.CompareHashAndPassword([]byte(dbUser.PasswordHash), []byte(password))
 	if err != nil {
 		return generated.Response(http.StatusUnauthorized, generated.ErrorResponse{
 			Message: "invalid username or password",
 		}), nil
+	}
+
+	// Get user's artists
+	artists, err := s.userRepo.GetUserArtists(ctx, dbUser.ID)
+	if err != nil {
+		// Log error but don't fail authentication
+		artists = []sqlc.Artist{}
+	}
+
+	// Convert to string slice
+	artistNames := make([]string, len(artists))
+	for i, artist := range artists {
+		artistNames[i] = artist.Name
+	}
+
+	// Convert database user to API user
+	user := &generated.User{
+		Id:        dbUser.ID.String(), // Standard UUID format with dashes
+		Username:  dbUser.Username,
+		Email:     dbUser.Email,
+		FirstName: dbUser.FirstName,
+		LastName:  dbUser.LastName,
+		Artists:   artistNames,
 	}
 
 	// Return response

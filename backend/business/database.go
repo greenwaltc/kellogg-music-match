@@ -24,12 +24,12 @@ type DatabaseConfig struct {
 // NewDatabaseConfigFromEnv creates a database config from environment variables
 func NewDatabaseConfigFromEnv() *DatabaseConfig {
 	return &DatabaseConfig{
-		Host:     getEnvWithDefault("KELLOGG_MUSIC_MATCH_DATABASE_HOST", "localhost"),
-		Port:     getEnvWithDefault("KELLOGG_MUSIC_MATCH_DATABASE_PORT", "5432"),
-		Name:     getEnvWithDefault("KELLOGG_MUSIC_MATCH_DATABASE_NAME", "kellogg_music_match"),
-		User:     getEnvWithDefault("KELLOGG_MUSIC_MATCH_DATABASE_USER", "postgres"),
-		Password: getEnvWithDefault("KELLOGG_MUSIC_MATCH_DATABASE_PASSWORD", "postgres123"),
-		SSLMode:  getEnvWithDefault("KELLOGG_MUSIC_MATCH_DATABASE_SSL_MODE", "disable"),
+		Host:     getEnvWithDefault("DB_HOST", "localhost"),
+		Port:     getEnvWithDefault("DB_PORT", "5432"),
+		Name:     getEnvWithDefault("DB_NAME", "kellogg_music_match"),
+		User:     getEnvWithDefault("DB_USER", "kellogg_user"),
+		Password: getEnvWithDefault("DB_PASSWORD", "kellogg_secure_pass_2024"),
+		SSLMode:  getEnvWithDefault("DB_SSLMODE", "disable"),
 	}
 }
 
@@ -42,25 +42,24 @@ func (c *DatabaseConfig) ConnectionString() string {
 // UserRepository defines the interface for user data operations
 type UserRepository interface {
 	// User operations
-	CreateUser(ctx context.Context, id, username, email, firstName, lastName, passwordHash string) (*sqlc.User, error)
+	CreateUser(ctx context.Context, id uuid.UUID, username, email, firstName, lastName, passwordHash string) (*sqlc.User, error)
 	GetUserByUsername(ctx context.Context, username string) (*sqlc.User, error)
+	GetUserByUsernameWithPassword(ctx context.Context, username string) (*sqlc.User, error)
 	GetUserByEmail(ctx context.Context, email string) (*sqlc.User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (*sqlc.User, error)
 	UserExistsByUsername(ctx context.Context, username string) (bool, error)
 	UserExistsByEmail(ctx context.Context, email string) (bool, error)
 	GetAllUsersWithArtists(ctx context.Context) ([]sqlc.GetUsersWithArtistsRow, error)
-
+	
 	// Artist operations
 	CreateArtist(ctx context.Context, name string) (*sqlc.Artist, error)
 	GetArtistByName(ctx context.Context, name string) (*sqlc.Artist, error)
-
+	
 	// User-Artist relationship operations
 	SetUserArtists(ctx context.Context, userID uuid.UUID, artistNames []string) error
 	GetUserArtists(ctx context.Context, userID uuid.UUID) ([]sqlc.Artist, error)
 	ClearUserArtists(ctx context.Context, userID uuid.UUID) error
-}
-
-// PostgreSQLUserRepository implements UserRepository using PostgreSQL
+}// PostgreSQLUserRepository implements UserRepository using PostgreSQL
 type PostgreSQLUserRepository struct {
 	db      *sql.DB
 	queries *sqlc.Queries
@@ -84,20 +83,35 @@ func NewPostgreSQLUserRepository(config *DatabaseConfig) (*PostgreSQLUserReposit
 	}, nil
 }
 
+// NewUserRepository creates a new UserRepository with default database configuration
+func NewUserRepository() (UserRepository, error) {
+	config := NewDatabaseConfigFromEnv()
+	
+	// Log connection attempt (without password)
+	fmt.Printf("Attempting database connection to %s:%s@%s:%s/%s\n", 
+		config.User, "***", config.Host, config.Port, config.Name)
+	
+	repo, err := NewPostgreSQLUserRepository(config)
+	if err != nil {
+		fmt.Printf("Database connection failed: %v\n", err)
+		return nil, fmt.Errorf("failed to create user repository: %w", err)
+	}
+	
+	fmt.Println("Database connection successful!")
+	return repo, nil
+}
+
 // Close closes the database connection
 func (r *PostgreSQLUserRepository) Close() error {
 	return r.db.Close()
 }
 
 // CreateUser creates a new user in the database
-func (r *PostgreSQLUserRepository) CreateUser(ctx context.Context, id, username, email, firstName, lastName, passwordHash string) (*sqlc.User, error) {
-	userID, err := uuid.Parse(id)
-	if err != nil {
-		return nil, fmt.Errorf("invalid UUID: %w", err)
-	}
-
+func (r *PostgreSQLUserRepository) CreateUser(ctx context.Context, id uuid.UUID, username, email, firstName, lastName, passwordHash string) (*sqlc.User, error) {
+	fmt.Printf("CreateUser called: ID=%s, Username=%s, Email=%s\n", id.String(), username, email)
+	
 	user, err := r.queries.CreateUser(ctx, sqlc.CreateUserParams{
-		ID:           userID,
+		ID:           id,
 		Username:     username,
 		Email:        email,
 		FirstName:    firstName,
@@ -105,14 +119,26 @@ func (r *PostgreSQLUserRepository) CreateUser(ctx context.Context, id, username,
 		PasswordHash: passwordHash,
 	})
 	if err != nil {
+		fmt.Printf("CreateUser database error: %v\n", err)
 		return nil, err
 	}
+	
+	fmt.Printf("CreateUser successful: ID=%s, Username=%s\n", user.ID.String(), user.Username)
 	return &user, nil
 }
 
 // GetUserByUsername retrieves a user by username
 func (r *PostgreSQLUserRepository) GetUserByUsername(ctx context.Context, username string) (*sqlc.User, error) {
 	user, err := r.queries.GetUserByUsername(ctx, username)
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+// GetUserByUsernameWithPassword retrieves a user by username with password for authentication
+func (r *PostgreSQLUserRepository) GetUserByUsernameWithPassword(ctx context.Context, username string) (*sqlc.User, error) {
+	user, err := r.queries.GetUserByUsernameWithPassword(ctx, username)
 	if err != nil {
 		return nil, err
 	}

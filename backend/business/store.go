@@ -9,12 +9,15 @@ import (
 )
 
 // UserWithPassword extends User with password hash for internal storage
+// Deprecated: This type is no longer used. Use UserRepository interface instead.
 type UserWithPassword struct {
 	generated.User
 	PasswordHash string `json:"-"`
 }
 
 // Store represents an in-memory data store for users
+// Deprecated: This implementation has been replaced by UserRepository interface with PostgreSQL backend.
+// Use business.NewUserRepository() instead of business.NewStore().
 type Store struct {
 	mu     sync.RWMutex
 	users  map[string]*UserWithPassword // key=username
@@ -22,6 +25,8 @@ type Store struct {
 }
 
 // NewStore creates a new memory store
+// Deprecated: This implementation has been replaced by UserRepository interface with PostgreSQL backend.
+// Use business.NewUserRepository() instead.
 func NewStore() *Store {
 	return &Store{
 		users:  make(map[string]*UserWithPassword),

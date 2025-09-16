@@ -5,20 +5,14 @@ FROM golang:1.22-alpine AS build
 # Install ca-certificates and dependencies
 RUN apk --no-cache add ca-certificates git curl
 
-# Install SQLC
-RUN go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
-
 WORKDIR /app
 
 # Copy dependency files first for better layer caching
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy source code
+# Copy source code (SQLC code is pre-generated and committed)
 COPY . .
-
-# Generate SQLC code
-RUN sqlc generate
 
 # Build with security hardening flags  
 RUN CGO_ENABLED=0 \
