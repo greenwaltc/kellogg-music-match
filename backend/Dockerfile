@@ -2,8 +2,11 @@
 # 1. Build stage
 FROM golang:1.22-alpine AS build
 
-# Install ca-certificates for HTTPS requests
-RUN apk --no-cache add ca-certificates
+# Install ca-certificates and dependencies
+RUN apk --no-cache add ca-certificates git curl
+
+# Install SQLC
+RUN go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
 
 WORKDIR /app
 
@@ -13,6 +16,9 @@ RUN go mod download
 
 # Copy source code
 COPY . .
+
+# Generate SQLC code
+RUN sqlc generate
 
 # Build with security hardening flags  
 RUN CGO_ENABLED=0 \

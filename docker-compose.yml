@@ -1,11 +1,48 @@
-version: '3.9'
 services:
+  # PostgreSQL Database - mirrors Pulumi configuration
+  postgres:
+    image: postgres:15-alpine
+    container_name: kmm-postgres
+    environment:
+      POSTGRES_USER: kellogg_user
+      POSTGRES_PASSWORD: kellogg_secure_pass_2024
+      POSTGRES_DB: kellogg_music_match
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      # Mount initialization scripts
+      - ./DATABASE_SCHEMA.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./init-database.sh:/docker-entrypoint-initdb.d/02-init.sh:ro
+      # Persistent data storage
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kellogg_user -d kellogg_music_match"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
   backend:
     build: ./backend
     image: kellogg-music-match-backend:latest
     container_name: kmm-backend
+    environment:
+      # Database connection environment variables
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: kellogg_music_match
+      DB_USER: kellogg_user
+      DB_PASSWORD: kellogg_secure_pass_2024
+      DB_SSLMODE: disable
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "8080:8080"
+    restart: unless-stopped
+
   ui:
     build: 
       context: ./ui
@@ -20,3 +57,9 @@ services:
       - backend
     ports:
       - "4200:80"
+    restart: unless-stopped
+
+# Named volumes for data persistence
+volumes:
+  postgres_data:
+    driver: local

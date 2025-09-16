@@ -1,15 +1,18 @@
 # 🎵 Kellogg Music Match
 
-A professional full-stack music taste matching application with Go backend, Angular frontend, and automated infrastructure deployment.
+A professional full-stack music taste matching application with Go backend, Angular frontend, PostgreSQL database, and automated infrastructure deployment.
 
 ## 🏗️ Architecture Overview
 
 ```
 kellogg-music-match/
-├── backend/          # Go backend with OpenAPI generation
-├── ui/              # Angular frontend application
-├── pulumi/          # Infrastructure as Code (Pulumi)
-├── Makefile         # Top-level orchestration
+├── backend/              # Go backend with OpenAPI generation
+├── ui/                  # Angular frontend application  
+├── pulumi/              # Infrastructure as Code (Pulumi)
+├── DATABASE_SCHEMA.sql  # PostgreSQL database schema
+├── init-database.sh     # Database initialization script
+├── dev.sh              # Development environment helper
+├── Makefile            # Top-level orchestration
 └── docker-compose.yml  # Local development environment
 ```
 
@@ -17,7 +20,15 @@ kellogg-music-match/
 - **Go 1.22+** with OpenAPI-generated server
 - **Clean Architecture** - Generated code separated from business logic
 - **REST API** with authentication, user management, and music matching
+- **PostgreSQL** database integration with comprehensive schema
 - **Docker** containerization with multi-stage builds
+
+### 🗄️ Database
+- **PostgreSQL 15** with normalized schema design
+- **Automatic initialization** with sample data for development
+- **User management** with bcrypt password hashing
+- **Music matching** with artist relationships and similarity scoring
+- **Performance optimized** with indexes and views
 
 ### 🎨 Frontend  
 - **Angular 17+** with reactive forms and modern UI
@@ -27,6 +38,7 @@ kellogg-music-match/
 
 ### ☁️ Infrastructure
 - **Pulumi** Infrastructure as Code
+- **Kubernetes deployment** with StatefulSet for PostgreSQL
 - **Cloud deployment** ready (AWS/Azure/GCP)
 - **Automated provisioning** and configuration management
 
@@ -36,6 +48,7 @@ kellogg-music-match/
 - **Go 1.22+**
 - **Node.js 18+** 
 - **Docker & Docker Compose**
+- **PostgreSQL client tools** (optional, for direct database access)
 - **Make**
 
 ### 1. Initial Setup
@@ -47,22 +60,48 @@ make setup
 ```
 
 ### 2. Development Environment
+
+#### Option A: Full Docker Environment (Recommended)
 ```bash
-# Option 1: Full Docker environment (recommended)
+# Start everything (database, backend, frontend)
+./dev.sh start
+
+# Or use Make
 make docker-run
+```
 
-# Option 2: Local development with live reload
-make dev
+#### Option B: Database + Local Development
+```bash
+# Start only PostgreSQL database
+./dev.sh db-only
 
-# Option 3: Component-specific development
-make backend-dev  # Backend only
-make ui-dev       # Frontend only
+# In separate terminals:
+make backend-dev  # Backend with live reload
+make ui-dev       # Frontend with live reload
+```
+
+#### Option C: Individual Services
+```bash
+./dev.sh db-only      # Database only
+make backend-dev      # Backend only  
+make ui-dev          # Frontend only
 ```
 
 ### 3. Access the Application
 - **Frontend:** http://localhost:4200
 - **Backend API:** http://localhost:8080  
+- **Database:** localhost:5432 (user: `kellogg_user`, db: `kellogg_music_match`)
 - **Health Check:** http://localhost:8080/health
+
+### 4. Test the Setup
+```bash
+# Run comprehensive tests
+./dev.sh test
+
+# Or run specific tests
+make test              # Application tests
+make docker-test       # Docker environment tests
+```
 
 ## 🛠️ Development Commands
 
@@ -72,6 +111,19 @@ make help           # Show all available commands
 make info           # Project information
 make status         # Application status
 make health         # Health check
+```
+
+### 🗄️ Database Operations
+```bash
+./dev.sh start           # Start all services (including database)
+./dev.sh db-only         # Start PostgreSQL database only
+./dev.sh status          # Show service status
+./dev.sh logs            # View logs
+./dev.sh cleanup         # Stop and remove all data
+./dev.sh test            # Run database tests
+
+# Direct database access
+psql -h localhost -p 5432 -U kellogg_user -d kellogg_music_match
 ```
 
 ### 🏗️ Build & Test
@@ -89,6 +141,8 @@ make docker-run         # Start full application
 make docker-stop        # Stop all services
 make docker-logs        # View application logs
 make docker-restart     # Restart services
+make docker-db          # Start database only
+make docker-test        # Test Docker environment
 ```
 
 ### 🔧 Backend Development
@@ -115,6 +169,45 @@ make infra-deploy      # Deploy infrastructure
 make infra-destroy     # Destroy infrastructure
 make infra-output      # Show infrastructure outputs
 ```
+
+## 🗄️ Database Information
+
+### Database Schema
+The application uses PostgreSQL with a comprehensive schema including:
+
+- **Users Table**: Authentication and profile management with bcrypt password hashing
+- **Artists Table**: Normalized artist storage with automatic name normalization
+- **User-Artists Table**: Many-to-many relationships for music preferences
+- **Views**: Optimized queries for user profiles and music matching
+- **Indexes**: Performance optimization for common operations
+
+### Sample Data
+The development database includes:
+- **10 Popular Artists**: Taylor Swift, The Beatles, Radiohead, Beyoncé, etc.
+- **3 Test Users**: alice, bob, charlie (password: `password123`)
+- **Sample Relationships**: Pre-configured music preferences for testing
+
+### Database Connection
+```bash
+# Docker Compose (local development)
+Host: localhost
+Port: 5432
+Database: kellogg_music_match
+Username: kellogg_user
+Password: kellogg_secure_pass_2024
+
+# Kubernetes (deployment)
+Host: postgres.kellogg-music-match.svc.cluster.local
+Port: 5432
+Database: kellogg_music_match
+Username: kellogg_user
+Password: [from kubernetes secret]
+```
+
+### Database Files
+- **`DATABASE_SCHEMA.sql`**: Complete PostgreSQL schema with tables, indexes, functions, and sample data
+- **`init-database.sh`**: Initialization script for automatic setup
+- **`DATABASE_SCHEMA.md`**: Comprehensive documentation with examples and queries
 
 ## 🔄 Development Workflows
 

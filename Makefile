@@ -12,7 +12,18 @@ help: ## Show this help message
 	@echo "Component-specific commands:"
 	@echo "  backend-*     Backend operations (make backend-build, backend-test, etc.)"
 	@echo "  ui-*          UI operations (make ui-build, ui-dev, etc.)"
+	@echo "  db-*          Database operations (make db-start, db-test, etc.)"
 	@echo "  infra-*       Infrastructure operations (make infra-deploy, infra-destroy, etc.)"
+	@echo ""
+	@echo "Schema management:"
+	@echo "  sync-schema       Sync DATABASE_SCHEMA.sql from backend/db/schema/*.sql"
+	@echo "  check-schema-sync Verify schema files are synchronized"
+	@echo "  create-migration  Create new migration file (make create-migration name=add_feature)"
+	@echo ""
+	@echo "Quick development workflow:"
+	@echo "  ./dev.sh start     Start full application"
+	@echo "  ./dev.sh db-only   Start database only"
+	@echo "  ./dev.sh test      Test environment"
 	@echo ""
 
 ## =============================================================================
@@ -24,23 +35,17 @@ build: backend-build ui-build ## Build both backend and UI
 
 dev: ## Start full development environment
 	@echo "🚀 Starting full development environment..."
-	@$(MAKE) backend-dev &
-	@sleep 3
-	@$(MAKE) ui-dev
-	@echo "🌐 Frontend: http://localhost:4200"
-	@echo "🔧 Backend: http://localhost:8080"
+	@echo "� This uses the './dev.sh start' script for reliable startup"
+	@./dev.sh start
 
 dev-stop: ## Stop development servers
 	@echo "🛑 Stopping development servers..."
-	@pkill -f "air" || true
-	@pkill -f "ng serve" || true
-	@pkill -f "npm start" || true
-	@echo "✅ Development servers stopped!"
+	@./dev.sh stop
 
 test: backend-test ui-test ## Run all tests
 	@echo "✅ All tests complete!"
 
-check: backend-check ui-check ## Run all checks (lint, test, format)
+check: backend-check ui-check check-schema-sync ## Run all checks (lint, test, format, schema sync)
 	@echo "✅ All checks passed!"
 
 clean: backend-clean ui-clean docker-clean ## Clean all build artifacts
@@ -84,11 +89,134 @@ docker-logs: ## Show Docker logs
 	@echo "📋 Showing Docker logs..."
 	@docker-compose logs -f
 
+docker-db: ## Start PostgreSQL database only
+	@echo "🗄️ Starting PostgreSQL database..."
+	@./dev.sh db-only
+
+docker-test: ## Test Docker environment
+	@echo "🧪 Testing Docker environment..."
+	@./test-docker-compose.sh
+
 docker-clean: ## Clean Docker resources
 	@echo "🧹 Cleaning Docker resources..."
 	@docker-compose down --rmi all --volumes --remove-orphans 2>/dev/null || true
 	@docker system prune -f 2>/dev/null || true
 	@echo "✅ Docker cleanup complete!"
+
+## =============================================================================
+## 🗄️  DATABASE OPERATIONS
+## =============================================================================
+
+sync-schema: ## Synchronize DATABASE_SCHEMA.sql from all backend schema files
+	@echo "🔄 Synchronizing schema files..."
+	@echo "-- Kellogg Music Match Database Schema" > DATABASE_SCHEMA.sql
+	@echo "-- This file is automatically synchronized from backend/db/schema/*.sql files" >> DATABASE_SCHEMA.sql
+	@echo "-- DO NOT EDIT DIRECTLY - Make changes in backend/db/schema/ and run 'make sync-schema'" >> DATABASE_SCHEMA.sql
+	@echo "-- " >> DATABASE_SCHEMA.sql
+	@echo "-- Schema files are processed in alphabetical order:" >> DATABASE_SCHEMA.sql
+	@for file in backend/db/schema/*.sql; do \
+		if [ -f "$$file" ]; then \
+			echo "-- $$file" >> DATABASE_SCHEMA.sql; \
+		fi; \
+	done
+	@echo "" >> DATABASE_SCHEMA.sql
+	@echo "-- ============================================================================" >> DATABASE_SCHEMA.sql
+	@echo "-- CONSOLIDATED SCHEMA (Auto-generated from backend/db/schema/*.sql)" >> DATABASE_SCHEMA.sql
+	@echo "-- ============================================================================" >> DATABASE_SCHEMA.sql
+	@echo "" >> DATABASE_SCHEMA.sql
+	@for file in backend/db/schema/*.sql; do \
+		if [ -f "$$file" ]; then \
+			echo "-- -------------------------------------------------------------------------" >> DATABASE_SCHEMA.sql; \
+			echo "-- From: $$file" >> DATABASE_SCHEMA.sql; \
+			echo "-- -------------------------------------------------------------------------" >> DATABASE_SCHEMA.sql; \
+			cat "$$file" >> DATABASE_SCHEMA.sql; \
+			echo "" >> DATABASE_SCHEMA.sql; \
+		fi; \
+	done
+	@echo "✅ Schema synchronized from backend/db/schema/*.sql to DATABASE_SCHEMA.sql"
+
+check-schema-sync: ## Check if schema files are synchronized
+	@echo "🔍 Checking schema synchronization..."
+	@temp_file=$$(mktemp) && \
+	echo "-- Kellogg Music Match Database Schema" > $$temp_file && \
+	echo "-- This file is automatically synchronized from backend/db/schema/*.sql files" >> $$temp_file && \
+	echo "-- DO NOT EDIT DIRECTLY - Make changes in backend/db/schema/ and run 'make sync-schema'" >> $$temp_file && \
+	echo "-- " >> $$temp_file && \
+	echo "-- Schema files are processed in alphabetical order:" >> $$temp_file && \
+	for file in backend/db/schema/*.sql; do \
+		if [ -f "$$file" ]; then \
+			echo "-- $$file" >> $$temp_file; \
+		fi; \
+	done && \
+	echo "" >> $$temp_file && \
+	echo "-- ============================================================================" >> $$temp_file && \
+	echo "-- CONSOLIDATED SCHEMA (Auto-generated from backend/db/schema/*.sql)" >> $$temp_file && \
+	echo "-- ============================================================================" >> $$temp_file && \
+	echo "" >> $$temp_file && \
+	for file in backend/db/schema/*.sql; do \
+		if [ -f "$$file" ]; then \
+			echo "-- -------------------------------------------------------------------------" >> $$temp_file; \
+			echo "-- From: $$file" >> $$temp_file; \
+			echo "-- -------------------------------------------------------------------------" >> $$temp_file; \
+			cat "$$file" >> $$temp_file; \
+			echo "" >> $$temp_file; \
+		fi; \
+	done && \
+	if diff -q $$temp_file DATABASE_SCHEMA.sql >/dev/null 2>&1; then \
+		echo "✅ Schema files are synchronized"; \
+		rm $$temp_file; \
+	else \
+		echo "❌ Schema files are out of sync!"; \
+		echo "🔧 Run 'make sync-schema' to synchronize"; \
+		rm $$temp_file; \
+		exit 1; \
+	fi
+
+create-migration: ## Create a new schema migration file (usage: make create-migration name=add_user_roles)
+	@if [ -z "$(name)" ]; then \
+		echo "❌ Please provide a migration name: make create-migration name=your_migration_name"; \
+		exit 1; \
+	fi
+	@./create-migration.sh "$(name)"
+
+db-start: docker-db ## Start PostgreSQL database only
+
+db-status: ## Show database status
+	@echo "📊 Database status..."
+	@./dev.sh status
+
+db-logs: ## Show database logs  
+	@echo "📋 Database logs..."
+	@docker-compose logs postgres
+
+db-connect: ## Connect to database with psql
+	@echo "🔗 Connecting to database..."
+	@psql -h localhost -p 5432 -U kellogg_user -d kellogg_music_match
+
+db-test: ## Test database setup
+	@echo "🧪 Testing database..."
+	@./test-docker-compose.sh
+
+db-reset: ## Reset database (clean + restart)
+	@echo "🔄 Resetting database..."
+	@./dev.sh cleanup
+	@./dev.sh db-only
+
+db-backup: ## Create database backup
+	@echo "💾 Creating database backup..."
+	@mkdir -p backups
+	@docker-compose exec -T postgres pg_dump -U kellogg_user kellogg_music_match > backups/backup_$(shell date +%Y%m%d_%H%M%S).sql
+	@echo "✅ Backup created in backups/ directory"
+
+db-help: ## Show database commands
+	@echo "🗄️ Database Commands:"
+	@echo "  db-start    Start PostgreSQL database"
+	@echo "  db-status   Show database status"
+	@echo "  db-logs     Show database logs"
+	@echo "  db-connect  Connect with psql"
+	@echo "  db-test     Test database setup"
+	@echo "  db-reset    Reset database"
+	@echo "  db-backup   Create backup"
 
 ## =============================================================================
 ## 🏗️  BACKEND OPERATIONS

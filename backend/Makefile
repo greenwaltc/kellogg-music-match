@@ -1,7 +1,7 @@
 # Makefile for Kellogg Music Match Backend
 # This Makefile provides targets for OpenAPI code generation and common development tasks
 
-.PHONY: help generate clean build test run docker-build docker-run docker-stop dev
+.PHONY: help generate generate-sqlc clean build test run docker-build docker-run docker-stop dev install-tools
 
 # Default target
 help: ## Show this help message
@@ -10,7 +10,7 @@ help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 
-generate: ## Generate OpenAPI server code from openapi.yaml
+generate: generate-sqlc ## Generate OpenAPI server code and SQLC code from specifications
 	@echo "🔧 Generating OpenAPI server code..."
 	@# Remove existing generated files temporarily
 	@if [ -d "generated/temp_backup" ]; then rm -rf generated/temp_backup; fi
@@ -35,15 +35,34 @@ generate: ## Generate OpenAPI server code from openapi.yaml
 	@echo "💼 Business logic remains in the 'business' package"
 	@echo "🚀 Application entry point is in 'cmd/main.go'"
 
+generate-sqlc: ## Generate SQLC code from SQL schema and queries
+	@echo "🗄️ Generating SQLC code..."
+	@if command -v sqlc >/dev/null 2>&1; then \
+		sqlc generate; \
+		echo "✅ SQLC code generation complete!"; \
+	elif [ -f ~/go/bin/sqlc ]; then \
+		~/go/bin/sqlc generate; \
+		echo "✅ SQLC code generation complete!"; \
+	else \
+		echo "❌ 'sqlc' tool not found. Installing..."; \
+		go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest; \
+		~/go/bin/sqlc generate; \
+		echo "✅ SQLC installed and code generated!"; \
+	fi
+	@echo "🔄 Synchronizing root DATABASE_SCHEMA.sql..."
+	@cd .. && $(MAKE) sync-schema
+
 clean: ## Clean build artifacts and temporary files
 	@echo "🧹 Cleaning build artifacts..."
 	@rm -f server backend
+	@rm -rf db/sqlc/*.go
+	@echo "✅ Cleanup complete!"
 	@rm -rf generated/temp_gen generated/temp_backup
 	@rm -f *.log
 	@go clean
 	@echo "✅ Clean complete!"
 
-build: ## Build the backend server
+build: generate-sqlc ## Build the backend server (includes SQLC generation)
 	@echo "🔨 Building backend server..."
 	@go mod tidy
 	@go build -o server ./cmd
@@ -54,16 +73,30 @@ test: ## Run tests
 	@go test ./... -v
 	@echo "✅ Tests complete!"
 
-run: build ## Build and run the server locally
-	@echo "🚀 Starting server on :8080..."
-	@./server
+run: build ## Build and run the backend server (includes SQLC generation)
+	@echo "🌍 Setting database environment variables..."
+	@export KELLOGG_MUSIC_MATCH_DATABASE_HOST=localhost && \
+	export KELLOGG_MUSIC_MATCH_DATABASE_PORT=5432 && \
+	export KELLOGG_MUSIC_MATCH_DATABASE_NAME=kellogg_music_match && \
+	export KELLOGG_MUSIC_MATCH_DATABASE_USER=postgres && \
+	export KELLOGG_MUSIC_MATCH_DATABASE_PASSWORD=postgres123 && \
+	export KELLOGG_MUSIC_MATCH_DATABASE_SSL_MODE=disable && \
+	echo "🚀 Starting server on :8080..." && \
+	./server
 
-dev: ## Start development server with live reload (requires 'air' tool)
-	@if command -v air >/dev/null 2>&1; then \
+dev: generate-sqlc ## Start development server with live reload (includes SQLC generation)
+	@echo "🌍 Setting database environment variables..."
+	@export KELLOGG_MUSIC_MATCH_DATABASE_HOST=localhost && \
+	export KELLOGG_MUSIC_MATCH_DATABASE_PORT=5432 && \
+	export KELLOGG_MUSIC_MATCH_DATABASE_NAME=kellogg_music_match && \
+	export KELLOGG_MUSIC_MATCH_DATABASE_USER=postgres && \
+	export KELLOGG_MUSIC_MATCH_DATABASE_PASSWORD=postgres123 && \
+	export KELLOGG_MUSIC_MATCH_DATABASE_SSL_MODE=disable && \
+	if command -v air >/dev/null 2>&1; then \
 		echo "🔥 Starting development server with live reload..."; \
 		air; \
 	else \
-		echo "❌ 'air' tool not found. Install with: go install github.com/cosmtrek/air@latest"; \
+		echo "❌ 'air' tool not found. Install with: make install-tools"; \
 		echo "🚀 Starting server normally..."; \
 		$(MAKE) run; \
 	fi
@@ -92,7 +125,8 @@ docker-logs: ## Show Docker Compose logs
 
 install-tools: ## Install development tools
 	@echo "🔧 Installing development tools..."
-	@go install github.com/cosmtrek/air@latest
+	@go install github.com/air-verse/air@latest
+	@go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
 	@echo "✅ Development tools installed!"
 
 lint: ## Run linting

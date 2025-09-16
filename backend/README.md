@@ -1,6 +1,6 @@
 # Kellogg Music Match Backend
 
-A Go backend server generated from OpenAPI specifications with clean architecture separation.
+A Go backend server generated from OpenAPI specifications with PostgreSQL database integration and clean architecture separation.
 
 ## 🏗️ Architecture
 
@@ -9,6 +9,26 @@ A Go backend server generated from OpenAPI specifications with clean architectur
 - **`cmd/`** - Application entry point and service wrappers
 - **`openapi.yaml`** - API specification
 - **`Makefile`** - Build automation and development tasks
+
+## 🗄️ Database Integration
+
+The backend integrates with PostgreSQL database for:
+- **User Management**: Registration, authentication with bcrypt password hashing
+- **Music Preferences**: Artist storage and user-artist relationships
+- **Matching Algorithm**: Music taste similarity calculations using Jaccard similarity
+
+### Database Configuration
+The backend uses these environment variables for database connection:
+```bash
+KELLOGG_MUSIC_MATCH_DATABASE_HOST=localhost
+KELLOGG_MUSIC_MATCH_DATABASE_PORT=5432
+KELLOGG_MUSIC_MATCH_DATABASE_NAME=kellogg_music_match
+KELLOGG_MUSIC_MATCH_DATABASE_USER=postgres
+KELLOGG_MUSIC_MATCH_DATABASE_PASSWORD=postgres123
+KELLOGG_MUSIC_MATCH_DATABASE_SSL_MODE=disable
+```
+
+> **Note**: These match the Docker Compose configuration for seamless local development.
 
 ## 🚀 Quick Start
 
@@ -19,28 +39,34 @@ A Go backend server generated from OpenAPI specifications with clean architectur
 
 ### Development Workflow
 
-1. **View available commands:**
+1. **Start the database:**
+   ```bash
+   # From project root
+   ./dev.sh db-only
+   ```
+
+2. **View available commands:**
    ```bash
    make help
    ```
 
-2. **Generate OpenAPI code from specification:**
+3. **Generate OpenAPI code from specification:**
    ```bash
    make generate
    ```
 
-3. **Build and run locally:**
+4. **Build and run locally (with database):**
    ```bash
    make run
    ```
 
-4. **Development with live reload:**
+5. **Development with live reload:**
    ```bash
    make install-tools  # Install 'air' tool
-   make dev
+   make dev           # Runs with database environment variables
    ```
 
-5. **Run with Docker:**
+6. **Run with Docker:**
    ```bash
    make docker-run
    ```
