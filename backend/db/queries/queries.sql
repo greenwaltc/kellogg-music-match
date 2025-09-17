@@ -109,35 +109,23 @@ GROUP BY u.id, u.username, u.email, u.first_name, u.last_name
 ORDER BY u.username;
 
 -- name: FindSimilarUsers :many
-WITH user_artist_lists AS (
-  -- Step 1: Create an ordered list of artist names for each user.
-  SELECT
-    u.id AS user_id,
-    u.username,
-    array_agg(a.name ORDER BY ua.rank ASC) AS artists
-  FROM
-    users u
-  JOIN
-    user_artists ua ON u.id = ua.user_id
-  JOIN
-    artists a ON ua.artist_id = a.id
-  GROUP BY
-    u.id, u.username
-)
--- Step 2: Compare every user against the target user's list.
 SELECT
-  -- 'compare_user' is the user we are finding matches for.
-  compare_user.username,
-  -- 'target_user' is the one we are comparing against.
-  spearman_distance(compare_user.artists, target_user.artists) AS distance
-FROM
-  user_artist_lists AS compare_user,
-  user_artist_lists AS target_user
-WHERE
-  -- Define your target user here.
-  target_user.username = $1
-  -- Ensure we don't compare the user to themselves.
-  AND compare_user.username != target_user.username
-ORDER BY
-  distance ASC
+  u1.username,
+  u1.first_name,
+  u1.last_name,
+  spearman_distance(
+    (SELECT array_agg(a1.name ORDER BY ua1.rank ASC)
+     FROM user_artists ua1
+     JOIN artists a1 ON ua1.artist_id = a1.id
+     WHERE ua1.user_id = u1.id),
+    (SELECT array_agg(a2.name ORDER BY ua2.rank ASC)
+     FROM users u2
+     JOIN user_artists ua2 ON u2.id = ua2.user_id
+     JOIN artists a2 ON ua2.artist_id = a2.id
+     WHERE u2.username = $1)
+  ) AS distance
+FROM users u1
+WHERE u1.username != $1
+  AND EXISTS (SELECT 1 FROM user_artists WHERE user_id = u1.id)
+ORDER BY distance ASC
 LIMIT 10;
