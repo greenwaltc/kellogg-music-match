@@ -5,9 +5,9 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
-	"golang.org/x/crypto/bcrypt"
 	sqlc "github.com/greenwaltc/kellogg-music-match/backend/db/sqlc"
 	"github.com/greenwaltc/kellogg-music-match/backend/generated"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // AuthService implements the business logic for authentication
@@ -25,9 +25,9 @@ func NewAuthService(userRepo UserRepository) *AuthService {
 // RegisterUser implements user registration business logic
 func (s *AuthService) RegisterUser(ctx context.Context, registerRequest generated.RegisterRequest) (generated.ImplResponse, error) {
 	// Validate input
-	if registerRequest.Username == "" || registerRequest.Password == "" || 
-	   registerRequest.Email == "" || registerRequest.FirstName == "" || 
-	   registerRequest.LastName == "" {
+	if registerRequest.Username == "" || registerRequest.Password == "" ||
+		registerRequest.Email == "" || registerRequest.FirstName == "" ||
+		registerRequest.LastName == "" {
 		return generated.Response(http.StatusBadRequest, generated.ErrorResponse{
 			Message: "all fields are required",
 		}), nil
@@ -54,7 +54,7 @@ func (s *AuthService) RegisterUser(ctx context.Context, registerRequest generate
 	}
 	if emailExists {
 		return generated.Response(http.StatusConflict, generated.ErrorResponse{
-			Message: "email already exists", 
+			Message: "email already exists",
 		}), nil
 	}
 

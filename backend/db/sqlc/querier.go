@@ -18,6 +18,8 @@ type Querier interface {
 	CreateArtist(ctx context.Context, name string) (Artist, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteUser(ctx context.Context, id uuid.UUID) error
+	// Step 2: Compare every user against the target user's list.
+	FindSimilarUsers(ctx context.Context) ([]FindSimilarUsersRow, error)
 	GetAllArtists(ctx context.Context) ([]Artist, error)
 	GetAllUsers(ctx context.Context) ([]User, error)
 	GetArtistByID(ctx context.Context, id int32) (Artist, error)

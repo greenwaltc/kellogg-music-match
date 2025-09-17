@@ -1,11 +1,5 @@
-# Kellogg Music Match - Top-Level Mdev: ## Start full development environment
-	@echo "🚀 Starting full development environment..."
-	@echo "📋 Using docker-compose for reliable service management"
-	@docker-compose up -d
-
-dev-stop: ## Stop development servers
-	@echo "🛑 Stopping development servers..."
-	@docker-compose down# Orchestrates backend, UI, and infrastructure deployment
+# Kellogg Music Match - Top-Level Makefile
+# Orchestrates backend, UI, and infrastructure deployment
 
 .PHONY: help backend-% ui-% infra-% docker-% dev-% clean-% check status logs
 
@@ -41,12 +35,12 @@ build: backend-build ui-build ## Build both backend and UI
 
 dev: ## Start full development environment
 	@echo "🚀 Starting full development environment..."
-	@echo "� This uses the './dev.sh start' script for reliable startup"
-	@./dev.sh start
+	@echo "📋 Using docker-compose for reliable service management"
+	@docker-compose up -d
 
 dev-stop: ## Stop development servers
 	@echo "🛑 Stopping development servers..."
-	@./dev.sh stop
+	@docker-compose down
 
 test: backend-test ui-test ## Run all tests
 	@echo "✅ All tests complete!"
@@ -109,10 +103,6 @@ docker-clean: ## Clean Docker resources
 	@docker-compose down --rmi all --volumes --remove-orphans 2>/dev/null || true
 	@docker system prune -f 2>/dev/null || true
 	@echo "✅ Docker cleanup complete!"
-
-status: ## Show status of all services
-	@echo "📊 Service Status:"
-	@docker-compose ps
 
 logs: ## Show logs for all services
 	@echo "📋 Service Logs:"

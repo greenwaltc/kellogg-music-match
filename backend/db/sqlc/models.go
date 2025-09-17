@@ -31,4 +31,5 @@ type UserArtist struct {
 	UserID    uuid.UUID    `json:"user_id"`
 	ArtistID  int32        `json:"artist_id"`
 	CreatedAt sql.NullTime `json:"created_at"`
+	Rank      int16        `json:"rank"`
 }

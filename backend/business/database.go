@@ -50,16 +50,16 @@ type UserRepository interface {
 	UserExistsByUsername(ctx context.Context, username string) (bool, error)
 	UserExistsByEmail(ctx context.Context, email string) (bool, error)
 	GetAllUsersWithArtists(ctx context.Context) ([]sqlc.GetUsersWithArtistsRow, error)
-	
+
 	// Artist operations
 	CreateArtist(ctx context.Context, name string) (*sqlc.Artist, error)
 	GetArtistByName(ctx context.Context, name string) (*sqlc.Artist, error)
-	
+
 	// User-Artist relationship operations
 	SetUserArtists(ctx context.Context, userID uuid.UUID, artistNames []string) error
 	GetUserArtists(ctx context.Context, userID uuid.UUID) ([]sqlc.Artist, error)
 	ClearUserArtists(ctx context.Context, userID uuid.UUID) error
-}// PostgreSQLUserRepository implements UserRepository using PostgreSQL
+} // PostgreSQLUserRepository implements UserRepository using PostgreSQL
 type PostgreSQLUserRepository struct {
 	db      *sql.DB
 	queries *sqlc.Queries
@@ -86,17 +86,17 @@ func NewPostgreSQLUserRepository(config *DatabaseConfig) (*PostgreSQLUserReposit
 // NewUserRepository creates a new UserRepository with default database configuration
 func NewUserRepository() (UserRepository, error) {
 	config := NewDatabaseConfigFromEnv()
-	
+
 	// Log connection attempt (without password)
-	fmt.Printf("Attempting database connection to %s:%s@%s:%s/%s\n", 
+	fmt.Printf("Attempting database connection to %s:%s@%s:%s/%s\n",
 		config.User, "***", config.Host, config.Port, config.Name)
-	
+
 	repo, err := NewPostgreSQLUserRepository(config)
 	if err != nil {
 		fmt.Printf("Database connection failed: %v\n", err)
 		return nil, fmt.Errorf("failed to create user repository: %w", err)
 	}
-	
+
 	fmt.Println("Database connection successful!")
 	return repo, nil
 }
@@ -109,7 +109,7 @@ func (r *PostgreSQLUserRepository) Close() error {
 // CreateUser creates a new user in the database
 func (r *PostgreSQLUserRepository) CreateUser(ctx context.Context, id uuid.UUID, username, email, firstName, lastName, passwordHash string) (*sqlc.User, error) {
 	fmt.Printf("CreateUser called: ID=%s, Username=%s, Email=%s\n", id.String(), username, email)
-	
+
 	user, err := r.queries.CreateUser(ctx, sqlc.CreateUserParams{
 		ID:           id,
 		Username:     username,
@@ -122,7 +122,7 @@ func (r *PostgreSQLUserRepository) CreateUser(ctx context.Context, id uuid.UUID,
 		fmt.Printf("CreateUser database error: %v\n", err)
 		return nil, err
 	}
-	
+
 	fmt.Printf("CreateUser successful: ID=%s, Username=%s\n", user.ID.String(), user.Username)
 	return &user, nil
 }
@@ -204,9 +204,16 @@ func (r *PostgreSQLUserRepository) SetUserArtists(ctx context.Context, userID uu
 	}
 
 	// Set new associations
+	// Create a slice of integers from 1 to len(artistNames)
+	orderValues := make([]int32, len(artistNames))
+	for i := range orderValues {
+		orderValues[i] = int32(i + 1)
+	}
+
 	return r.queries.SetUserArtists(ctx, sqlc.SetUserArtistsParams{
 		UserID:  userID,
 		Column2: artistNames,
+		Column3: orderValues,
 	})
 }
 

@@ -25,7 +25,7 @@ func NewMatchingService(userRepo UserRepository, matching *MatchingEngine) *Matc
 // FindMusicMatches implements music matching business logic
 func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest generated.ArtistsRequest, xUserUsername string) (generated.ImplResponse, error) {
 	fmt.Printf("DEBUG: FindMusicMatches called for user: %s with artists: %v\n", xUserUsername, artistsRequest.Artists)
-	
+
 	// Validate input
 	if xUserUsername == "" {
 		return generated.Response(http.StatusBadRequest, generated.ErrorResponse{
@@ -48,7 +48,7 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 				Message: "failed to retrieve user",
 			}), nil
 		}
-		
+
 		if user == nil {
 			return generated.Response(http.StatusNotFound, generated.ErrorResponse{
 				Message: "user not found",
@@ -105,7 +105,7 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 
 	// Find matches using the algorithm
 	matches := s.matching.ComputeMatches(artistsRequest.Artists, xUserUsername, users)
-	
+
 	// Debug: log the matches
 	fmt.Printf("ComputeMatches returned %d matches for user %s\n", len(matches), xUserUsername)
 

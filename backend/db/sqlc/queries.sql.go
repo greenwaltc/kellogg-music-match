@@ -14,19 +14,20 @@ import (
 )
 
 const addUserArtist = `-- name: AddUserArtist :exec
-INSERT INTO user_artists (user_id, artist_id)
-VALUES ($1, $2)
-ON CONFLICT (user_id, artist_id) DO NOTHING
+INSERT INTO user_artists (user_id, artist_id, rank)
+VALUES ($1, $2, $3)
+ON CONFLICT (user_id, artist_id, rank) DO NOTHING
 `
 
 type AddUserArtistParams struct {
 	UserID   uuid.UUID `json:"user_id"`
 	ArtistID int32     `json:"artist_id"`
+	Rank     int16     `json:"rank"`
 }
 
 // User-Artist relationship queries
 func (q *Queries) AddUserArtist(ctx context.Context, arg AddUserArtistParams) error {
-	_, err := q.db.ExecContext(ctx, addUserArtist, arg.UserID, arg.ArtistID)
+	_, err := q.db.ExecContext(ctx, addUserArtist, arg.UserID, arg.ArtistID, arg.Rank)
 	return err
 }
 
@@ -99,6 +100,69 @@ DELETE FROM users WHERE id = $1
 func (q *Queries) DeleteUser(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.ExecContext(ctx, deleteUser, id)
 	return err
+}
+
+const findSimilarUsers = `-- name: FindSimilarUsers :many
+WITH user_artist_lists AS (
+  -- Step 1: Create an ordered list of artist names for each user.
+  SELECT
+    u.id AS user_id,
+    u.username,
+    array_agg(a.name ORDER BY ua.rank ASC) AS artists
+  FROM
+    users u
+  JOIN
+    user_artists ua ON u.id = ua.user_id
+  JOIN
+    artists a ON ua.artist_id = a.id
+  GROUP BY
+    u.id, u.username
+)
+SELECT
+  -- 'compare_user' is the user we are finding matches for.
+  compare_user.username,
+  -- 'target_user' is the one we are comparing against.
+  spearman_distance(compare_user.artists, target_user.artists) AS distance
+FROM
+  user_artist_lists AS compare_user,
+  user_artist_lists AS target_user
+WHERE
+  -- Define your target user here.
+  target_user.username = 'alice'
+  -- Ensure we don't compare the user to themselves.
+  AND compare_user.username != target_user.username
+ORDER BY
+  distance ASC
+LIMIT 10
+`
+
+type FindSimilarUsersRow struct {
+	Username string  `json:"username"`
+	Distance float64 `json:"distance"`
+}
+
+// Step 2: Compare every user against the target user's list.
+func (q *Queries) FindSimilarUsers(ctx context.Context) ([]FindSimilarUsersRow, error) {
+	rows, err := q.db.QueryContext(ctx, findSimilarUsers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []FindSimilarUsersRow{}
+	for rows.Next() {
+		var i FindSimilarUsersRow
+		if err := rows.Scan(&i.Username, &i.Distance); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getAllArtists = `-- name: GetAllArtists :many
@@ -420,21 +484,28 @@ WITH new_artists AS (
     RETURNING id, name
 ),
 artist_mapping AS (
-    SELECT id FROM new_artists
-    WHERE name = ANY($2::text[])
+    SELECT 
+        a.id, 
+        ranks.rank,
+        ROW_NUMBER() OVER () as row_num
+    FROM new_artists a
+    JOIN (SELECT unnest($3::int[]) as rank, generate_subscripts($3::int[], 1) as row_num) ranks
+        ON generate_subscripts($2::text[], 1) = ranks.row_num
+    WHERE a.name = ($2::text[])[ranks.row_num]
 )
-INSERT INTO user_artists (user_id, artist_id)
-SELECT $1, id FROM artist_mapping
-ON CONFLICT (user_id, artist_id) DO NOTHING
+INSERT INTO user_artists (user_id, artist_id, rank)
+SELECT $1, id, rank FROM artist_mapping
+ON CONFLICT (user_id, artist_id, rank) DO NOTHING
 `
 
 type SetUserArtistsParams struct {
 	UserID  uuid.UUID `json:"user_id"`
 	Column2 []string  `json:"column_2"`
+	Column3 []int32   `json:"column_3"`
 }
 
 func (q *Queries) SetUserArtists(ctx context.Context, arg SetUserArtistsParams) error {
-	_, err := q.db.ExecContext(ctx, setUserArtists, arg.UserID, pq.Array(arg.Column2))
+	_, err := q.db.ExecContext(ctx, setUserArtists, arg.UserID, pq.Array(arg.Column2), pq.Array(arg.Column3))
 	return err
 }
 
