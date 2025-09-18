@@ -1,6 +1,6 @@
 # Backend Dockerfile
 # 1. Build stage
-FROM golang:1.22-alpine AS build
+FROM golang:1.23-alpine AS build
 
 # Install ca-certificates and dependencies
 RUN apk --no-cache add ca-certificates git curl

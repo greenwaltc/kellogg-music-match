@@ -417,10 +417,17 @@ components:
           minimum: 0
           maximum: 1
           example: 0.812
+        artists:
+          type: array
+          description: List of favorite artists for this matched user
+          items:
+            type: string
+          example: ["The Beatles", "Radiohead", "Led Zeppelin"]
       required:
         - name
         - overlap
         - score
+        - artists
 
     ErrorResponse:
       type: object

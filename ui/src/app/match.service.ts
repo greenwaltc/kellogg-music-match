@@ -3,7 +3,13 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { environment } from '../environments/environment';
 import { AuthService } from './auth.service';
 
-export interface MatchUser { name: string; [k: string]: any }
+export interface MatchUser { 
+  name: string; 
+  overlap: number;
+  score: number;
+  artists: string[];
+  [k: string]: any 
+}
 
 @Injectable({ providedIn: 'root' })
 export class MatchService {
