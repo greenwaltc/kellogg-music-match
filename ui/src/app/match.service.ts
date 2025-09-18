@@ -11,6 +11,12 @@ export interface MatchUser {
   [k: string]: any 
 }
 
+export interface Artist {
+  id: number;
+  name: string;
+  created_at: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class MatchService {
   matches = signal<MatchUser[] | null>(null);
@@ -30,11 +36,16 @@ export class MatchService {
   const username = user.username;
   const headers = username ? new HttpHeaders({ 'X-User-Username': username }) : undefined;
   this.http.post<MatchUser[]>(this.url('/findMusicMatches'), { artists: user.artists }, { headers }).subscribe({
-        next: (res) => { this.matches.set(res); this.loading.set(false); },
+        next: (res: MatchUser[]) => { this.matches.set(res); this.loading.set(false); },
         error: () => { this.loading.set(false); }
       });
     }
   }
 
   private url(path: string): string { return `${this.apiBase}${path}`; }
+
+  searchArtists(query: string, limit: number = 10): Promise<Artist[]> {
+    const params = new URLSearchParams({ q: query, limit: limit.toString() });
+    return this.http.get<Artist[]>(`${this.url('/artists/search')}?${params}`).toPromise().then((result: Artist[] | undefined) => result || []);
+  }
 }

@@ -32,6 +32,7 @@ type Querier interface {
 	// Matching queries
 	GetUsersWithArtists(ctx context.Context) ([]GetUsersWithArtistsRow, error)
 	RemoveUserArtist(ctx context.Context, arg RemoveUserArtistParams) error
+	SearchArtists(ctx context.Context, arg SearchArtistsParams) ([]Artist, error)
 	SetUserArtists(ctx context.Context, arg SetUserArtistsParams) error
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
 	UserExistsByEmail(ctx context.Context, email string) (bool, error)

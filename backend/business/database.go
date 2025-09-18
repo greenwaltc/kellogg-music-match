@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/google/uuid"
 	sqlc "github.com/greenwaltc/kellogg-music-match/backend/db/sqlc"
@@ -54,6 +55,7 @@ type UserRepository interface {
 	// Artist operations
 	CreateArtist(ctx context.Context, name string) (*sqlc.Artist, error)
 	GetArtistByName(ctx context.Context, name string) (*sqlc.Artist, error)
+	SearchArtists(ctx context.Context, query string, limit int32) ([]sqlc.Artist, error)
 
 	// User-Artist relationship operations
 	SetUserArtists(ctx context.Context, userID uuid.UUID, artistNames []string) error
@@ -197,6 +199,21 @@ func (r *PostgreSQLUserRepository) GetArtistByName(ctx context.Context, name str
 		return nil, err
 	}
 	return &artist, nil
+}
+
+// SearchArtists performs fuzzy search for artists
+func (r *PostgreSQLUserRepository) SearchArtists(ctx context.Context, query string, limit int32) ([]sqlc.Artist, error) {
+	// Prepare fuzzy search patterns
+	fuzzyPattern := "%" + strings.ToLower(query) + "%"
+	exactQuery := strings.ToLower(query)
+	startsWithPattern := strings.ToLower(query) + "%"
+	
+	return r.queries.SearchArtists(ctx, sqlc.SearchArtistsParams{
+		Lower:   fuzzyPattern,     // LIKE pattern for general fuzzy matching
+		Lower_2: exactQuery,       // Exact match for highest priority
+		Lower_3: startsWithPattern, // Starts with for second priority
+		Limit:   limit,            // Limit results
+	})
 }
 
 // SetUserArtists sets the complete list of artists for a user

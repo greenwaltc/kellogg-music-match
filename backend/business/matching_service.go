@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/greenwaltc/kellogg-music-match/backend/generated"
 )
@@ -23,6 +24,54 @@ func NewMatchingService(userRepo UserRepository, matching *MatchingEngine) *Matc
 	}
 }
 
+// SearchArtists implements fuzzy artist search functionality
+func (s *MatchingService) SearchArtists(ctx context.Context, query string, limit int32) (generated.ImplResponse, error) {
+	// Validate input
+	if strings.TrimSpace(query) == "" {
+		return generated.Response(http.StatusBadRequest, generated.ErrorResponse{
+			Message: "search query is required",
+		}), nil
+	}
+
+	if len(query) > 240 {
+		return generated.Response(http.StatusBadRequest, generated.ErrorResponse{
+			Message: "search query must be 240 characters or less",
+		}), nil
+	}
+
+	// Set default limit if not provided
+	if limit <= 0 {
+		limit = 10
+	}
+	if limit > 50 {
+		limit = 50
+	}
+
+	// Perform fuzzy search using the repository
+	artists, err := s.userRepo.SearchArtists(ctx, query, limit)
+	if err != nil {
+		return generated.Response(http.StatusInternalServerError, generated.ErrorResponse{
+			Message: "failed to search artists",
+		}), nil
+	}
+
+	// Convert to API response format
+	apiArtists := make([]generated.Artist, 0, len(artists))
+	for _, artist := range artists {
+		createdAt := artist.CreatedAt.Time
+		if !artist.CreatedAt.Valid {
+			createdAt = time.Time{} // Use zero time if null
+		}
+		apiArtists = append(apiArtists, generated.Artist{
+			Id:        int32(artist.ID),
+			Name:      artist.Name,
+			CreatedAt: createdAt,
+		})
+	}
+
+	return generated.Response(http.StatusOK, apiArtists), nil
+}
+
 // FindMusicMatches implements music matching business logic
 func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest generated.ArtistsRequest, xUserUsername string) (generated.ImplResponse, error) {
 	fmt.Printf("DEBUG: FindMusicMatches called for user: %s with artists: %v\n", xUserUsername, artistsRequest.Artists)
@@ -38,6 +87,15 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 		return generated.Response(http.StatusBadRequest, generated.ErrorResponse{
 			Message: "at least one artist is required",
 		}), nil
+	}
+
+	// Validate artist name lengths
+	for _, artist := range artistsRequest.Artists {
+		if len(artist) > 240 {
+			return generated.Response(http.StatusBadRequest, generated.ErrorResponse{
+				Message: "artist names must be 240 characters or less",
+			}), nil
+		}
 	}
 
 	// If username is provided, update user's artist preferences

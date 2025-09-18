@@ -62,3 +62,8 @@ func NewMatchingAPIServiceWrapper(matchingService *business.MatchingService) gen
 func (w *MatchingAPIServiceWrapper) FindMusicMatches(ctx context.Context, artistsRequest generated.ArtistsRequest, xUserUsername string) (generated.ImplResponse, error) {
 	return w.matchingService.FindMusicMatches(ctx, artistsRequest, xUserUsername)
 }
+
+// SearchArtists delegates to business logic
+func (w *MatchingAPIServiceWrapper) SearchArtists(ctx context.Context, q string, limit int32) (generated.ImplResponse, error) {
+	return w.matchingService.SearchArtists(ctx, q, limit)
+}

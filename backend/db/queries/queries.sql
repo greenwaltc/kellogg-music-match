@@ -50,6 +50,19 @@ SELECT * FROM artists WHERE id = $1 LIMIT 1;
 -- name: GetAllArtists :many
 SELECT * FROM artists ORDER BY name;
 
+-- name: SearchArtists :many
+SELECT * FROM artists 
+WHERE LOWER(name) LIKE LOWER($1) 
+ORDER BY 
+  CASE 
+    WHEN LOWER(name) = LOWER($2) THEN 1
+    WHEN LOWER(name) LIKE LOWER($3) THEN 2
+    ELSE 3
+  END,
+  LENGTH(name),
+  name
+LIMIT $4;
+
 -- User-Artist relationship queries
 -- name: AddUserArtist :exec
 INSERT INTO user_artists (user_id, artist_id, rank)

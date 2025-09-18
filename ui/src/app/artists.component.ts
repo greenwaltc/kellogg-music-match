@@ -3,16 +3,17 @@ import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormArray, FormBuilder, FormControl, Validators, FormGroup } from '@angular/forms';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { MatchService, MatchUser } from './match.service';
+import { MatchService, MatchUser, Artist } from './match.service';
 import { environment } from '../environments/environment';
 import { AuthService } from './auth.service';
+import { ArtistAutocompleteComponent } from './artist-autocomplete.component';
 
 interface ArtistsFormShape { artists: FormArray<FormControl<string | null>>; }
 
 @Component({
   selector: 'app-artists',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, ArtistAutocompleteComponent],
   template: `
   <section class="artists-section">
     <div class="page-header">
@@ -31,13 +32,12 @@ interface ArtistsFormShape { artists: FormArray<FormControl<string | null>>; }
           <div class="artist-row" *ngFor="let ctrl of artistsArray.controls; let i = index">
             <div class="input-wrapper">
               <span class="rank-number">{{ i + 1 }}</span>
-              <input 
-                [formControlName]="i" 
-                type="text" 
-                [attr.placeholder]="'Enter artist #' + (i+1)" 
-                class="artist-input"
-                [class.error]="ctrl.invalid && ctrl.touched"
-              />
+              <app-artist-autocomplete
+                [control]="ctrl"
+                [placeholder]="'Enter artist #' + (i+1)"
+                (artistSelected)="onArtistSelected($event, i)"
+                class="artist-autocomplete">
+              </app-artist-autocomplete>
               <button 
                 type="button" 
                 class="remove-btn" 
@@ -191,13 +191,8 @@ interface ArtistsFormShape { artists: FormArray<FormControl<string | null>>; }
       font-size: 0.875rem;
     }
 
-    .artist-input {
+    .artist-autocomplete {
       flex: 1;
-      border: none;
-      background: transparent;
-      font-size: 1rem;
-      color: #2c3e50;
-      outline: none;
     }
 
     .remove-btn {
@@ -332,12 +327,17 @@ export class ArtistsComponent {
     if (user?.artists?.length) {
       const arr = this.artistsArray;
       while (arr.length) arr.removeAt(0);
-      user.artists.slice(0, this.maxArtists).forEach((a: string) => arr.push(this.fb.control<string | null>(a, [Validators.required, Validators.minLength(2)])));
+      user.artists.slice(0, this.maxArtists).forEach((a: string) => arr.push(this.fb.control<string | null>(a, [Validators.required, Validators.minLength(2), Validators.maxLength(240)])));
     }
   }
 
   get artistsArray(): FormArray<FormControl<string | null>> { return this.form.controls.artists; }
-  private artistControl(): FormControl<string | null> { return this.fb.control<string | null>('', [Validators.required, Validators.minLength(2)]); }
+  private artistControl(): FormControl<string | null> { return this.fb.control<string | null>('', [Validators.required, Validators.minLength(2), Validators.maxLength(240)]); }
+
+  onArtistSelected(artist: Artist, index: number): void {
+    // Artist was selected from dropdown, the control value is already set
+    console.log('Artist selected:', artist.name, 'at index:', index);
+  }
 
   add(): void { if (this.artistsArray.length < this.maxArtists) this.artistsArray.push(this.artistControl()); }
   remove(i: number): void { if (this.artistsArray.length > 1) this.artistsArray.removeAt(i); }

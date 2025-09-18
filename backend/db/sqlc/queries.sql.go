@@ -477,6 +477,55 @@ func (q *Queries) RemoveUserArtist(ctx context.Context, arg RemoveUserArtistPara
 	return err
 }
 
+const searchArtists = `-- name: SearchArtists :many
+SELECT id, name, created_at FROM artists 
+WHERE LOWER(name) LIKE LOWER($1) 
+ORDER BY 
+  CASE 
+    WHEN LOWER(name) = LOWER($2) THEN 1
+    WHEN LOWER(name) LIKE LOWER($3) THEN 2
+    ELSE 3
+  END,
+  LENGTH(name),
+  name
+LIMIT $4
+`
+
+type SearchArtistsParams struct {
+	Lower   string `json:"lower"`
+	Lower_2 string `json:"lower_2"`
+	Lower_3 string `json:"lower_3"`
+	Limit   int32  `json:"limit"`
+}
+
+func (q *Queries) SearchArtists(ctx context.Context, arg SearchArtistsParams) ([]Artist, error) {
+	rows, err := q.db.QueryContext(ctx, searchArtists,
+		arg.Lower,
+		arg.Lower_2,
+		arg.Lower_3,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Artist{}
+	for rows.Next() {
+		var i Artist
+		if err := rows.Scan(&i.ID, &i.Name, &i.CreatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const setUserArtists = `-- name: SetUserArtists :exec
 WITH new_artists AS (
     INSERT INTO artists (name)
