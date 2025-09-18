@@ -207,12 +207,12 @@ func (r *PostgreSQLUserRepository) SearchArtists(ctx context.Context, query stri
 	fuzzyPattern := "%" + strings.ToLower(query) + "%"
 	exactQuery := strings.ToLower(query)
 	startsWithPattern := strings.ToLower(query) + "%"
-	
+
 	return r.queries.SearchArtists(ctx, sqlc.SearchArtistsParams{
-		Lower:   fuzzyPattern,     // LIKE pattern for general fuzzy matching
-		Lower_2: exactQuery,       // Exact match for highest priority
+		Lower:   fuzzyPattern,      // LIKE pattern for general fuzzy matching
+		Lower_2: exactQuery,        // Exact match for highest priority
 		Lower_3: startsWithPattern, // Starts with for second priority
-		Limit:   limit,            // Limit results
+		Limit:   limit,             // Limit results
 	})
 }
 
