@@ -16,14 +16,18 @@ type Querier interface {
 	ClearUserArtists(ctx context.Context, userID uuid.UUID) error
 	// Artist queries
 	CreateArtist(ctx context.Context, name string) (Artist, error)
+	// Feedback queries
+	CreateFeedback(ctx context.Context, arg CreateFeedbackParams) (Feedback, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteUser(ctx context.Context, id uuid.UUID) error
 	FindSimilarUsers(ctx context.Context, username string) ([]FindSimilarUsersRow, error)
 	GetAllArtists(ctx context.Context) ([]Artist, error)
+	GetAllFeedback(ctx context.Context, limit int32) ([]GetAllFeedbackRow, error)
 	GetAllUsers(ctx context.Context) ([]User, error)
 	GetArtistByID(ctx context.Context, id int32) (Artist, error)
 	GetArtistByName(ctx context.Context, name string) (Artist, error)
 	GetArtistUsers(ctx context.Context, artistID int32) ([]GetArtistUsersRow, error)
+	GetFeedbackByUser(ctx context.Context, userID uuid.UUID) ([]Feedback, error)
 	GetUserArtists(ctx context.Context, userID uuid.UUID) ([]Artist, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)

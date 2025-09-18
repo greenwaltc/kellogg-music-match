@@ -6,6 +6,7 @@ import { AppComponent } from './app/app.component';
 import { LoginComponent } from './app/login.component';
 import { ArtistsComponent } from './app/artists.component';
 import { MatchesComponent } from './app/matches.component';
+import { FeedbackComponent } from './app/feedback.component';
 import { authGuard } from './app/auth.guard';
 
 declare global {
@@ -18,6 +19,7 @@ const routes: Routes = [
   { path: '', component: LoginComponent },
   { path: 'artists', component: ArtistsComponent, canActivate: [authGuard] },
   { path: 'matches', component: MatchesComponent, canActivate: [authGuard] },
+  { path: 'feedback', component: FeedbackComponent, canActivate: [authGuard] },
   { path: '**', redirectTo: '' }
 ];
 

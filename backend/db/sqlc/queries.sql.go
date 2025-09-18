@@ -55,6 +55,31 @@ func (q *Queries) CreateArtist(ctx context.Context, name string) (Artist, error)
 	return i, err
 }
 
+const createFeedback = `-- name: CreateFeedback :one
+INSERT INTO feedback (user_id, feedback_text)
+VALUES ($1, $2)
+RETURNING id, user_id, feedback_text, created_at, updated_at
+`
+
+type CreateFeedbackParams struct {
+	UserID       uuid.UUID `json:"user_id"`
+	FeedbackText string    `json:"feedback_text"`
+}
+
+// Feedback queries
+func (q *Queries) CreateFeedback(ctx context.Context, arg CreateFeedbackParams) (Feedback, error) {
+	row := q.db.QueryRowContext(ctx, createFeedback, arg.UserID, arg.FeedbackText)
+	var i Feedback
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.FeedbackText,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (id, username, email, first_name, last_name, password_hash)
 VALUES ($1, $2, $3, $4, $5, $6)
@@ -193,6 +218,57 @@ func (q *Queries) GetAllArtists(ctx context.Context) ([]Artist, error) {
 	return items, nil
 }
 
+const getAllFeedback = `-- name: GetAllFeedback :many
+SELECT f.id, f.user_id, f.feedback_text, f.created_at, f.updated_at, u.username, u.first_name, u.last_name
+FROM feedback f
+JOIN users u ON f.user_id = u.id
+ORDER BY f.created_at DESC
+LIMIT $1
+`
+
+type GetAllFeedbackRow struct {
+	ID           int32        `json:"id"`
+	UserID       uuid.UUID    `json:"user_id"`
+	FeedbackText string       `json:"feedback_text"`
+	CreatedAt    sql.NullTime `json:"created_at"`
+	UpdatedAt    sql.NullTime `json:"updated_at"`
+	Username     string       `json:"username"`
+	FirstName    string       `json:"first_name"`
+	LastName     string       `json:"last_name"`
+}
+
+func (q *Queries) GetAllFeedback(ctx context.Context, limit int32) ([]GetAllFeedbackRow, error) {
+	rows, err := q.db.QueryContext(ctx, getAllFeedback, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetAllFeedbackRow{}
+	for rows.Next() {
+		var i GetAllFeedbackRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.FeedbackText,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Username,
+			&i.FirstName,
+			&i.LastName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getAllUsers = `-- name: GetAllUsers :many
 SELECT id, username, email, first_name, last_name, password_hash, created_at, updated_at FROM users ORDER BY created_at
 `
@@ -284,6 +360,41 @@ func (q *Queries) GetArtistUsers(ctx context.Context, artistID int32) ([]GetArti
 			&i.Email,
 			&i.FirstName,
 			&i.LastName,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getFeedbackByUser = `-- name: GetFeedbackByUser :many
+SELECT id, user_id, feedback_text, created_at, updated_at FROM feedback
+WHERE user_id = $1
+ORDER BY created_at DESC
+`
+
+func (q *Queries) GetFeedbackByUser(ctx context.Context, userID uuid.UUID) ([]Feedback, error) {
+	rows, err := q.db.QueryContext(ctx, getFeedbackByUser, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Feedback{}
+	for rows.Next() {
+		var i Feedback
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.FeedbackText,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {

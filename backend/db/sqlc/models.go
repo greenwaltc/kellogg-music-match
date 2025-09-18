@@ -16,6 +16,14 @@ type Artist struct {
 	CreatedAt sql.NullTime `json:"created_at"`
 }
 
+type Feedback struct {
+	ID           int32        `json:"id"`
+	UserID       uuid.UUID    `json:"user_id"`
+	FeedbackText string       `json:"feedback_text"`
+	CreatedAt    sql.NullTime `json:"created_at"`
+	UpdatedAt    sql.NullTime `json:"updated_at"`
+}
+
 type User struct {
 	ID           uuid.UUID    `json:"id"`
 	Username     string       `json:"username"`

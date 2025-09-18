@@ -143,3 +143,21 @@ WHERE u1.username != $1
   AND EXISTS (SELECT 1 FROM user_artists WHERE user_id = u1.id)
 ORDER BY distance ASC
 LIMIT 10;
+
+-- Feedback queries
+-- name: CreateFeedback :one
+INSERT INTO feedback (user_id, feedback_text)
+VALUES ($1, $2)
+RETURNING *;
+
+-- name: GetFeedbackByUser :many
+SELECT * FROM feedback
+WHERE user_id = $1
+ORDER BY created_at DESC;
+
+-- name: GetAllFeedback :many
+SELECT f.*, u.username, u.first_name, u.last_name
+FROM feedback f
+JOIN users u ON f.user_id = u.id
+ORDER BY f.created_at DESC
+LIMIT $1;

@@ -30,6 +30,8 @@ tags:
     description: User registration and login operations
   - name: Matching
     description: Music taste matching and artist management
+  - name: Feedback
+    description: User feedback and suggestions
   - name: Health
     description: Service health and monitoring
 
@@ -126,6 +128,90 @@ paths:
                   summary: Query too long
                   value:
                     message: "search query must be 240 characters or less"
+
+  /feedback:
+    post:
+      tags:
+        - Feedback
+      summary: Submit user feedback
+      description: |
+        Allows authenticated users to submit feedback and suggestions about the application.
+        Feedback is limited to 1000 characters and requires user authentication.
+      operationId: submitFeedback
+      parameters:
+        - name: X-User-Username
+          in: header
+          required: true
+          description: Username of the authenticated user submitting feedback
+          schema:
+            type: string
+            example: "student123"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackRequest'
+            examples:
+              validFeedback:
+                summary: Valid feedback submission
+                value:
+                  feedback: "I love the music matching feature! It would be great to have a mobile app version as well."
+      responses:
+        '201':
+          description: Feedback successfully submitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedbackResponse'
+              examples:
+                success:
+                  summary: Successful submission
+                  value:
+                    id: 1
+                    message: "Feedback submitted successfully"
+                    created_at: "2025-09-18T17:45:00Z"
+        '400':
+          description: Invalid feedback data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                emptyFeedback:
+                  summary: Empty feedback text
+                  value:
+                    message: "feedback text is required"
+                tooLong:
+                  summary: Feedback too long
+                  value:
+                    message: "feedback must be 1000 characters or less"
+        '401':
+          description: User not authenticated or not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missingUser:
+                  summary: Missing username header
+                  value:
+                    message: "username header is required"
+                userNotFound:
+                  summary: User not found
+                  value:
+                    message: "user not found"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                serverError:
+                  summary: Database error
+                  value:
+                    message: "failed to save feedback"
 
   /register:
     post:
@@ -528,6 +614,42 @@ components:
           example: "username already exists"
       required:
         - message
+        - created_at
+
+    FeedbackRequest:
+      type: object
+      description: Request to submit user feedback
+      properties:
+        feedback:
+          type: string
+          description: User feedback text (maximum 1000 characters)
+          minLength: 1
+          maxLength: 1000
+          example: "I love the music matching feature! It would be great to have a mobile app version as well."
+      required:
+        - feedback
+
+    FeedbackResponse:
+      type: object
+      description: Response after successful feedback submission
+      properties:
+        id:
+          type: integer
+          description: Unique identifier for the feedback entry
+          example: 1
+        message:
+          type: string
+          description: Success message
+          example: "Feedback submitted successfully"
+        created_at:
+          type: string
+          format: date-time
+          description: When the feedback was submitted
+          example: "2025-09-18T17:45:00Z"
+      required:
+        - id
+        - message
+        - created_at
 
   securitySchemes:
     # Reserved for future JWT implementation

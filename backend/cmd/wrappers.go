@@ -67,3 +67,38 @@ func (w *MatchingAPIServiceWrapper) FindMusicMatches(ctx context.Context, artist
 func (w *MatchingAPIServiceWrapper) SearchArtists(ctx context.Context, q string, limit int32) (generated.ImplResponse, error) {
 	return w.matchingService.SearchArtists(ctx, q, limit)
 }
+
+// FeedbackAPIServiceWrapper wraps business logic to implement OpenAPI service interface
+type FeedbackAPIServiceWrapper struct {
+	feedbackService *business.FeedbackService
+}
+
+// NewFeedbackAPIServiceWrapper creates a new wrapper
+func NewFeedbackAPIServiceWrapper(feedbackService *business.FeedbackService) generated.FeedbackAPIServicer {
+	return &FeedbackAPIServiceWrapper{
+		feedbackService: feedbackService,
+	}
+}
+
+// SubmitFeedback delegates to business logic
+func (w *FeedbackAPIServiceWrapper) SubmitFeedback(ctx context.Context, xUserUsername string, feedbackRequest generated.FeedbackRequest) (generated.ImplResponse, error) {
+	feedback, err := w.feedbackService.SubmitFeedback(ctx, xUserUsername, feedbackRequest.Feedback)
+	if err != nil {
+		return generated.Response(400, generated.ErrorResponse{
+			Message: err.Error(),
+		}), nil
+	}
+
+	createdAt := feedback.CreatedAt.Time
+	if !feedback.CreatedAt.Valid {
+		createdAt = feedback.CreatedAt.Time
+	}
+
+	response := generated.FeedbackResponse{
+		Id:        int32(feedback.ID),
+		Message:   "Feedback submitted successfully",
+		CreatedAt: createdAt,
+	}
+
+	return generated.Response(201, response), nil
+}

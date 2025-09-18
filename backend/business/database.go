@@ -9,7 +9,6 @@ import (
 
 	"github.com/google/uuid"
 	sqlc "github.com/greenwaltc/kellogg-music-match/backend/db/sqlc"
-	"github.com/lib/pq"
 )
 
 // DatabaseConfig holds configuration for database connection
@@ -64,6 +63,10 @@ type UserRepository interface {
 
 	// Matching operations
 	FindSimilarUsers(ctx context.Context, username string) ([]sqlc.FindSimilarUsersRow, error)
+
+	// Feedback operations
+	CreateFeedback(ctx context.Context, userID uuid.UUID, feedbackText string) (*sqlc.Feedback, error)
+	GetFeedbackByUser(ctx context.Context, userID uuid.UUID) ([]sqlc.Feedback, error)
 } // PostgreSQLUserRepository implements UserRepository using PostgreSQL
 type PostgreSQLUserRepository struct {
 	db      *sql.DB
@@ -248,70 +251,25 @@ func (r *PostgreSQLUserRepository) ClearUserArtists(ctx context.Context, userID 
 }
 
 // FindSimilarUsers finds users similar to the given username based on their artist preferences
-func (r *PostgreSQLUserRepository) FindSimilarUsers(ctx context.Context, username string) ([]sqlc.FindSimilarUsersRow, error) {
-	const query = `
-SELECT
-  u1.username,
-  u1.first_name,
-  u1.last_name,
-  (SELECT array_agg(a1.name ORDER BY ua1.rank ASC)
-   FROM user_artists ua1
-   JOIN artists a1 ON ua1.artist_id = a1.id
-   WHERE ua1.user_id = u1.id) AS artists,
-  spearman_distance(
-    (SELECT array_agg(a1.name ORDER BY ua1.rank ASC)
-     FROM user_artists ua1
-     JOIN artists a1 ON ua1.artist_id = a1.id
-     WHERE ua1.user_id = u1.id),
-    (SELECT array_agg(a2.name ORDER BY ua2.rank ASC)
-     FROM users u2
-     JOIN user_artists ua2 ON u2.id = ua2.user_id
-     JOIN artists a2 ON ua2.artist_id = a2.id
-     WHERE u2.username = $1)
-  ) AS distance
-FROM users u1
-WHERE u1.username != $1
-  AND EXISTS (SELECT 1 FROM user_artists WHERE user_id = u1.id)
-ORDER BY distance ASC
-LIMIT 10`
+func (repo *PostgreSQLUserRepository) FindSimilarUsers(ctx context.Context, username string) ([]sqlc.FindSimilarUsersRow, error) {
+	return repo.queries.FindSimilarUsers(ctx, username)
+}
 
-	rows, err := r.db.QueryContext(ctx, query, username)
+// Feedback operations
+func (repo *PostgreSQLUserRepository) CreateFeedback(ctx context.Context, userID uuid.UUID, feedbackText string) (*sqlc.Feedback, error) {
+	params := sqlc.CreateFeedbackParams{
+		UserID:       userID,
+		FeedbackText: feedbackText,
+	}
+	feedback, err := repo.queries.CreateFeedback(ctx, params)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	return &feedback, nil
+}
 
-	var results []sqlc.FindSimilarUsersRow
-	for rows.Next() {
-		var row sqlc.FindSimilarUsersRow
-		var artists pq.StringArray
-
-		err := rows.Scan(
-			&row.Username,
-			&row.FirstName,
-			&row.LastName,
-			&artists,
-			&row.Distance,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		// Convert pq.StringArray to []interface{} for compatibility
-		if len(artists) > 0 {
-			artistsInterface := make([]interface{}, len(artists))
-			for i, artist := range artists {
-				artistsInterface[i] = artist
-			}
-			row.Artists = artistsInterface
-		} else {
-			row.Artists = []interface{}{}
-		}
-
-		results = append(results, row)
-	}
-
-	return results, rows.Err()
+func (repo *PostgreSQLUserRepository) GetFeedbackByUser(ctx context.Context, userID uuid.UUID) ([]sqlc.Feedback, error) {
+	return repo.queries.GetFeedbackByUser(ctx, userID)
 }
 
 // getEnvWithDefault returns environment variable value or default if not set

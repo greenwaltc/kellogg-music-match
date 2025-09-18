@@ -43,18 +43,21 @@ func main() {
 	authService := business.NewAuthService(userRepo)
 	healthService := business.NewHealthService()
 	matchingService := business.NewMatchingService(userRepo, matchingEngine)
+	feedbackService := business.NewFeedbackService(userRepo)
 
 	// Create service wrappers that implement the OpenAPI service interfaces
 	authAPIService := NewAuthAPIServiceWrapper(authService)
 	healthAPIService := NewHealthAPIServiceWrapper(healthService)
 	matchingAPIService := NewMatchingAPIServiceWrapper(matchingService)
+	feedbackAPIService := NewFeedbackAPIServiceWrapper(feedbackService)
 
 	// Create controllers with our wrapped services
 	AuthenticationAPIController := generated.NewAuthenticationAPIController(authAPIService)
 	HealthAPIController := generated.NewHealthAPIController(healthAPIService)
 	MatchingAPIController := generated.NewMatchingAPIController(matchingAPIService)
+	FeedbackAPIController := generated.NewFeedbackAPIController(feedbackAPIService)
 
-	router := generated.NewRouter(AuthenticationAPIController, HealthAPIController, MatchingAPIController)
+	router := generated.NewRouter(AuthenticationAPIController, HealthAPIController, MatchingAPIController, FeedbackAPIController)
 
 	// Wrap router with CORS middleware
 	corsRouter := corsMiddleware(router)

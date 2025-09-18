@@ -4,6 +4,7 @@
     <nav *ngIf="isLoggedIn(); else loggedOut" class="nav">
       <a routerLink="/artists" routerLinkActive="active">Artists</a>
       <a routerLink="/matches" routerLinkActive="active">Matches</a>
+      <a routerLink="/feedback" routerLinkActive="active">Feedback</a>
       <button type="button" class="ghost" (click)="toggleTheme()" aria-label="Toggle theme">{{ theme.mode() === 'dark' ? '🌞' : '🌙' }}</button>
       <button type="button" (click)="logout()">Logout</button>
     </nav>
