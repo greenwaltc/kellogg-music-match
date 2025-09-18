@@ -110,6 +110,30 @@ func main() {
 										Name:  pulumi.String("PORT"),
 										Value: pulumi.String("8080"),
 									},
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("DB_HOST"),
+										Value: pulumi.String("postgres"),
+									},
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("DB_PORT"),
+										Value: pulumi.String("5432"),
+									},
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("DB_USER"),
+										Value: pulumi.String("kellogg_user"),
+									},
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("DB_PASSWORD"),
+										Value: pulumi.String("kellogg_secure_pass_2024"),
+									},
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("DB_NAME"),
+										Value: pulumi.String("kellogg_music_match"),
+									},
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("DATABASE_URL"),
+										Value: pulumi.String("postgres://kellogg_user:kellogg_secure_pass_2024@postgres:5432/kellogg_music_match?sslmode=disable"),
+									},
 								},
 								Resources: &corev1.ResourceRequirementsArgs{
 									Requests: pulumi.StringMap{
@@ -430,7 +454,7 @@ func main() {
 						Containers: corev1.ContainerArray{
 							&corev1.ContainerArgs{
 								Name:  pulumi.String("postgres"),
-								Image: pulumi.String("postgres:15"),
+								Image: pulumi.String("kellogg-music-match-postgres:latest"),
 								Ports: corev1.ContainerPortArray{
 									&corev1.ContainerPortArgs{
 										ContainerPort: pulumi.Int(5432),
@@ -462,12 +486,12 @@ func main() {
 								},
 								Resources: &corev1.ResourceRequirementsArgs{
 									Requests: pulumi.StringMap{
-										"cpu":    pulumi.String("100m"),
-										"memory": pulumi.String("256Mi"),
+										"cpu":    pulumi.String("200m"),
+										"memory": pulumi.String("512Mi"),
 									},
 									Limits: pulumi.StringMap{
-										"cpu":    pulumi.String("500m"),
-										"memory": pulumi.String("512Mi"),
+										"cpu":    pulumi.String("1000m"),
+										"memory": pulumi.String("1Gi"),
 									},
 								},
 								LivenessProbe: &corev1.ProbeArgs{

@@ -19,6 +19,9 @@ Before deploying, build and tag your Docker images:
 # From the project root
 cd ../
 
+# Build custom PostgreSQL image with scientific libraries
+docker build -f postgres.dockerfile -t kellogg-music-match-postgres:latest .
+
 # Build backend image
 docker build -t kellogg-music-match-backend:latest ./backend
 
@@ -26,9 +29,11 @@ docker build -t kellogg-music-match-backend:latest ./backend
 docker build -t kellogg-music-match-ui:latest ./ui
 
 # If using a container registry, tag and push:
+# docker tag kellogg-music-match-postgres:latest your-registry/kellogg-music-match-postgres:latest
 # docker tag kellogg-music-match-backend:latest your-registry/kellogg-music-match-backend:latest
-# docker push your-registry/kellogg-music-match-backend:latest
 # docker tag kellogg-music-match-ui:latest your-registry/kellogg-music-match-ui:latest
+# docker push your-registry/kellogg-music-match-postgres:latest
+# docker push your-registry/kellogg-music-match-backend:latest
 # docker push your-registry/kellogg-music-match-ui:latest
 ```
 
@@ -78,19 +83,23 @@ The Pulumi program creates the following Kubernetes resources:
   - Requests: 100m CPU, 128Mi memory
   - Limits: 500m CPU, 512Mi memory
 
-### PostgreSQL Database
+### PostgreSQL Database (Scientific Extensions)
 - **StatefulSet**: `postgres`
 - **Service**: `postgres`
-- **Image**: `postgres:15-alpine`
+- **Image**: `kellogg-music-match-postgres:latest` (Custom PostgreSQL 15 with scientific libraries)
+- **Extensions**: plpython3u, scipy, numpy for advanced music similarity calculations
 - **Port**: 5432
 - **Storage**: 10Gi persistent volume
 - **Database**: `kellogg_music_match`
 - **User**: `kellogg_user`
 - **Secret**: `postgres-secret` (contains credentials)
 - **Health Checks**: `pg_isready` probes
+- **Scientific Functions**: 
+  - `spearman_distance()`: Hybrid Jaccard + positional correlation algorithm
+  - Custom similarity calculations for music preference matching
 - **Resources**:
-  - Requests: 100m CPU, 256Mi memory
-  - Limits: 500m CPU, 1Gi memory
+  - Requests: 200m CPU, 512Mi memory
+  - Limits: 1000m CPU, 1Gi memory
 
 ### UI Deployment & Service
 - **Deployment**: `kellogg-music-match-ui`
@@ -134,8 +143,17 @@ Access the application at:
 If using a private container registry, update the image references in `main.go`:
 
 ```go
+Image: pulumi.String("your-registry/kellogg-music-match-postgres:latest"),
 Image: pulumi.String("your-registry/kellogg-music-match-backend:latest"),
 Image: pulumi.String("your-registry/kellogg-music-match-ui:latest"),
+```
+
+**Important**: The custom PostgreSQL image with scientific libraries must be pushed to your registry:
+
+```bash
+# Build and push custom PostgreSQL image
+docker build -f postgres.dockerfile -t your-registry/kellogg-music-match-postgres:latest .
+docker push your-registry/kellogg-music-match-postgres:latest
 ```
 
 And add image pull secrets if needed:
@@ -173,7 +191,7 @@ kubectl describe ingress -n kellogg-music-match
 
 ## Database Access
 
-### PostgreSQL Connection Information
+### PostgreSQL Connection Information (Scientific Database)
 After deployment, use these connection details:
 
 - **Host**: `postgres.kellogg-music-match.svc.cluster.local`
@@ -181,6 +199,8 @@ After deployment, use these connection details:
 - **Database**: `kellogg_music_match`
 - **Username**: `kellogg_user`
 - **Password**: Retrieved from `postgres-secret`
+- **Extensions**: plpython3u, scipy, numpy available for advanced calculations
+- **Scientific Functions**: Access to `spearman_distance()` and other similarity algorithms
 
 ### Port Forward for Local Access
 ```bash
@@ -195,6 +215,12 @@ psql -h localhost -p 5432 -U kellogg_user -d kellogg_music_match
 ```bash
 # Execute psql in the PostgreSQL pod
 kubectl exec -it -n kellogg-music-match postgres-0 -- psql -U kellogg_user -d kellogg_music_match
+
+# Test scientific functions
+kubectl exec -it -n kellogg-music-match postgres-0 -- psql -U kellogg_user -d kellogg_music_match -c "SELECT spearman_distance(ARRAY[1,2,3], ARRAY[1,2,3]);"
+
+# Verify Python scientific libraries
+kubectl exec -it -n kellogg-music-match postgres-0 -- python3 -c "import scipy.stats; import numpy; print('✅ Scientific libraries available')"
 ```
 
 ### Database Outputs
