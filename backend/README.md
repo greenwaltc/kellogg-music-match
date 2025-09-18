@@ -1,34 +1,49 @@
 # Kellogg Music Match Backend
 
-A Go backend server with PostgreSQL database integration, SQLC type-safe queries, OpenAPI specification, and clean repository architecture.
+A Go backend server with custom PostgreSQL database integration, SQLC type-safe queries, OpenAPI specification, scientific similarity calculations, and comprehensive behavioral testing.
 
 ## 🏗️ Architecture
 
 - **`generated/`** - OpenAPI generated code (controllers, models, routing)
 - **`business/`** - Custom business logic (authentication, matching, database repository)  
+  - **`matching.go`** - Music matching engine with Jaccard similarity calculations
+  - **`database.go`** - UserRepository implementation with custom PostgreSQL array handling
+  - **`business_suite_test.go`** - Ginkgo test suite bootstrap
+  - **`matching_behavior_test.go`** - Comprehensive behavioral tests for similarity algorithms
+  - **`TESTING.md`** - Behavioral testing documentation
 - **`cmd/`** - Application entry point and service wrappers
-- **`db/`** - Database layer with SQLC integration
-  - **`schema/`** - PostgreSQL schema definition files
+- **`db/`** - Database layer with SQLC integration and scientific functions
+  - **`schema/`** - PostgreSQL schema definition files with scientific extensions
   - **`queries/`** - SQLC query definitions
   - **`sqlc/`** - Generated type-safe Go code
 - **`openapi.yaml`** - API specification
 - **`sqlc.yaml`** - SQLC configuration
-- **`Makefile`** - Build automation and development tasks
+- **`Makefile`** - Build automation and development tasks with Ginkgo testing
 
 ## 🗄️ Database Integration
 
-The backend uses PostgreSQL with SQLC for type-safe database operations:
+The backend uses a custom PostgreSQL setup with scientific extensions for advanced similarity calculations:
+
+### Scientific Database Features
+- **Custom PostgreSQL Image**: Built with plpython3u extension and scientific libraries (scipy, numpy)
+- **Spearman Distance Function**: PostgreSQL function implementing hybrid similarity algorithm:
+  - **Jaccard Similarity** (70% weight): Measures artist overlap between users
+  - **Positional Correlation** (30% weight): Considers ranking/order of shared artists
+  - **Distance Values**: 0 (identical), 0.7 (subset), 2.0 (no overlap)
+- **Text Array Support**: Custom handling for PostgreSQL TEXT[] arrays in Go using pq.StringArray
 
 ### Repository Pattern
 - **UserRepository Interface**: Clean abstraction for database operations
-- **PostgreSQL Implementation**: Full CRUD operations with proper error handling
+- **Custom PostgreSQL Implementation**: Full CRUD operations with scientific extensions
 - **SQLC Integration**: Type-safe Go code generated from SQL queries
+- **Custom Array Scanning**: Overrides for proper PostgreSQL array handling
 - **UUID Support**: Proper UUID handling with database constraints
 
 ### Database Features
 - **User Management**: Registration, authentication with bcrypt password hashing
 - **Music Preferences**: Normalized artist storage and user-artist relationships  
-- **Matching Algorithm**: Music taste similarity calculations using Jaccard similarity
+- **Scientific Matching Algorithm**: Music taste similarity calculations using hybrid Jaccard + positional correlation
+- **Custom Distance Function**: PostgreSQL plpython3u function for accurate similarity scoring
 - **Transaction Support**: Proper error handling and data consistency
 - **Performance Optimization**: Indexes and optimized queries for common operations
 
@@ -123,6 +138,15 @@ make build
 # Run tests
 make test
 
+# Run quick unit tests only
+make test-quick  
+
+# Run Ginkgo behavioral tests
+make test-ginkgo
+
+# Run behavioral tests (alias)
+make test-behavioral
+
 # Format code
 make format
 
@@ -147,6 +171,54 @@ make docker-stop
 # View logs
 make docker-logs
 ```
+
+## 🧪 Testing Framework
+
+The backend includes comprehensive testing using both Go's built-in testing and Ginkgo behavioral testing framework.
+
+### Test Categories
+
+#### 1. **Go Unit Tests**
+Traditional Go tests for individual functions and business logic:
+```bash
+make test-quick  # Fast unit tests only
+```
+
+#### 2. **Ginkgo Behavioral Tests**
+Comprehensive behavioral testing using Ginkgo v2 + Gomega for algorithm validation:
+```bash
+make test-ginkgo  # Run behavioral tests
+```
+
+**Test Coverage:**
+- **Music Matching Algorithm**: Validates Jaccard similarity calculations
+- **Edge Cases**: Empty lists, normalization, caller exclusion
+- **Database Function Alignment**: Tests scenarios matching PostgreSQL distance function
+- **Scientific Accuracy**: Validates similarity scores for known test cases
+
+#### 3. **Algorithm Validation Tests**
+Specific tests that validate the hybrid similarity algorithm behavior:
+- **Identical Preferences**: Score ≥ 0.9 for identical artist lists
+- **Subset Relationships**: Score ≈ 0.5 for subset cases like {Tool} vs {Tool, Radiohead}
+- **No Overlap**: No matches returned for completely different preferences
+- **Partial Overlap**: Correct Jaccard calculations (e.g., 1/3 ≈ 0.33)
+
+### Testing Setup
+```bash
+# Install testing dependencies
+make install-tools
+
+# Run all tests (Go + Ginkgo)
+make test
+
+# Run full checks (lint + test + format)
+make check
+```
+
+### Test Files
+- **`business_suite_test.go`**: Ginkgo test suite bootstrap
+- **`matching_behavior_test.go`**: Comprehensive behavioral tests (13 test specs)
+- **`TESTING.md`**: Detailed testing documentation and expected results
 
 ### Quick Workflows
 ```bash

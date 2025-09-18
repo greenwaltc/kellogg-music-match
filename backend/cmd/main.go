@@ -8,6 +8,26 @@ import (
 	"github.com/greenwaltc/kellogg-music-match/backend/generated"
 )
 
+// corsMiddleware handles CORS headers for cross-origin requests
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Set CORS headers
+		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:4200")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-User-Username")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+
+		// Handle preflight OPTIONS request
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		// Continue to next handler
+		next.ServeHTTP(w, r)
+	})
+}
+
 func main() {
 	log.Printf("Server started")
 
@@ -36,5 +56,9 @@ func main() {
 
 	router := generated.NewRouter(AuthenticationAPIController, HealthAPIController, MatchingAPIController)
 
-	log.Fatal(http.ListenAndServe(":8080", router))
+	// Wrap router with CORS middleware
+	corsRouter := corsMiddleware(router)
+
+	log.Printf("Server listening on :8080 with CORS enabled for http://localhost:4200")
+	log.Fatal(http.ListenAndServe(":8080", corsRouter))
 }

@@ -56,33 +56,49 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 		}
 
 		// Update user's artists
+		fmt.Printf("DEBUG: Attempting to set artists for user ID: %s, artists: %v\n", user.ID.String(), artistsRequest.Artists)
 		err = s.userRepo.SetUserArtists(ctx, user.ID, artistsRequest.Artists)
 		if err != nil {
+			fmt.Printf("ERROR: SetUserArtists failed: %v\n", err)
 			return generated.Response(http.StatusInternalServerError, generated.ErrorResponse{
 				Message: "failed to update user artists",
 			}), nil
 		}
+		fmt.Printf("DEBUG: Successfully set artists for user: %s\n", user.Username)
 	}
 
-	// Get all users with their artists from database
-	dbUsersWithArtists, err := s.userRepo.GetAllUsersWithArtists(ctx)
+	similarUsers, err := s.userRepo.FindSimilarUsers(ctx, xUserUsername)
 	if err != nil {
 		return generated.Response(http.StatusInternalServerError, generated.ErrorResponse{
-			Message: "failed to retrieve users",
+			Message: "failed to query similar users",
 		}), nil
 	}
 
-	// Debug: log the number of users retrieved
-	fmt.Printf("GetAllUsersWithArtists returned %d users\n", len(dbUsersWithArtists))
-
-	// Convert database users to API users
-	users := make([]*generated.User, 0, len(dbUsersWithArtists))
-
-	for _, row := range dbUsersWithArtists {
-		// Convert artist_names interface{} to []string
+	// Debug: log similar users found
+	fmt.Printf("FindSimilarUsers returned %d similar users for %s\n", len(similarUsers), xUserUsername)
+	for _, row := range similarUsers {
+		// Convert artists interface{} to []string for logging
 		var artistNames []string
-		if row.ArtistNames != nil {
-			if names, ok := row.ArtistNames.([]interface{}); ok {
+		if row.Artists != nil {
+			if names, ok := row.Artists.([]interface{}); ok {
+				artistNames = make([]string, 0, len(names))
+				for _, name := range names {
+					if str, ok := name.(string); ok {
+						artistNames = append(artistNames, str)
+					}
+				}
+			}
+		}
+		fmt.Printf("Similar user: %s (distance: %.3f) with artists: %v\n", row.Username, row.Distance, artistNames)
+	}
+
+	// Convert similar users to API response format
+	matches := make([]*generated.MatchUser, 0, len(similarUsers))
+	for _, row := range similarUsers {
+		// Convert artists interface{} to []string
+		var artistNames []string
+		if row.Artists != nil {
+			if names, ok := row.Artists.([]interface{}); ok {
 				artistNames = make([]string, 0, len(names))
 				for _, name := range names {
 					if str, ok := name.(string); ok {
@@ -92,22 +108,16 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 			}
 		}
 
-		user := &generated.User{
-			Id:        row.ID.String(),
-			Username:  row.Username,
-			Email:     row.Email,
-			FirstName: row.FirstName,
-			LastName:  row.LastName,
-			Artists:   artistNames,
+		// Calculate overlap count (could be enhanced to compare with user's artists)
+		overlapCount := len(artistNames) // Simple count for now
+
+		match := &generated.MatchUser{
+			Name:    fmt.Sprintf("%s %s", row.FirstName, row.LastName),
+			Overlap: int32(overlapCount),
+			Score:   float32(1.0 - row.Distance), // Convert distance to similarity score (higher is better)
 		}
-		users = append(users, user)
+		matches = append(matches, match)
 	}
-
-	// Find matches using the algorithm
-	matches := s.matching.ComputeMatches(artistsRequest.Artists, xUserUsername, users)
-
-	// Debug: log the matches
-	fmt.Printf("ComputeMatches returned %d matches for user %s\n", len(matches), xUserUsername)
 
 	return generated.Response(http.StatusOK, matches), nil
 }

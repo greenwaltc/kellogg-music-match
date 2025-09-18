@@ -1,13 +1,19 @@
 # Makefile for Kellogg Music Match Backend
-# This Makefile provides targets for OpenAPI code generation and common development tasks
+# This Makefile provides targets for OpenAPI code generation, testing, and common development tasks
 
-.PHONY: help generate generate-sqlc clean build test run docker-build docker-run docker-stop dev install-tools
+.PHONY: help generate generate-sqlc clean build test test-ginkgo test-behavioral test-quick run docker-build docker-run docker-stop dev install-tools
 
 # Default target
 help: ## Show this help message
 	@echo "Kellogg Music Match Backend - Available targets:"
 	@echo ""
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@echo ""
+	@echo "Testing commands:"
+	@echo "  test             Run all tests (Go + Ginkgo behavioral)"
+	@echo "  test-quick       Run quick Go unit tests only"
+	@echo "  test-ginkgo      Run Ginkgo behavioral tests"
+	@echo "  test-behavioral  Alias for test-ginkgo"
 	@echo ""
 
 generate: generate-sqlc ## Generate OpenAPI server code and SQLC code from specifications
@@ -68,10 +74,32 @@ build: generate-sqlc ## Build the backend server (includes SQLC generation)
 	@go build -o server ./cmd
 	@echo "✅ Build complete! Binary: ./server"
 
-test: ## Run tests
-	@echo "🧪 Running tests..."
+test: ## Run all tests (Go tests + Ginkgo behavioral tests)
+	@echo "🧪 Running Go tests..."
 	@go test ./... -v
-	@echo "✅ Tests complete!"
+	@echo "🎭 Running Ginkgo behavioral tests..."
+	@$(MAKE) test-ginkgo
+	@echo "✅ All tests complete!"
+
+test-quick: ## Run quick Go unit tests only
+	@echo "🧪 Running quick Go tests..."
+	@go test ./... -short
+	@echo "✅ Quick tests complete!"
+
+test-ginkgo: ## Run Ginkgo behavioral tests
+	@echo "🎭 Running Ginkgo behavioral tests..."
+	@if command -v ginkgo >/dev/null 2>&1; then \
+		ginkgo run ./...; \
+	elif [ -f ~/go/bin/ginkgo ]; then \
+		~/go/bin/ginkgo run ./...; \
+	else \
+		echo "❌ 'ginkgo' tool not found. Installing..."; \
+		go install github.com/onsi/ginkgo/v2/ginkgo@latest; \
+		~/go/bin/ginkgo run ./...; \
+	fi
+	@echo "✅ Behavioral tests complete!"
+
+test-behavioral: test-ginkgo ## Alias for test-ginkgo
 
 run: build ## Build and run the backend server (includes SQLC generation)
 	@echo "🌍 Setting database environment variables..."
@@ -127,6 +155,8 @@ install-tools: ## Install development tools
 	@echo "🔧 Installing development tools..."
 	@go install github.com/air-verse/air@latest
 	@go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
+	@go install github.com/onsi/ginkgo/v2/ginkgo@latest
+	@go install github.com/onsi/gomega@latest
 	@echo "✅ Development tools installed!"
 
 lint: ## Run linting
@@ -151,7 +181,7 @@ deps: ## Download and tidy dependencies
 	@go mod tidy
 	@echo "✅ Dependencies updated!"
 
-check: clean lint test ## Run full check (clean, lint, test)
+check: clean lint test ## Run full check (clean, lint, test with behavioral tests)
 	@echo "✅ All checks passed!"
 
 # OpenAPI specific targets

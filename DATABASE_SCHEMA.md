@@ -2,7 +2,73 @@
 
 ## Overview
 
-The Kellogg Music Match application uses a PostgreSQL database with a normalized schema designed for efficient storage and querying of user data and music preferences. The database is automatically initialized with the complete schema when the PostgreSQL container starts.
+The Kellogg Music Match application uses a **custom PostgreSQL database** with scientific extensions for advanced similarity calculations. The database features normalized schema design, plpython3u extension with scipy/numpy libraries, and a hybrid Jaccard + positional similarity algorithm for accurate music taste matching.
+
+## 🧪 Scientific Database Features
+
+### Custom PostgreSQL Image
+- **Base**: PostgreSQL 15 with plpython3u extension
+- **Scientific Libraries**: scipy, numpy for statistical calculations
+- **Hybrid Algorithm**: Combines Jaccard similarity with positional correlation
+- **Performance**: Optimized for real-time similarity calculations
+
+### Spearman Distance Function
+Custom PostgreSQL function implementing scientific similarity algorithm:
+
+```sql
+CREATE OR REPLACE FUNCTION spearman_distance(arr1 TEXT[], arr2 TEXT[]) 
+RETURNS FLOAT8 AS $$
+import numpy as np
+from scipy.stats import spearmanr
+
+# Handle empty arrays
+if not arr1 or not arr2:
+    return 2.0
+
+# Convert to sets for Jaccard similarity
+set1 = set(arr1)
+set2 = set(arr2)
+
+# Calculate Jaccard similarity
+intersection = len(set1.intersection(set2))
+union = len(set1.union(set2))
+jaccard_similarity = intersection / union if union > 0 else 0
+
+# If no intersection, return maximum distance
+if intersection == 0:
+    return 2.0
+
+# If identical sets, return minimum distance
+if set1 == set2:
+    return 0.0
+
+# For subset relationships, apply penalty
+if set1.issubset(set2) or set2.issubset(set1):
+    return 0.7
+
+# Calculate positional correlation for shared items
+shared_items = list(set1.intersection(set2))
+if len(shared_items) > 1:
+    ranks1 = [arr1.index(item) for item in shared_items if item in arr1]
+    ranks2 = [arr2.index(item) for item in shared_items if item in arr2]
+    
+    if len(ranks1) == len(ranks2) and len(ranks1) > 1:
+        correlation, _ = spearmanr(ranks1, ranks2)
+        if not np.isnan(correlation):
+            # Combine Jaccard (70%) and positional correlation (30%)
+            combined_similarity = 0.7 * jaccard_similarity + 0.3 * (correlation + 1) / 2
+            return 1.0 - combined_similarity
+
+# Default to Jaccard-based distance
+return 1.0 - jaccard_similarity
+$$ LANGUAGE plpython3u IMMUTABLE;
+```
+
+**Algorithm Details:**
+- **Distance = 0**: Identical arrays (perfect similarity)
+- **Distance = 0.7**: Subset relationships (moderate similarity)  
+- **Distance = 2.0**: No overlap (no similarity)
+- **Hybrid Calculation**: 70% Jaccard + 30% positional correlation for shared items
 
 ## 📊 Database Schema
 
@@ -103,6 +169,10 @@ BEGIN
     RETURN LOWER(TRIM(artist_name));
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
+
+-- Scientific similarity calculation (see "Scientific Database Features" section above)
+-- The spearman_distance function provides accurate music taste similarity using
+-- hybrid Jaccard + positional correlation algorithm with scipy statistical functions
 ```
 
 ### 👁️ Views for Common Queries
@@ -178,29 +248,50 @@ GROUP BY u.id, u.username, u.email, u.first_name, u.last_name, u.created_at, u.l
 
 **Database Operations:**
 1. Normalize and find/create artists in `artists` table
-2. Query users with overlapping artists
-3. Calculate similarity scores using SQL aggregations
-4. Return top matches sorted by score
+2. Query users with overlapping artists using spearman_distance function
+3. Calculate scientific similarity scores using hybrid Jaccard + positional algorithm
+4. Return top matches sorted by score (converted from distance: score = 1.0 - distance)
+
+**Example Query with Scientific Function:**
+```sql
+-- Find similar users using spearman_distance function
+SELECT 
+    u.first_name || ' ' || u.last_name as name,
+    COUNT(ua.artist_id) as overlap,
+    1.0 - spearman_distance(
+        target_artists.artists,
+        ARRAY_AGG(a.name ORDER BY ua.added_at)
+    ) as score
+FROM users u
+JOIN user_artists ua ON u.id = ua.user_id
+JOIN artists a ON ua.artist_id = a.id
+CROSS JOIN (SELECT ARRAY['Taylor Swift', 'The Beatles'] as artists) target_artists
+WHERE u.username != 'target_user'
+GROUP BY u.id, u.first_name, u.last_name, target_artists.artists
+HAVING COUNT(ua.artist_id) > 0
+ORDER BY score DESC, overlap DESC;
+```
 
 ## 🚀 Automatic Database Initialization
 
-### Schema Creation Process
+### Custom PostgreSQL Setup
 
-The database schema is **automatically created** when the PostgreSQL StatefulSet starts:
+The database schema is **automatically created** using a custom PostgreSQL image with scientific extensions:
 
-1. **Initialization Script**: `init-database.sh` is embedded in the Kubernetes ConfigMap
-2. **Auto-Execution**: Script runs in `/docker-entrypoint-initdb.d/` directory
-3. **Idempotent Design**: Uses `CREATE TABLE IF NOT EXISTS` for safe re-runs
-4. **Sample Data**: Includes 10 popular artists for testing
+1. **Custom Image Build**: `postgres.dockerfile` creates image with plpython3u, scipy, numpy
+2. **Initialization Script**: `init-database.sh` creates schema and functions
+3. **Scientific Function**: `spearman_distance` function for similarity calculations
+4. **Sample Data**: Test users and artists for algorithm validation
 
 ### Initialization Components
 
-- **Tables**: users, artists, user_artists
-- **Indexes**: Performance-optimized for common queries
-- **Functions**: Timestamp updates and name normalization
+- **Tables**: users, artists, user_artists with UUID and foreign key constraints
+- **Indexes**: Performance-optimized for common queries and UUID lookups
+- **Scientific Functions**: spearman_distance with hybrid Jaccard + positional algorithm
+- **Standard Functions**: Timestamp updates and name normalization
 - **Triggers**: Automatic field management
-- **Views**: Common query patterns
-- **Sample Data**: Test artists for development
+- **Views**: Common query patterns with artist aggregation
+- **Sample Data**: Test artists and users for development and testing
 
 ## 📝 Common Database Queries
 
@@ -223,35 +314,49 @@ SELECT
 ON CONFLICT DO NOTHING;
 ```
 
-### Find Music Matches (Complex Query)
+### Find Music Matches (Scientific Algorithm)
 ```sql
-WITH user_artists_query AS (
-    SELECT artist_id FROM user_artists 
-    WHERE user_id = (SELECT id FROM users WHERE username = 'alice')
+-- Test spearman_distance function with various scenarios
+SELECT 
+    'Identical arrays' as scenario,
+    spearman_distance(ARRAY['Tool', 'Radiohead'], ARRAY['Tool', 'Radiohead']) as distance;
+-- Returns: 0 (perfect similarity)
+
+SELECT 
+    'Subset relationship' as scenario,
+    spearman_distance(ARRAY['Tool'], ARRAY['Tool', 'Radiohead']) as distance;
+-- Returns: ~0.7 (moderate similarity)
+
+SELECT 
+    'No overlap' as scenario,
+    spearman_distance(ARRAY['Tool'], ARRAY['Beatles']) as distance;
+-- Returns: 2.0 (no similarity)
+
+-- Find music matches using scientific similarity
+WITH user_target_artists AS (
+    SELECT ARRAY['Tool', 'Radiohead'] as artists
 ),
-match_scores AS (
+similarity_scores AS (
     SELECT 
         u.id,
         u.first_name || ' ' || u.last_name as name,
-        COUNT(DISTINCT ua.artist_id) as total_artists,
-        COUNT(DISTINCT uaq.artist_id) as shared_artists,
-        ROUND(
-            COUNT(DISTINCT uaq.artist_id)::FLOAT / 
-            NULLIF(COUNT(DISTINCT ua.artist_id) + 
-                   (SELECT COUNT(*) FROM user_artists_query) - 
-                   COUNT(DISTINCT uaq.artist_id), 0),
-            3
-        ) as jaccard_similarity
+        ARRAY_AGG(a.name ORDER BY ua.added_at) as user_artists,
+        1.0 - spearman_distance(
+            (SELECT artists FROM user_target_artists),
+            ARRAY_AGG(a.name ORDER BY ua.added_at)
+        ) as score,
+        COUNT(a.name) as total_artists
     FROM users u
     JOIN user_artists ua ON u.id = ua.user_id
-    LEFT JOIN user_artists_query uaq ON ua.artist_id = uaq.artist_id
-    WHERE u.username != 'alice' AND u.is_active = true
+    JOIN artists a ON ua.artist_id = a.id
+    WHERE u.username != 'target_user' AND u.is_active = true
     GROUP BY u.id, u.first_name, u.last_name
-    HAVING COUNT(DISTINCT uaq.artist_id) > 0
+    HAVING COUNT(a.name) > 0
 )
-SELECT name, shared_artists as overlap, jaccard_similarity as score
-FROM match_scores
-ORDER BY jaccard_similarity DESC, shared_artists DESC, name
+SELECT name, score, total_artists as overlap
+FROM similarity_scores
+WHERE score > 0  -- Only return users with some similarity
+ORDER BY score DESC, overlap DESC, name
 LIMIT 5;
 ```
 
@@ -277,14 +382,20 @@ LIMIT 5;
 
 ### Development Access
 ```bash
-# Port forward PostgreSQL for local access
+# Connect to custom PostgreSQL with scientific extensions
+docker-compose exec postgres psql -U kellogg_user -d kellogg_music_match
+
+# Test scientific functions
+docker-compose exec postgres psql -U kellogg_user -d kellogg_music_match -c \
+  "SELECT spearman_distance(ARRAY['Tool'], ARRAY['Tool', 'Radiohead']);"
+
+# Verify extensions are loaded
+docker-compose exec postgres psql -U kellogg_user -d kellogg_music_match -c \
+  "SELECT * FROM pg_available_extensions WHERE name='plpython3u';"
+
+# For Kubernetes deployment:
 kubectl port-forward -n kellogg-music-match service/postgres 5432:5432
-
-# Connect with psql
 psql -h localhost -p 5432 -U kellogg_user -d kellogg_music_match
-
-# Direct pod access
-kubectl exec -it -n kellogg-music-match postgres-0 -- psql -U kellogg_user -d kellogg_music_match
 ```
 
 ### Backup & Recovery

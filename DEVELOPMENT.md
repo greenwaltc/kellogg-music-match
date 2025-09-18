@@ -30,12 +30,26 @@ make logs
 
 ## 🗄️ Database Development
 
+### Custom PostgreSQL Setup
+The project uses a custom PostgreSQL image with scientific extensions:
+
+```bash
+# Build custom PostgreSQL image (includes plpython3u, scipy, numpy)
+docker-compose build postgres
+
+# Start database with scientific extensions
+docker-compose up -d postgres
+
+# Verify extensions are available
+docker-compose exec postgres psql -U kellogg_user -d kellogg_music_match -c "SELECT * FROM pg_available_extensions WHERE name='plpython3u';"
+```
+
 ### Schema Management
-The project uses a multi-file schema system with automatic synchronization:
+The project uses a multi-file schema system with automatic synchronization and scientific functions:
 
 ```bash
 # 1. Edit schema files in backend/db/schema/
-vim backend/db/schema/001_initial.sql
+vim backend/db/schema/004_spearman_distance.sql  # Hybrid similarity algorithm
 
 # 2. Synchronize to main schema file
 make schema-sync
@@ -44,8 +58,18 @@ make schema-sync
 make backend-sqlc
 
 # 4. Commit changes
-git add backend/db/ DATABASE_SCHEMA.sql
-git commit -m "Update database schema"
+git add backend/db/ DATABASE_SCHEMA.sql postgres.dockerfile
+git commit -m "Update database schema with scientific functions"
+```
+
+### Scientific Distance Function
+The database includes a custom `spearman_distance` function for music similarity:
+
+```sql
+-- Test the hybrid similarity algorithm
+SELECT spearman_distance(ARRAY['Tool', 'Radiohead'], ARRAY['Tool', 'Radiohead']);  -- Returns 0 (identical)
+SELECT spearman_distance(ARRAY['Tool'], ARRAY['Tool', 'Radiohead']);              -- Returns ~0.7 (subset)
+SELECT spearman_distance(ARRAY['Tool'], ARRAY['Beatles']);                        -- Returns 2.0 (no overlap)
 ```
 
 ### Database Operations
@@ -89,8 +113,20 @@ make backend-build
 # Run with hot reload
 make backend-dev
 
-# Run tests
+### Backend Testing
+```bash
+# Run all backend tests (Go + Ginkgo behavioral)
 make backend-test
+
+# Run quick Go unit tests only
+make backend-test-quick
+
+# Run Ginkgo behavioral tests
+make backend-test-ginkgo
+
+# Install testing dependencies
+make backend-install-tools
+```
 ```
 
 ### Code Generation
@@ -161,38 +197,95 @@ cd ui && npm run build
 
 ## 🧪 Testing Strategy
 
-### Unit Tests
+### Comprehensive Test Framework
+The project includes multiple testing approaches for thorough validation:
+
+#### 1. **Go Unit Tests**
+Traditional Go testing for business logic:
 ```bash
-# Run all tests
-make test
-
-# Backend tests only
-make backend-test
-
-# Frontend tests only
-make ui-test
+# Run quick unit tests
+make test-quick
+make backend-test-quick
 ```
 
-### Integration Testing
+#### 2. **Ginkgo Behavioral Tests**
+Comprehensive behavioral testing using Ginkgo v2 + Gomega:
 ```bash
-# Start services for testing
+# Run all behavioral tests
+make test-behavioral
+make backend-test-ginkgo
+
+# Run behavioral tests with verbose output
+cd backend/business && ~/go/bin/ginkgo run -v .
+```
+
+**Behavioral Test Coverage (13 test specs):**
+- **Music Matching Algorithm**: Validates Jaccard similarity calculations
+- **Identical Preferences**: Score ≥ 0.9 for identical artist lists
+- **Subset Relationships**: Score ≈ 0.5 for subset cases
+- **Edge Cases**: Empty lists, normalization, caller exclusion
+- **Scientific Accuracy**: Validates hybrid algorithm alignment with PostgreSQL
+
+#### 3. **Database Function Testing**
+Tests for PostgreSQL scientific functions:
+```bash
+# Test spearman_distance function directly
+docker-compose exec postgres psql -U kellogg_user -d kellogg_music_match -c \
+  "SELECT spearman_distance(ARRAY['Tool'], ARRAY['Tool', 'Radiohead']);"
+```
+
+#### 4. **Integration Testing**
+Full end-to-end testing:
+```bash
+# Run all tests (Go + Ginkgo + UI)
+make test
+
+# Test API endpoints
+curl -X POST http://localhost:8080/findMusicMatches \
+  -H "Content-Type: application/json" \
+  -H "X-User-Username: alice" \
+  -d '{"artists":["Tool", "Radiohead"]}'
+```
+
+### Testing Setup
+```bash
+# Install all testing dependencies
+make install-tools
+
+# Run full test suite
+make test
+
+# Run checks (lint + test + format)
+make check
+```
+
+### Manual Testing for Algorithm Validation
+```bash
+# 1. Start services
 make dev
 
-# Run API tests manually
-./test-api-endpoints.sh
+# 2. Test similarity scenarios
+curl -X POST http://localhost:8080/findMusicMatches \
+  -H "Content-Type: application/json" \
+  -H "X-User-Username: alice" \
+  -d '{"artists":["Tool"]}'  # Should find bob with moderate similarity
 
-# Check database state
-docker-compose exec postgres psql -U kellogg_user -d kellogg_music_match -c "SELECT COUNT(*) FROM users;"
+# 3. Verify database state
+docker-compose exec postgres psql -U kellogg_user -d kellogg_music_match -c \
+  "SELECT u.username, ua.artist_name FROM users u JOIN user_artists ua ON u.id = ua.user_id ORDER BY u.username, ua.artist_name;"
 ```
 
 ### Manual Testing Checklist
 - [ ] User registration works with proper UUID format
 - [ ] User login validates credentials correctly
 - [ ] Artist preferences are stored and retrieved
-- [ ] Music matching finds users with shared artists
-- [ ] Database persistence verified
+- [ ] Music matching finds users with shared artists using scientific similarity
+- [ ] **Similarity scores are accurate**: Identical preferences (≥0.9), subsets (≈0.5), no overlap (no matches)
+- [ ] **PostgreSQL spearman_distance function works**: Distance values 0, 0.7, 2.0 for test cases
+- [ ] Database persistence verified with custom array handling
 - [ ] Frontend connects to backend API
 - [ ] All endpoints return expected HTTP status codes
+- [ ] **Behavioral tests pass**: All 13 Ginkgo test specs validate algorithm behavior
 
 ## 🔄 Development Cycle
 
@@ -205,13 +298,13 @@ docker-compose exec postgres psql -U kellogg_user -d kellogg_music_match -c "SEL
 6. **Commit**: Git commit with descriptive message
 
 ### Schema Changes Flow
-1. **Edit Schema**: Modify files in backend/db/schema/
+1. **Edit Schema**: Modify files in backend/db/schema/ (especially 004_spearman_distance.sql for algorithm changes)
 2. **Sync Schema**: `make schema-sync`
 3. **Generate Code**: `make backend-sqlc`
 4. **Update Queries**: Edit backend/db/queries/queries.sql if needed
 5. **Regenerate**: `make backend-sqlc`
-6. **Test**: Verify database operations work
-7. **Commit**: Include schema files and generated code
+6. **Test**: Verify database operations work with `make test-behavioral`
+7. **Commit**: Include schema files, generated code, and postgres.dockerfile
 
 ### Code Generation Flow
 1. **Edit OpenAPI**: Modify backend/openapi.yaml
@@ -280,6 +373,9 @@ DB_NAME=kellogg_music_match
 DB_USER=kellogg_user
 DB_PASSWORD=kellogg_secure_pass_2024
 DB_SSLMODE=disable
+
+# Note: Custom PostgreSQL image includes plpython3u extension
+# and scientific libraries (scipy, numpy) for similarity calculations
 ```
 
 #### Frontend (Docker Compose)
@@ -292,9 +388,12 @@ API_BASE_URL=http://localhost:8080
 ### Key Files
 - **README.md**: Main project documentation
 - **DATABASE.md**: Database setup and schema information
-- **DOCKER-COMPOSE-SETUP.md**: Docker environment setup
-- **backend/README.md**: Backend-specific documentation
+- **DATABASE_SCHEMA.md**: Comprehensive schema documentation with spearman_distance function
+- **DOCKER-COMPOSE-SETUP.md**: Docker environment setup with custom PostgreSQL
+- **backend/README.md**: Backend-specific documentation with testing framework
+- **backend/business/TESTING.md**: Detailed Ginkgo behavioral testing documentation
 - **ui/README.md**: Frontend-specific documentation
+- **postgres.dockerfile**: Custom PostgreSQL image with scientific libraries
 
 ### Generated Documentation
 - **Backend API**: http://localhost:8080/docs (when running)

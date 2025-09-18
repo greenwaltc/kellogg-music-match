@@ -61,8 +61,8 @@ export class ArtistsComponent {
     const artists = this.artistsArray.controls.map(c => (c.value || '').trim()).filter(Boolean) as string[];
     if (!artists.length) { this.error.set('Enter at least one artist.'); return; }
     this.loading.set(true); this.error.set(null); this.matches.clear();
-  const email = this.auth.user()?.email;
-  const headers = email ? new HttpHeaders({ 'X-User-Email': email }) : undefined;
+  const username = this.auth.user()?.username;
+  const headers = username ? new HttpHeaders({ 'X-User-Username': username }) : undefined;
   this.http.post<MatchUser[]>(this.url('/findMusicMatches'), { artists }, { headers }).subscribe({
       next: (res) => { this.loading.set(false); this.matches.set(res); this.router.navigateByUrl('/matches'); },
       error: (err) => { this.loading.set(false); this.error.set(this.extractError(err) + ' Please try again later.'); }

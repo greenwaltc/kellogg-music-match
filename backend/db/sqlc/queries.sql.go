@@ -107,6 +107,10 @@ SELECT
   u1.username,
   u1.first_name,
   u1.last_name,
+  (SELECT array_agg(a1.name ORDER BY ua1.rank ASC)
+   FROM user_artists ua1
+   JOIN artists a1 ON ua1.artist_id = a1.id
+   WHERE ua1.user_id = u1.id) AS artists,
   spearman_distance(
     (SELECT array_agg(a1.name ORDER BY ua1.rank ASC)
      FROM user_artists ua1
@@ -126,10 +130,11 @@ LIMIT 10
 `
 
 type FindSimilarUsersRow struct {
-	Username  string  `json:"username"`
-	FirstName string  `json:"first_name"`
-	LastName  string  `json:"last_name"`
-	Distance  float64 `json:"distance"`
+	Username  string      `json:"username"`
+	FirstName string      `json:"first_name"`
+	LastName  string      `json:"last_name"`
+	Artists   interface{} `json:"artists"`
+	Distance  float64     `json:"distance"`
 }
 
 func (q *Queries) FindSimilarUsers(ctx context.Context, username string) ([]FindSimilarUsersRow, error) {
@@ -145,6 +150,7 @@ func (q *Queries) FindSimilarUsers(ctx context.Context, username string) ([]Find
 			&i.Username,
 			&i.FirstName,
 			&i.LastName,
+			&i.Artists,
 			&i.Distance,
 		); err != nil {
 			return nil, err
@@ -478,19 +484,16 @@ WITH new_artists AS (
     ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
     RETURNING id, name
 ),
-artist_mapping AS (
+ranked_artists AS (
     SELECT 
-        a.id, 
-        ranks.rank,
-        ROW_NUMBER() OVER () as row_num
+        a.id,
+        a.name,
+        ($3::int[])[array_position($2::text[], a.name)] as rank
     FROM new_artists a
-    JOIN (SELECT unnest($3::int[]) as rank, generate_subscripts($3::int[], 1) as row_num) ranks
-        ON generate_subscripts($2::text[], 1) = ranks.row_num
-    WHERE a.name = ($2::text[])[ranks.row_num]
 )
 INSERT INTO user_artists (user_id, artist_id, rank)
-SELECT $1, id, rank FROM artist_mapping
-ON CONFLICT (user_id, artist_id, rank) DO NOTHING
+SELECT $1, id, rank FROM ranked_artists
+ON CONFLICT (user_id, artist_id) DO UPDATE SET rank = EXCLUDED.rank
 `
 
 type SetUserArtistsParams struct {

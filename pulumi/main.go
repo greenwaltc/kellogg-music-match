@@ -430,7 +430,7 @@ func main() {
 						Containers: corev1.ContainerArray{
 							&corev1.ContainerArgs{
 								Name:  pulumi.String("postgres"),
-								Image: pulumi.String("postgres:15-alpine"),
+								Image: pulumi.String("postgres:15"),
 								Ports: corev1.ContainerPortArray{
 									&corev1.ContainerPortArgs{
 										ContainerPort: pulumi.Int(5432),

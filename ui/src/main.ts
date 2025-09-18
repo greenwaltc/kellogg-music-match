@@ -8,6 +8,12 @@ import { ArtistsComponent } from './app/artists.component';
 import { MatchesComponent } from './app/matches.component';
 import { authGuard } from './app/auth.guard';
 
+declare global {
+  interface Window {
+    __kmmConfig?: { apiBaseUrl?: string };
+  }
+}
+
 const routes: Routes = [
   { path: '', component: LoginComponent },
   { path: 'artists', component: ArtistsComponent, canActivate: [authGuard] },
@@ -15,10 +21,26 @@ const routes: Routes = [
   { path: '**', redirectTo: '' }
 ];
 
-bootstrapApplication(AppComponent, {
-  providers: [
-    provideAnimations(),
-    provideHttpClient(withFetch()),
-    provideRouter(routes)
-  ]
-}).catch((err: unknown) => console.error(err));
+// Wait for config to load before bootstrapping Angular
+async function loadConfigAndBootstrap() {
+  try {
+    // Give the config loading script some time to complete
+    let retries = 10;
+    while (retries > 0 && (!window.__kmmConfig?.apiBaseUrl || window.__kmmConfig.apiBaseUrl === '')) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      retries--;
+    }
+  } catch (err) {
+    console.warn('Config loading failed:', err);
+  }
+
+  bootstrapApplication(AppComponent, {
+    providers: [
+      provideAnimations(),
+      provideHttpClient(withFetch()),
+      provideRouter(routes)
+    ]
+  }).catch((err: unknown) => console.error(err));
+}
+
+loadConfigAndBootstrap();

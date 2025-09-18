@@ -7,23 +7,28 @@
 help: ## Show this help message
 	@echo "🎵 Kellogg Music Match - Full Stack Development & Deployment"
 	@echo ""
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-25s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "Component-specific commands:"
-	@echo "  backend-*     Backend operations (make backend-build, backend-test, etc.)"
-	@echo "  ui-*          UI operations (make ui-build, ui-dev, etc.)"
-	@echo "  db-*          Database operations (make db-start, db-test, etc.)"
-	@echo "  infra-*       Infrastructure operations (make infra-deploy, infra-destroy, etc.)"
+	@echo "  backend-*             Backend operations (make backend-build, backend-test, etc.)"
+	@echo "  ui-*                  UI operations (make ui-build, ui-dev, etc.)"
+	@echo "  db-*                  Database operations (make db-start, db-test, etc.)"
+	@echo "  infra-*               Infrastructure operations (make infra-deploy, infra-destroy, etc.)"
+	@echo ""
+	@echo "Testing commands:"
+	@echo "  test                  Run all tests (backend, UI, database)"
+	@echo "  test-behavioral       Run Ginkgo behavioral tests"
+	@echo "  test-quick           Run quick unit tests only"
 	@echo ""
 	@echo "Schema management:"
-	@echo "  schema-sync       Sync DATABASE_SCHEMA.sql from backend/db/schema/*.sql"
-	@echo "  check-schema-sync Verify schema files are synchronized"
-	@echo "  create-migration  Create new migration file (make create-migration name=add_feature)"
+	@echo "  schema-sync           Sync DATABASE_SCHEMA.sql from backend/db/schema/*.sql"
+	@echo "  check-schema-sync     Verify schema files are synchronized"
+	@echo "  create-migration      Create new migration file (make create-migration name=add_feature)"
 	@echo ""
 	@echo "Quick development workflow:"
-	@echo "  ./dev.sh start     Start full application"
-	@echo "  ./dev.sh db-only   Start database only"
-	@echo "  ./dev.sh test      Test environment"
+	@echo "  ./dev.sh start        Start full application"
+	@echo "  ./dev.sh db-only      Start database only"
+	@echo "  ./dev.sh test         Test environment"
 	@echo ""
 
 ## =============================================================================
@@ -42,10 +47,18 @@ dev-stop: ## Stop development servers
 	@echo "🛑 Stopping development servers..."
 	@docker-compose down
 
-test: backend-test ui-test ## Run all tests
+test: backend-test ui-test db-test ## Run all tests (backend, UI, database)
 	@echo "✅ All tests complete!"
 
-check: backend-check ui-check schema-sync ## Run all checks (lint, test, format, schema sync)
+test-behavioral: ## Run backend behavioral tests using Ginkgo
+	@echo "🧪 Running behavioral tests..."
+	@cd backend && ~/go/bin/ginkgo run ./...
+	@echo "✅ Behavioral tests complete!"
+
+test-quick: backend-test-quick ## Run quick tests (backend unit tests only)
+	@echo "✅ Quick tests complete!"
+
+check: backend-check ui-check schema-sync test-behavioral ## Run all checks (lint, test, format, schema sync, behavioral tests)
 	@echo "✅ All checks passed!"
 
 clean: backend-clean ui-clean docker-clean ## Clean all build artifacts

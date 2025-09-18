@@ -1,6 +1,16 @@
 # 🎵 Kellogg Music Match
 
-A professional full-stack music taste matching application with Go backend, Angular frontend, PostgreSQL database, and automated infrastructure deployment.
+### 🗄️ Database
+- **Custom PostgreSQL 15** with **plpython3u extension** and scientific libraries (scipy, numpy)
+- **Scientific Similarity Calculations** - Custom `spearman_distance` function with hybrid Jaccard + positional correlation algorithm
+- **SQLC Integration** - Type-safe Go code generated from SQL queries
+- **Multi-file Schema Management** - Automatic synchronization from backend/db/schema/*.sql
+- **UserRepository Interface** - Clean abstraction layer for database operations
+- **UUID Support** - Proper UUID format with performance indexes
+- **Automatic initialization** with sample data for development
+- **User management** with bcrypt password hashing
+- **Music matching** with artist relationships and scientifically accurate similarity scoring
+- **Performance optimized** with indexes and comprehensive foreign key constraintsonal full-stack music taste matching application with Go backend, Angular frontend, PostgreSQL database, and automated infrastructure deployment.
 
 ## 🏗️ Architecture Overview
 
@@ -19,9 +29,11 @@ kellogg-music-match/
 ### 🔧 Backend
 - **Go 1.22+** with OpenAPI-generated server
 - **Clean Architecture** - Generated code separated from business logic
-- **PostgreSQL Integration** - Complete database migration with SQLC for type-safe queries
+- **Custom PostgreSQL Integration** - Complete database migration with scientific extensions
 - **UserRepository Interface** - Clean abstraction layer for database operations
+- **Scientific Similarity Engine** - Hybrid Jaccard + positional correlation algorithm for music matching
 - **REST API** with authentication, user management, and music matching
+- **Comprehensive Testing** - Unit tests + Ginkgo behavioral tests for algorithm validation
 - **Docker** containerization with multi-stage builds
 
 ### 🗄️ Database
@@ -169,7 +181,9 @@ docker-compose build    # Rebuild images
 make backend-help           # Backend-specific commands
 make backend-generate       # Generate SQLC and OpenAPI code
 make backend-build          # Build backend
-make backend-test           # Run backend tests
+make backend-test           # Run all backend tests (Go + Ginkgo)
+make backend-test-quick     # Run quick Go unit tests only
+make backend-test-ginkgo    # Run Ginkgo behavioral tests
 make backend-dev            # Development with live reload
 make backend-sqlc           # Generate SQLC code from queries
 ```
@@ -205,7 +219,11 @@ The application uses PostgreSQL with a comprehensive schema including:
 
 ### Database Architecture
 - **UserRepository Interface**: Clean abstraction layer separating business logic from database operations
-- **PostgreSQL Implementation**: Full CRUD operations with proper error handling and transactions
+- **Custom PostgreSQL Implementation**: Full CRUD operations with scientific extensions (plpython3u, scipy, numpy)
+- **Spearman Distance Function**: PostgreSQL function implementing hybrid similarity algorithm:
+  - **Jaccard Similarity** (70% weight): Measures artist overlap between users
+  - **Positional Correlation** (30% weight): Considers ranking/order of shared artists  
+  - **Distance Values**: 0 (identical), 0.7 (subset), 2.0 (no overlap)
 - **Type Safety**: SQLC generates type-safe Go structs and methods from SQL queries
 - **Environment Variables**: Configurable connection parameters (DB_HOST, DB_PORT, DB_NAME, etc.)
 
@@ -213,7 +231,8 @@ The application uses PostgreSQL with a comprehensive schema including:
 The development database includes:
 - **10 Popular Artists**: Taylor Swift, The Beatles, Radiohead, Beyoncé, etc.
 - **3 Test Users**: alice, bob, charlie (password: `password123`)
-- **Sample Relationships**: Pre-configured music preferences for testing
+- **Sample Relationships**: Pre-configured music preferences for testing similarity algorithms
+- **Spearman Distance Function**: PostgreSQL function for scientific similarity calculations
 
 ### Database Connection
 ```bash
@@ -235,10 +254,15 @@ Password: [from kubernetes secret]
 ### Database Files
 - **`DATABASE_SCHEMA.sql`**: Complete PostgreSQL schema with tables, indexes, functions, and sample data
 - **`backend/db/schema/*.sql`**: Multi-file schema source (single source of truth)
+  - `001_initial.sql`: Base tables and relationships
+  - `002_spearman_func.sql`: Initial similarity function
+  - `003_add_rank.sql`: Ranking support
+  - `004_spearman_distance.sql`: Hybrid Jaccard + positional similarity algorithm
 - **`backend/db/queries/queries.sql`**: SQLC query definitions for type-safe Go code generation
 - **`backend/sqlc.yaml`**: SQLC configuration for code generation
 - **`init-database.sh`**: Initialization script for automatic setup
 - **`DATABASE_SCHEMA.md`**: Comprehensive documentation with examples and queries
+- **`postgres.dockerfile`**: Custom PostgreSQL image with scientific libraries
 
 ## 🔄 Development Workflows
 
@@ -297,6 +321,54 @@ make deploy-prod
 ```
 
 ## 🧪 Testing Strategy
+
+### Comprehensive Test Coverage
+- **Go Unit Tests**: Traditional Go testing for business logic and API handlers
+- **Ginkgo Behavioral Tests**: Comprehensive behavioral testing using Ginkgo v2 + Gomega
+- **Database Integration Tests**: End-to-end testing with PostgreSQL scientific functions
+- **Algorithm Validation**: Specific tests validating similarity calculation accuracy
+
+### Test Categories
+
+#### 1. **Music Matching Algorithm Tests**
+```bash
+make test-behavioral  # Run Ginkgo behavioral tests
+```
+- **Identical Preferences**: Validates maximum similarity scores (≥0.9) for identical artist lists
+- **Subset Relationships**: Tests moderate similarity (≈0.5) for subset cases
+- **No Overlap**: Confirms zero matches for completely different preferences
+- **Partial Overlap**: Validates Jaccard similarity calculation for partial artist overlap
+
+#### 2. **Database Function Validation**
+- **Distance = 0**: High scores for identical arrays (perfect similarity)
+- **Distance = 0.7**: Moderate scores for subset relationships 
+- **Distance = 2.0**: No matches for completely different preferences
+- **Scientific Accuracy**: Validates hybrid Jaccard + positional algorithm
+
+#### 3. **Edge Case Testing**
+- Empty artist lists and single artist preferences
+- Case-insensitive and whitespace-tolerant matching
+- User exclusion (users don't match themselves)
+- Result ordering verification (descending by score, then overlap)
+
+### Running Tests
+```bash
+# All tests (Go + Ginkgo behavioral)
+make test
+
+# Quick unit tests only  
+make test-quick
+
+# Behavioral tests only
+make test-behavioral
+
+# Backend-specific tests
+make backend-test
+make backend-test-ginkgo
+
+# Full checks (lint + test + format)
+make check
+```
 
 ### Unit Tests
 ```bash

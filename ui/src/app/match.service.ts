@@ -21,8 +21,8 @@ export class MatchService {
     const user = this.auth.user();
     if (user?.artists?.length) {
       this.loading.set(true);
-  const email = user.email;
-  const headers = email ? new HttpHeaders({ 'X-User-Email': email }) : undefined;
+  const username = user.username;
+  const headers = username ? new HttpHeaders({ 'X-User-Username': username }) : undefined;
   this.http.post<MatchUser[]>(this.url('/findMusicMatches'), { artists: user.artists }, { headers }).subscribe({
         next: (res) => { this.matches.set(res); this.loading.set(false); },
         error: () => { this.loading.set(false); }
