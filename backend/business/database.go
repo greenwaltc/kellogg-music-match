@@ -42,7 +42,7 @@ func (c *DatabaseConfig) ConnectionString() string {
 // UserRepository defines the interface for user data operations
 type UserRepository interface {
 	// User operations
-	CreateUser(ctx context.Context, id uuid.UUID, username, email, firstName, lastName, passwordHash string) (*sqlc.User, error)
+	CreateUser(ctx context.Context, id uuid.UUID, username, email, firstName, lastName, passwordHash, program string, graduationYear int32) (*sqlc.User, error)
 	GetUserByUsername(ctx context.Context, username string) (*sqlc.User, error)
 	GetUserByUsernameWithPassword(ctx context.Context, username string) (*sqlc.User, error)
 	GetUserByEmail(ctx context.Context, email string) (*sqlc.User, error)
@@ -115,16 +115,18 @@ func (r *PostgreSQLUserRepository) Close() error {
 }
 
 // CreateUser creates a new user in the database
-func (r *PostgreSQLUserRepository) CreateUser(ctx context.Context, id uuid.UUID, username, email, firstName, lastName, passwordHash string) (*sqlc.User, error) {
-	fmt.Printf("CreateUser called: ID=%s, Username=%s, Email=%s\n", id.String(), username, email)
+func (r *PostgreSQLUserRepository) CreateUser(ctx context.Context, id uuid.UUID, username, email, firstName, lastName, passwordHash, program string, graduationYear int32) (*sqlc.User, error) {
+	fmt.Printf("CreateUser called: ID=%s, Username=%s, Email=%s, Program=%s, GradYear=%d\n", id.String(), username, email, program, graduationYear)
 
 	user, err := r.queries.CreateUser(ctx, sqlc.CreateUserParams{
-		ID:           id,
-		Username:     username,
-		Email:        email,
-		FirstName:    firstName,
-		LastName:     lastName,
-		PasswordHash: passwordHash,
+		ID:             id,
+		Username:       username,
+		Email:          email,
+		FirstName:      firstName,
+		LastName:       lastName,
+		PasswordHash:   passwordHash,
+		Program:        sql.NullString{String: program, Valid: program != ""},
+		GraduationYear: sql.NullInt32{Int32: graduationYear, Valid: graduationYear > 0},
 	})
 	if err != nil {
 		fmt.Printf("CreateUser database error: %v\n", err)

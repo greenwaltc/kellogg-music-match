@@ -1,13 +1,13 @@
 -- name: CreateUser :one
-INSERT INTO users (id, username, email, first_name, last_name, password_hash)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO users (id, username, email, first_name, last_name, password_hash, program, graduation_year)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING *;
 
 -- name: GetUserByUsername :one
 SELECT * FROM users WHERE username = $1 LIMIT 1;
 
 -- name: GetUserByUsernameWithPassword :one
-SELECT id, username, email, first_name, last_name, password_hash, created_at, updated_at 
+SELECT id, username, email, first_name, last_name, password_hash, created_at, updated_at, program, graduation_year 
 FROM users WHERE username = $1 LIMIT 1;
 
 -- name: GetUserByEmail :one
@@ -123,6 +123,8 @@ SELECT
   u1.username,
   u1.first_name,
   u1.last_name,
+  u1.program,
+  u1.graduation_year,
   (SELECT array_agg(a1.name ORDER BY ua1.rank ASC)
    FROM user_artists ua1
    JOIN artists a1 ON ua1.artist_id = a1.id

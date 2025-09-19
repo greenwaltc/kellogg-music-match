@@ -9,6 +9,7 @@
 -- backend/db/schema/004_spearman_distance.sql
 -- backend/db/schema/005_artist_name_limit.sql
 -- backend/db/schema/006_feedback_table.sql
+-- backend/db/schema/007_add_user_program_graduation_year.sql
 
 -- ============================================================================
 -- CONSOLIDATED SCHEMA (Auto-generated from backend/db/schema/*.sql)
@@ -297,3 +298,24 @@ CREATE INDEX idx_feedback_created_at ON feedback(created_at);
 -- Add trigger to automatically update updated_at
 CREATE TRIGGER update_feedback_updated_at BEFORE UPDATE ON feedback
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+-- -------------------------------------------------------------------------
+-- From: backend/db/schema/007_add_user_program_graduation_year.sql
+-- -------------------------------------------------------------------------
+-- Add program and graduation year fields to users table
+-- Migration: 007_add_user_program_graduation_year.sql
+
+-- Add program field with enum-like constraint
+ALTER TABLE users 
+ADD COLUMN program VARCHAR(10) CHECK (program IN ('2Y', '1Y', 'MBAi', 'MMM', 'EWMBA'));
+
+-- Add graduation year field with reasonable range constraint
+ALTER TABLE users 
+ADD COLUMN graduation_year INTEGER CHECK (graduation_year >= EXTRACT(YEAR FROM NOW()) AND graduation_year <= 2030);
+
+-- Create indexes for performance
+CREATE INDEX idx_users_program ON users(program);
+CREATE INDEX idx_users_graduation_year ON users(graduation_year);
+
+-- Add comments for documentation
+COMMENT ON COLUMN users.program IS 'MBA program type: 2Y, 1Y, MBAi, MMM, or EWMBA';
+COMMENT ON COLUMN users.graduation_year IS 'Expected graduation year (current year to 2030)';

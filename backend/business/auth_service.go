@@ -78,6 +78,8 @@ func (s *AuthService) RegisterUser(ctx context.Context, registerRequest generate
 		registerRequest.FirstName,
 		registerRequest.LastName,
 		string(hashedPassword),
+		registerRequest.Program,
+		registerRequest.GraduationYear,
 	)
 	if err != nil {
 		return generated.Response(http.StatusInternalServerError, generated.ErrorResponse{
@@ -87,12 +89,14 @@ func (s *AuthService) RegisterUser(ctx context.Context, registerRequest generate
 
 	// Convert database user to API user
 	user := &generated.User{
-		Id:        dbUser.ID.String(), // Standard UUID format with dashes
-		Username:  dbUser.Username,
-		Email:     dbUser.Email,
-		FirstName: dbUser.FirstName,
-		LastName:  dbUser.LastName,
-		Artists:   []string{}, // Will be populated when user sets artists
+		Id:             dbUser.ID.String(), // Standard UUID format with dashes
+		Username:       dbUser.Username,
+		Email:          dbUser.Email,
+		FirstName:      dbUser.FirstName,
+		LastName:       dbUser.LastName,
+		Program:        dbUser.Program.String,
+		GraduationYear: dbUser.GraduationYear.Int32,
+		Artists:        []string{}, // Will be populated when user sets artists
 	}
 
 	// Return response
@@ -151,12 +155,14 @@ func (s *AuthService) LoginUser(ctx context.Context, loginRequest generated.Logi
 
 	// Convert database user to API user
 	user := &generated.User{
-		Id:        dbUser.ID.String(), // Standard UUID format with dashes
-		Username:  dbUser.Username,
-		Email:     dbUser.Email,
-		FirstName: dbUser.FirstName,
-		LastName:  dbUser.LastName,
-		Artists:   artistNames,
+		Id:             dbUser.ID.String(), // Standard UUID format with dashes
+		Username:       dbUser.Username,
+		Email:          dbUser.Email,
+		FirstName:      dbUser.FirstName,
+		LastName:       dbUser.LastName,
+		Program:        dbUser.Program.String,
+		GraduationYear: dbUser.GraduationYear.Int32,
+		Artists:        artistNames,
 	}
 
 	// Return response

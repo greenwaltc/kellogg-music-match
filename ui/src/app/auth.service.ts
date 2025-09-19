@@ -23,6 +23,8 @@ export interface RegisterRequest {
   firstName: string;
   lastName: string;
   password: string;
+  program: string;
+  graduationYear: number;
 }
 
 export interface AuthResponse {

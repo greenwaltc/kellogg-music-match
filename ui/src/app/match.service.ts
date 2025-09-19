@@ -8,6 +8,8 @@ export interface MatchUser {
   overlap: number;
   score: number;
   artists: string[];
+  program?: string;
+  graduationYear?: number;
   [k: string]: any 
 }
 

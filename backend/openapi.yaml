@@ -445,6 +445,17 @@ components:
           description: User's last name
           minLength: 1
           example: "Doe"
+        program:
+          type: string
+          description: MBA program type
+          enum: ["2Y", "1Y", "MMM", "MBAi", "JD-MBA", "MD-MBA", "EWMBA"]
+          example: "2Y"
+        graduationYear:
+          type: integer
+          description: Expected graduation year
+          minimum: 2025
+          maximum: 2030
+          example: 2027
         artists:
           type: array
           items:
@@ -457,6 +468,8 @@ components:
         - email
         - firstName
         - lastName
+        - program
+        - graduationYear
         - artists
 
     Artist:
@@ -512,12 +525,25 @@ components:
           minLength: 6
           format: password
           example: "SecurePass123!"
+        program:
+          type: string
+          description: MBA program type
+          enum: ["2Y", "1Y", "MMM", "MBAi", "JD-MBA", "MD-MBA", "EWMBA"]
+          example: "2Y"
+        graduationYear:
+          type: integer
+          description: Expected graduation year
+          minimum: 2025
+          maximum: 2030
+          example: 2027
       required:
         - username
         - email
         - firstName
         - lastName
         - password
+        - program
+        - graduationYear
 
     LoginRequest:
       type: object
@@ -563,8 +589,8 @@ components:
             minLength: 1
             maxLength: 240
           description: |
-            List of favorite artists (maximum 240 characters each). Duplicates and empty strings are automatically removed.
-            Artist names are case-insensitive for matching purposes.
+            List of favorite artists (maximum 240 characters each). Duplicates are not allowed and will be automatically rejected (case-insensitive comparison).
+            Empty strings are automatically removed. Artist names are case-insensitive for matching purposes.
           minItems: 1
           example: ["Taylor Swift", "The Beatles", "Radiohead", "Beyoncé"]
       required:
@@ -578,6 +604,17 @@ components:
           type: string
           description: Full name of the matching user (firstName + lastName)
           example: "Alice Johnson"
+        program:
+          type: string
+          description: MBA program type
+          enum: ["2Y", "1Y", "MMM", "MBAi", "JD-MBA", "MD-MBA", "EWMBA"]
+          example: "2Y"
+        graduationYear:
+          type: integer
+          description: Expected graduation year
+          minimum: 2025
+          maximum: 2030
+          example: 2027
         overlap:
           type: integer
           description: Number of shared artists between the query and this user
@@ -600,6 +637,8 @@ components:
           example: ["The Beatles", "Radiohead", "Led Zeppelin"]
       required:
         - name
+        - program
+        - graduationYear
         - overlap
         - score
         - artists

@@ -33,6 +33,10 @@ type User struct {
 	PasswordHash string       `json:"password_hash"`
 	CreatedAt    sql.NullTime `json:"created_at"`
 	UpdatedAt    sql.NullTime `json:"updated_at"`
+	// MBA program type: 2Y, 1Y, MBAi, MMM, or EWMBA
+	Program sql.NullString `json:"program"`
+	// Expected graduation year (current year to 2030)
+	GraduationYear sql.NullInt32 `json:"graduation_year"`
 }
 
 type UserArtist struct {

@@ -81,18 +81,20 @@ func (q *Queries) CreateFeedback(ctx context.Context, arg CreateFeedbackParams) 
 }
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (id, username, email, first_name, last_name, password_hash)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, username, email, first_name, last_name, password_hash, created_at, updated_at
+INSERT INTO users (id, username, email, first_name, last_name, password_hash, program, graduation_year)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, username, email, first_name, last_name, password_hash, created_at, updated_at, program, graduation_year
 `
 
 type CreateUserParams struct {
-	ID           uuid.UUID `json:"id"`
-	Username     string    `json:"username"`
-	Email        string    `json:"email"`
-	FirstName    string    `json:"first_name"`
-	LastName     string    `json:"last_name"`
-	PasswordHash string    `json:"password_hash"`
+	ID             uuid.UUID      `json:"id"`
+	Username       string         `json:"username"`
+	Email          string         `json:"email"`
+	FirstName      string         `json:"first_name"`
+	LastName       string         `json:"last_name"`
+	PasswordHash   string         `json:"password_hash"`
+	Program        sql.NullString `json:"program"`
+	GraduationYear sql.NullInt32  `json:"graduation_year"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
@@ -103,6 +105,8 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		arg.FirstName,
 		arg.LastName,
 		arg.PasswordHash,
+		arg.Program,
+		arg.GraduationYear,
 	)
 	var i User
 	err := row.Scan(
@@ -114,6 +118,8 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.PasswordHash,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Program,
+		&i.GraduationYear,
 	)
 	return i, err
 }
@@ -132,6 +138,8 @@ SELECT
   u1.username,
   u1.first_name,
   u1.last_name,
+  u1.program,
+  u1.graduation_year,
   (SELECT array_agg(a1.name ORDER BY ua1.rank ASC)
    FROM user_artists ua1
    JOIN artists a1 ON ua1.artist_id = a1.id
@@ -155,11 +163,13 @@ LIMIT 10
 `
 
 type FindSimilarUsersRow struct {
-	Username  string      `json:"username"`
-	FirstName string      `json:"first_name"`
-	LastName  string      `json:"last_name"`
-	Artists   interface{} `json:"artists"`
-	Distance  float64     `json:"distance"`
+	Username       string         `json:"username"`
+	FirstName      string         `json:"first_name"`
+	LastName       string         `json:"last_name"`
+	Program        sql.NullString `json:"program"`
+	GraduationYear sql.NullInt32  `json:"graduation_year"`
+	Artists        interface{}    `json:"artists"`
+	Distance       float64        `json:"distance"`
 }
 
 func (q *Queries) FindSimilarUsers(ctx context.Context, username string) ([]FindSimilarUsersRow, error) {
@@ -175,6 +185,8 @@ func (q *Queries) FindSimilarUsers(ctx context.Context, username string) ([]Find
 			&i.Username,
 			&i.FirstName,
 			&i.LastName,
+			&i.Program,
+			&i.GraduationYear,
 			&i.Artists,
 			&i.Distance,
 		); err != nil {
@@ -270,7 +282,7 @@ func (q *Queries) GetAllFeedback(ctx context.Context, limit int32) ([]GetAllFeed
 }
 
 const getAllUsers = `-- name: GetAllUsers :many
-SELECT id, username, email, first_name, last_name, password_hash, created_at, updated_at FROM users ORDER BY created_at
+SELECT id, username, email, first_name, last_name, password_hash, created_at, updated_at, program, graduation_year FROM users ORDER BY created_at
 `
 
 func (q *Queries) GetAllUsers(ctx context.Context) ([]User, error) {
@@ -291,6 +303,8 @@ func (q *Queries) GetAllUsers(ctx context.Context) ([]User, error) {
 			&i.PasswordHash,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Program,
+			&i.GraduationYear,
 		); err != nil {
 			return nil, err
 		}
@@ -443,7 +457,7 @@ func (q *Queries) GetUserArtists(ctx context.Context, userID uuid.UUID) ([]Artis
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, username, email, first_name, last_name, password_hash, created_at, updated_at FROM users WHERE email = $1 LIMIT 1
+SELECT id, username, email, first_name, last_name, password_hash, created_at, updated_at, program, graduation_year FROM users WHERE email = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -458,12 +472,14 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.PasswordHash,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Program,
+		&i.GraduationYear,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, username, email, first_name, last_name, password_hash, created_at, updated_at FROM users WHERE id = $1 LIMIT 1
+SELECT id, username, email, first_name, last_name, password_hash, created_at, updated_at, program, graduation_year FROM users WHERE id = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
@@ -478,12 +494,14 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.PasswordHash,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Program,
+		&i.GraduationYear,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, username, email, first_name, last_name, password_hash, created_at, updated_at FROM users WHERE username = $1 LIMIT 1
+SELECT id, username, email, first_name, last_name, password_hash, created_at, updated_at, program, graduation_year FROM users WHERE username = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
@@ -498,12 +516,14 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.PasswordHash,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Program,
+		&i.GraduationYear,
 	)
 	return i, err
 }
 
 const getUserByUsernameWithPassword = `-- name: GetUserByUsernameWithPassword :one
-SELECT id, username, email, first_name, last_name, password_hash, created_at, updated_at 
+SELECT id, username, email, first_name, last_name, password_hash, created_at, updated_at, program, graduation_year 
 FROM users WHERE username = $1 LIMIT 1
 `
 
@@ -519,6 +539,8 @@ func (q *Queries) GetUserByUsernameWithPassword(ctx context.Context, username st
 		&i.PasswordHash,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Program,
+		&i.GraduationYear,
 	)
 	return i, err
 }
@@ -671,7 +693,7 @@ const updateUser = `-- name: UpdateUser :one
 UPDATE users 
 SET first_name = $2, last_name = $3, email = $4
 WHERE id = $1
-RETURNING id, username, email, first_name, last_name, password_hash, created_at, updated_at
+RETURNING id, username, email, first_name, last_name, password_hash, created_at, updated_at, program, graduation_year
 `
 
 type UpdateUserParams struct {
@@ -698,6 +720,8 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		&i.PasswordHash,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Program,
+		&i.GraduationYear,
 	)
 	return i, err
 }

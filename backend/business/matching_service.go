@@ -98,6 +98,21 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 		}
 	}
 
+	// Check for duplicate artists (case-insensitive)
+	artistSet := make(map[string]bool)
+	for _, artist := range artistsRequest.Artists {
+		artistLower := strings.ToLower(strings.TrimSpace(artist))
+		if artistLower == "" {
+			continue // Skip empty artists
+		}
+		if artistSet[artistLower] {
+			return generated.Response(http.StatusBadRequest, generated.ErrorResponse{
+				Message: "duplicate artists are not allowed",
+			}), nil
+		}
+		artistSet[artistLower] = true
+	}
+
 	// If username is provided, update user's artist preferences
 	if xUserUsername != "" {
 		// First get the user to check if they exist
@@ -164,13 +179,48 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 		// Convert artists interface{} to []string
 		var artistNames []string
 		if row.Artists != nil {
-			if names, ok := row.Artists.([]interface{}); ok {
-				artistNames = make([]string, 0, len(names))
-				for _, name := range names {
+			// Handle different possible types for PostgreSQL arrays
+			switch v := row.Artists.(type) {
+			case []interface{}:
+				artistNames = make([]string, 0, len(v))
+				for _, name := range v {
 					if str, ok := name.(string); ok {
 						artistNames = append(artistNames, str)
 					}
 				}
+			case []string:
+				artistNames = v
+			case []uint8:
+				// PostgreSQL array as byte array - convert to string first
+				arrayStr := string(v)
+				if len(arrayStr) > 2 && arrayStr[0] == '{' && arrayStr[len(arrayStr)-1] == '}' {
+					arrayStr = arrayStr[1 : len(arrayStr)-1] // Remove { and }
+					if arrayStr != "" {
+						artistNames = strings.Split(arrayStr, ",")
+						// Trim whitespace and quotes from each artist name
+						for i, artist := range artistNames {
+							artist = strings.Trim(artist, ` "`)
+							artistNames[i] = artist
+						}
+					}
+				}
+			case string:
+				// Sometimes PostgreSQL returns arrays as strings
+				// Remove curly braces and split by comma
+				if len(v) > 2 && v[0] == '{' && v[len(v)-1] == '}' {
+					v = v[1 : len(v)-1] // Remove { and }
+					if v != "" {
+						artistNames = strings.Split(v, ",")
+						// Trim whitespace and quotes from each artist name
+						for i, artist := range artistNames {
+							artist = strings.Trim(artist, ` "`)
+							artistNames[i] = artist
+						}
+					}
+				}
+			default:
+				// Fallback - try to log for any remaining edge cases but don't fail
+				fmt.Printf("DEBUG: Unhandled artists type: %T\n", v)
 			}
 		}
 
@@ -184,10 +234,12 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 		}
 
 		match := &generated.MatchUser{
-			Name:    fmt.Sprintf("%s %s", row.FirstName, row.LastName),
-			Overlap: int32(overlapCount),
-			Score:   float32(1.0 - row.Distance), // Convert distance to similarity score (higher is better)
-			Artists: artistNames,                 // Include the artists array
+			Name:           fmt.Sprintf("%s %s", row.FirstName, row.LastName),
+			Program:        row.Program.String,
+			GraduationYear: row.GraduationYear.Int32,
+			Overlap:        int32(overlapCount),
+			Score:          float32(1.0 - (row.Distance / 2.0)), // Convert distance to similarity score: 0-2 distance → 1-0 similarity
+			Artists:        artistNames,                         // Include the artists array
 		}
 		matches = append(matches, match)
 	}
@@ -195,10 +247,12 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 	// Add the funny "Kellogg MBA Crush" component only when matches are returned
 	if len(matches) > 0 {
 		crushMatch := &generated.MatchUser{
-			Name:    "Your Kellogg MBA Crush",
-			Overlap: int32(0),                                                     // No overlap by design
-			Score:   float32(0.0),                                                 // No compatibility
-			Artists: []string{"Classical Music", "Podcasts", "NPR", "True Crime"}, // Completely different taste
+			Name:           "Your Kellogg MBA Crush",
+			Program:        "2Y",                                                         // Default program for the joke entry
+			GraduationYear: 2026,                                                         // Default graduation year for the joke entry
+			Overlap:        int32(0),                                                     // No overlap by design
+			Score:          float32(0.0),                                                 // No compatibility
+			Artists:        []string{"Classical Music", "Podcasts", "NPR", "True Crime"}, // Completely different taste
 		}
 		matches = append(matches, crushMatch)
 	}

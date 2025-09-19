@@ -1,6 +1,6 @@
 import { Component, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule, FormArray, FormBuilder, FormControl, Validators, FormGroup } from '@angular/forms';
+import { ReactiveFormsModule, FormArray, FormBuilder, FormControl, Validators, FormGroup, AbstractControl, ValidationErrors, ValidatorFn } from '@angular/forms';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { MatchService, MatchUser, Artist } from './match.service';
@@ -67,6 +67,12 @@ interface ArtistsFormShape { artists: FormArray<FormControl<string | null>>; }
           <span *ngIf="artistsArray.length >= maxArtists" class="limit-msg">
             Maximum of {{ maxArtists }} artists reached
           </span>
+        </div>
+        
+        <!-- Duplicate artists error -->
+        <div class="form-error" *ngIf="form.hasError('duplicateArtists') && (form.touched || form.dirty)">
+          <span class="error-icon">⚠️</span>
+          Duplicate artists are not allowed. Please remove or change duplicate entries.
         </div>
       </div>
       
@@ -217,6 +223,22 @@ interface ArtistsFormShape { artists: FormArray<FormControl<string | null>>; }
       font-size: 0.875rem;
     }
 
+    .form-error {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: #f8d7da;
+      color: #721c24;
+      padding: 0.75rem;
+      border-radius: 8px;
+      margin-top: 1rem;
+      border: 1px solid #f5c6cb;
+    }
+
+    .error-icon {
+      font-size: 1rem;
+    }
+
     .form-actions {
       display: flex;
       justify-content: space-between;
@@ -321,7 +343,7 @@ export class ArtistsComponent {
   private apiBase = environment.apiBaseUrl;
 
   constructor(private fb: FormBuilder, private http: HttpClient, private matches: MatchService, private router: Router, private auth: AuthService) {
-    this.form = this.fb.group<ArtistsFormShape>({ artists: this.fb.array([this.artistControl()]) });
+    this.form = this.fb.group<ArtistsFormShape>({ artists: this.fb.array([this.artistControl()], { validators: [this.noDuplicatesValidator] }) });
     // Prefill for returning users
     const user = this.auth.user();
     if (user?.artists?.length) {
@@ -331,21 +353,60 @@ export class ArtistsComponent {
     }
   }
 
+  // Custom validator to check for duplicate artists (case-insensitive)
+  private noDuplicatesValidator = (control: AbstractControl): { [key: string]: any } | null => {
+    const formArray = control as FormArray;
+    const artists = formArray.controls
+      .map((ctrl: AbstractControl) => (ctrl.value || '').toString().trim().toLowerCase())
+      .filter((artist: string) => artist.length > 0);
+    
+    const duplicates = artists.filter((artist: string, index: number) => artists.indexOf(artist) !== index);
+    return duplicates.length > 0 ? { duplicateArtists: { duplicates } } : null;
+  };
+
   get artistsArray(): FormArray<FormControl<string | null>> { return this.form.controls.artists; }
   private artistControl(): FormControl<string | null> { return this.fb.control<string | null>('', [Validators.required, Validators.minLength(2), Validators.maxLength(240)]); }
 
   onArtistSelected(artist: Artist, index: number): void {
     // Artist was selected from dropdown, the control value is already set
     console.log('Artist selected:', artist.name, 'at index:', index);
+    // Trigger validation for duplicates
+    this.artistsArray.updateValueAndValidity();
   }
 
-  add(): void { if (this.artistsArray.length < this.maxArtists) this.artistsArray.push(this.artistControl()); }
-  remove(i: number): void { if (this.artistsArray.length > 1) this.artistsArray.removeAt(i); }
+  add(): void { 
+    if (this.artistsArray.length < this.maxArtists) {
+      this.artistsArray.push(this.artistControl());
+      this.artistsArray.updateValueAndValidity();
+    }
+  }
+  
+  remove(i: number): void { 
+    if (this.artistsArray.length > 1) {
+      this.artistsArray.removeAt(i);
+      this.artistsArray.updateValueAndValidity();
+    }
+  }
 
   submit(): void {
-    if (this.form.invalid) { this.form.markAllAsTouched(); return; }
+    if (this.form.invalid) { 
+      this.form.markAllAsTouched();
+      if (this.form.hasError('duplicateArtists')) {
+        this.error.set('Please remove duplicate artists before submitting.');
+      }
+      return; 
+    }
     const artists = this.artistsArray.controls.map((c: FormControl<string | null>) => (c.value || '').trim()).filter(Boolean) as string[];
     if (!artists.length) { this.error.set('Enter at least one artist.'); return; }
+    
+    // Additional duplicate check at submit time (case-insensitive)
+    const lowerCaseArtists = artists.map(a => a.toLowerCase());
+    const uniqueArtists = [...new Set(lowerCaseArtists)];
+    if (lowerCaseArtists.length !== uniqueArtists.length) {
+      this.error.set('Duplicate artists are not allowed. Please remove or change duplicate entries.');
+      return;
+    }
+    
     this.loading.set(true); this.error.set(null); this.matches.clear();
   const username = this.auth.user()?.username;
   const headers = username ? new HttpHeaders({ 'X-User-Username': username }) : undefined;
