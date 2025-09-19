@@ -11,7 +11,7 @@
   </style>
   <script>
     // Runtime configuration loader (config.json served next to index.html)
-    window.__kmmConfig = { apiBaseUrl: '' };
+    window.__kmmConfig = { apiBaseUrl: '/api' }; // Default fallback
     fetch('config.json',{cache:'no-store'}).then(r=> r.ok ? r.json():{}).then(cfg=>{ if(cfg && typeof cfg.apiBaseUrl==='string'){ window.__kmmConfig.apiBaseUrl = cfg.apiBaseUrl; } }).catch(()=>{});
   </script>
 </head>
