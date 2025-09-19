@@ -35,10 +35,10 @@ help: ## Show this help message
 ## 🏗️  BUILD & DEVELOPMENT
 ## =============================================================================
 
-build: backend-build ui-build ## Build both backend and UI
+build: sync-schema backend-build ui-build ## Build both backend and UI (includes schema sync)
 	@echo "✅ Full application build complete!"
 
-dev: ## Start full development environment
+dev: sync-schema ## Start full development environment (includes schema sync)
 	@echo "🚀 Starting full development environment..."
 	@echo "📋 Using docker-compose for reliable service management"
 	@docker-compose up -d
@@ -68,12 +68,12 @@ clean: backend-clean ui-clean docker-clean ## Clean all build artifacts
 ## 🐳  DOCKER OPERATIONS
 ## =============================================================================
 
-docker-build: ## Build all Docker images
+docker-build: sync-schema ## Build all Docker images (includes schema sync)
 	@echo "🐳 Building all Docker images..."
 	@docker-compose build --parallel
 	@echo "✅ All Docker images built!"
 
-docker-build-backend: ## Build backend Docker image only
+docker-build-backend: sync-schema ## Build backend Docker image only (includes schema sync)
 	@echo "🐳 Building backend Docker image..."
 	@docker-compose build backend
 	@echo "✅ Backend Docker image built!"
