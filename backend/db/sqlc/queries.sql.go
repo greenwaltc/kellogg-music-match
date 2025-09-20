@@ -160,7 +160,7 @@ SELECT
     JOIN artists a ON a.id = ua.artist_id
     WHERE ua.user_id = u.id
   ), '{}') AS artists,
-  (1.0 - pwo_similarity(u.id, (SELECT target_id FROM target))) AS distance
+  pwo_distance($3, u.id, (SELECT target_id FROM target)) AS distance
 FROM users u
 WHERE u.username <> $1
   AND EXISTS (SELECT 1 FROM user_artists ua WHERE ua.user_id = u.id)
@@ -171,8 +171,9 @@ LIMIT $2
 `
 
 type FindSimilarUsersParams struct {
-	Username string `json:"username"`
-	Limit    int32  `json:"limit"`
+	Username string  `json:"username"`
+	Limit    int32   `json:"limit"`
+	Alpha    float64 `json:"alpha"`
 }
 
 type FindSimilarUsersRow struct {
@@ -182,7 +183,7 @@ type FindSimilarUsersRow struct {
 	Program        sql.NullString `json:"program"`
 	GraduationYear sql.NullInt32  `json:"graduation_year"`
 	Artists        interface{}    `json:"artists"`
-	Distance       int32          `json:"distance"`
+	Distance       float64        `json:"distance"`
 }
 
 // SELECT
@@ -218,7 +219,7 @@ type FindSimilarUsersRow struct {
 // :username => the anchor profile
 // :limit_n  => how many matches to return
 func (q *Queries) FindSimilarUsers(ctx context.Context, arg FindSimilarUsersParams) ([]FindSimilarUsersRow, error) {
-	rows, err := q.db.QueryContext(ctx, findSimilarUsers, arg.Username, arg.Limit)
+	rows, err := q.db.QueryContext(ctx, findSimilarUsers, arg.Username, arg.Limit, arg.Alpha)
 	if err != nil {
 		return nil, err
 	}

@@ -257,6 +257,7 @@ func (repo *PostgreSQLUserRepository) FindSimilarUsers(ctx context.Context, user
 	return repo.queries.FindSimilarUsers(ctx, sqlc.FindSimilarUsersParams{
 		Username: username,
 		Limit:    20,
+		Alpha:    0.85,
 	})
 }
 

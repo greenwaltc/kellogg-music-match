@@ -324,12 +324,13 @@ SELECT CASE WHEN den.den = 0 THEN 0.0 ELSE num.num / den.den END
 FROM num, den;
 $$;
 
-CREATE OR REPLACE FUNCTION pwo_similarity(u1 uuid, u2 uuid)
+-- returns double precision, so sqlc will generate float64
+CREATE OR REPLACE FUNCTION pwo_distance(alpha float8, u1 uuid, u2 uuid)
 RETURNS double precision
 LANGUAGE sql
 STABLE
 AS $$
-  SELECT pwo_similarity(0.85, u1, u2);
+  SELECT 1::float8 - pwo_similarity(alpha, u1, u2)
 $$;
 
 -- Harmonic PWO: sum_x (1/r1(x))*(1/r2(x)) / sum_{i=1..m} (1/i^2)
@@ -350,12 +351,4 @@ WITH r1 AS (SELECT artist_id, rank FROM user_artists WHERE user_id = u1),
      )
 SELECT CASE WHEN den.den = 0 THEN 0.0 ELSE num.num / den.den END
 FROM num, den;
-$$;
-
-CREATE OR REPLACE FUNCTION pwo_similarity_harmonic(u1 uuid, u2 uuid)
-RETURNS double precision
-LANGUAGE sql
-STABLE
-AS $$
-  SELECT pwo_similarity_harmonic(0.85, u1, u2);
 $$;

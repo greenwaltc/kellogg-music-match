@@ -172,7 +172,7 @@ SELECT
     JOIN artists a ON a.id = ua.artist_id
     WHERE ua.user_id = u.id
   ), '{}') AS artists,
-  (1.0 - pwo_similarity(u.id, (SELECT target_id FROM target))) AS distance
+  pwo_distance($3, u.id, (SELECT target_id FROM target)) AS distance
 FROM users u
 WHERE u.username <> $1
   AND EXISTS (SELECT 1 FROM user_artists ua WHERE ua.user_id = u.id)
