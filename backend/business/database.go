@@ -254,7 +254,10 @@ func (r *PostgreSQLUserRepository) ClearUserArtists(ctx context.Context, userID 
 
 // FindSimilarUsers finds users similar to the given username based on their artist preferences
 func (repo *PostgreSQLUserRepository) FindSimilarUsers(ctx context.Context, username string) ([]sqlc.FindSimilarUsersRow, error) {
-	return repo.queries.FindSimilarUsers(ctx, username)
+	return repo.queries.FindSimilarUsers(ctx, sqlc.FindSimilarUsersParams{
+		Username: username,
+		Limit:    20,
+	})
 }
 
 // Feedback operations

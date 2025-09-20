@@ -7,8 +7,7 @@ RETURNING *;
 SELECT * FROM users WHERE username = $1 LIMIT 1;
 
 -- name: GetUserByUsernameWithPassword :one
-SELECT id, username, email, first_name, last_name, password_hash, created_at, updated_at, program, graduation_year 
-FROM users WHERE username = $1 LIMIT 1;
+SELECT * FROM users WHERE username = $1 LIMIT 1;
 
 -- name: GetUserByEmail :one
 SELECT * FROM users WHERE email = $1 LIMIT 1;
@@ -118,33 +117,70 @@ LEFT JOIN artists a ON ua.artist_id = a.id
 GROUP BY u.id, u.username, u.email, u.first_name, u.last_name
 ORDER BY u.username;
 
+-- SELECT
+--   u1.username,
+--   u1.first_name,
+--   u1.last_name,
+--   u1.program,
+--   u1.graduation_year,
+--   COALESCE((SELECT array_agg(a1.name ORDER BY ua1.rank ASC)
+--    FROM user_artists ua1
+--    JOIN artists a1 ON ua1.artist_id = a1.id
+--    WHERE ua1.user_id = u1.id), '{}') AS artists,
+--   spearman_distance(
+--     COALESCE((SELECT array_agg(a1.name ORDER BY ua1.rank ASC)
+--      FROM user_artists ua1
+--      JOIN artists a1 ON ua1.artist_id = a1.id
+--      WHERE ua1.user_id = u1.id), '{}'),
+--     COALESCE((SELECT array_agg(a2.name ORDER BY ua2.rank ASC)
+--      FROM users u2
+--      JOIN user_artists ua2 ON u2.id = ua2.user_id
+--      JOIN artists a2 ON ua2.artist_id = a2.id
+--      WHERE u2.username = $1), '{}')
+--   ) AS distance
+-- FROM users u1
+-- WHERE u1.username != $1
+--   AND EXISTS (SELECT 1 FROM user_artists WHERE user_id = u1.id)
+-- ORDER BY distance ASC
+-- LIMIT 50;
+
+-- :username => the anchor profile
+-- :limit_n  => how many matches to return
 -- name: FindSimilarUsers :many
+WITH target AS (
+  SELECT id AS target_id
+  FROM users
+  WHERE username = $1
+),
+base_list AS (
+  -- Optional: ensure the target has at least one artist
+  SELECT 1
+  FROM user_artists ua
+  JOIN target t ON ua.user_id = t.target_id
+  LIMIT 1
+)
 SELECT
-  u1.username,
-  u1.first_name,
-  u1.last_name,
-  u1.program,
-  u1.graduation_year,
-  COALESCE((SELECT array_agg(a1.name ORDER BY ua1.rank ASC)
-   FROM user_artists ua1
-   JOIN artists a1 ON ua1.artist_id = a1.id
-   WHERE ua1.user_id = u1.id), '{}') AS artists,
-  spearman_distance(
-    COALESCE((SELECT array_agg(a1.name ORDER BY ua1.rank ASC)
-     FROM user_artists ua1
-     JOIN artists a1 ON ua1.artist_id = a1.id
-     WHERE ua1.user_id = u1.id), '{}'),
-    COALESCE((SELECT array_agg(a2.name ORDER BY ua2.rank ASC)
-     FROM users u2
-     JOIN user_artists ua2 ON u2.id = ua2.user_id
-     JOIN artists a2 ON ua2.artist_id = a2.id
-     WHERE u2.username = $1), '{}')
-  ) AS distance
-FROM users u1
-WHERE u1.username != $1
-  AND EXISTS (SELECT 1 FROM user_artists WHERE user_id = u1.id)
-ORDER BY distance ASC
-LIMIT 50;
+  u.username,
+  u.first_name,
+  u.last_name,
+  u.program,
+  u.graduation_year,
+  -- Optional: return their ordered artist names
+  COALESCE((
+    SELECT array_agg(a.name ORDER BY ua.rank)
+    FROM user_artists ua
+    JOIN artists a ON a.id = ua.artist_id
+    WHERE ua.user_id = u.id
+  ), '{}') AS artists,
+  (1.0 - pwo_similarity(u.id, (SELECT target_id FROM target))) AS distance
+FROM users u
+WHERE u.username <> $1
+  AND EXISTS (SELECT 1 FROM user_artists ua WHERE ua.user_id = u.id)
+ORDER BY distance ASC,
+    u.program = (SELECT program FROM users WHERE username = $1) DESC,
+    u.graduation_year = (SELECT graduation_year FROM users WHERE username = $1) DESC
+LIMIT $2;
+
 
 -- Feedback queries
 -- name: CreateFeedback :one

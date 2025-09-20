@@ -83,7 +83,7 @@ func (q *Queries) CreateFeedback(ctx context.Context, arg CreateFeedbackParams) 
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (id, username, email, first_name, last_name, password_hash, program, graduation_year)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, username, email, first_name, last_name, password_hash, created_at, updated_at, program, graduation_year
+RETURNING id, username, email, first_name, last_name, password_hash, program, graduation_year, created_at, updated_at
 `
 
 type CreateUserParams struct {
@@ -116,10 +116,10 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.FirstName,
 		&i.LastName,
 		&i.PasswordHash,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 		&i.Program,
 		&i.GraduationYear,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -134,33 +134,46 @@ func (q *Queries) DeleteUser(ctx context.Context, id uuid.UUID) error {
 }
 
 const findSimilarUsers = `-- name: FindSimilarUsers :many
+
+WITH target AS (
+  SELECT id AS target_id
+  FROM users
+  WHERE username = $1
+),
+base_list AS (
+  -- Optional: ensure the target has at least one artist
+  SELECT 1
+  FROM user_artists ua
+  JOIN target t ON ua.user_id = t.target_id
+  LIMIT 1
+)
 SELECT
-  u1.username,
-  u1.first_name,
-  u1.last_name,
-  u1.program,
-  u1.graduation_year,
-  COALESCE((SELECT array_agg(a1.name ORDER BY ua1.rank ASC)
-   FROM user_artists ua1
-   JOIN artists a1 ON ua1.artist_id = a1.id
-   WHERE ua1.user_id = u1.id), '{}') AS artists,
-  spearman_distance(
-    COALESCE((SELECT array_agg(a1.name ORDER BY ua1.rank ASC)
-     FROM user_artists ua1
-     JOIN artists a1 ON ua1.artist_id = a1.id
-     WHERE ua1.user_id = u1.id), '{}'),
-    COALESCE((SELECT array_agg(a2.name ORDER BY ua2.rank ASC)
-     FROM users u2
-     JOIN user_artists ua2 ON u2.id = ua2.user_id
-     JOIN artists a2 ON ua2.artist_id = a2.id
-     WHERE u2.username = $1), '{}')
-  ) AS distance
-FROM users u1
-WHERE u1.username != $1
-  AND EXISTS (SELECT 1 FROM user_artists WHERE user_id = u1.id)
-ORDER BY distance ASC
-LIMIT 50
+  u.username,
+  u.first_name,
+  u.last_name,
+  u.program,
+  u.graduation_year,
+  -- Optional: return their ordered artist names
+  COALESCE((
+    SELECT array_agg(a.name ORDER BY ua.rank)
+    FROM user_artists ua
+    JOIN artists a ON a.id = ua.artist_id
+    WHERE ua.user_id = u.id
+  ), '{}') AS artists,
+  (1.0 - pwo_similarity(u.id, (SELECT target_id FROM target))) AS distance
+FROM users u
+WHERE u.username <> $1
+  AND EXISTS (SELECT 1 FROM user_artists ua WHERE ua.user_id = u.id)
+ORDER BY distance ASC,
+    u.program = (SELECT program FROM users WHERE username = $1) DESC,
+    u.graduation_year = (SELECT graduation_year FROM users WHERE username = $1) DESC
+LIMIT $2
 `
+
+type FindSimilarUsersParams struct {
+	Username string `json:"username"`
+	Limit    int32  `json:"limit"`
+}
 
 type FindSimilarUsersRow struct {
 	Username       string         `json:"username"`
@@ -169,11 +182,43 @@ type FindSimilarUsersRow struct {
 	Program        sql.NullString `json:"program"`
 	GraduationYear sql.NullInt32  `json:"graduation_year"`
 	Artists        interface{}    `json:"artists"`
-	Distance       float64        `json:"distance"`
+	Distance       int32          `json:"distance"`
 }
 
-func (q *Queries) FindSimilarUsers(ctx context.Context, username string) ([]FindSimilarUsersRow, error) {
-	rows, err := q.db.QueryContext(ctx, findSimilarUsers, username)
+// SELECT
+//
+//	u1.username,
+//	u1.first_name,
+//	u1.last_name,
+//	u1.program,
+//	u1.graduation_year,
+//	COALESCE((SELECT array_agg(a1.name ORDER BY ua1.rank ASC)
+//	 FROM user_artists ua1
+//	 JOIN artists a1 ON ua1.artist_id = a1.id
+//	 WHERE ua1.user_id = u1.id), '{}') AS artists,
+//	spearman_distance(
+//	  COALESCE((SELECT array_agg(a1.name ORDER BY ua1.rank ASC)
+//	   FROM user_artists ua1
+//	   JOIN artists a1 ON ua1.artist_id = a1.id
+//	   WHERE ua1.user_id = u1.id), '{}'),
+//	  COALESCE((SELECT array_agg(a2.name ORDER BY ua2.rank ASC)
+//	   FROM users u2
+//	   JOIN user_artists ua2 ON u2.id = ua2.user_id
+//	   JOIN artists a2 ON ua2.artist_id = a2.id
+//	   WHERE u2.username = $1), '{}')
+//	) AS distance
+//
+// FROM users u1
+// WHERE u1.username != $1
+//
+//	AND EXISTS (SELECT 1 FROM user_artists WHERE user_id = u1.id)
+//
+// ORDER BY distance ASC
+// LIMIT 50;
+// :username => the anchor profile
+// :limit_n  => how many matches to return
+func (q *Queries) FindSimilarUsers(ctx context.Context, arg FindSimilarUsersParams) ([]FindSimilarUsersRow, error) {
+	rows, err := q.db.QueryContext(ctx, findSimilarUsers, arg.Username, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -282,7 +327,7 @@ func (q *Queries) GetAllFeedback(ctx context.Context, limit int32) ([]GetAllFeed
 }
 
 const getAllUsers = `-- name: GetAllUsers :many
-SELECT id, username, email, first_name, last_name, password_hash, created_at, updated_at, program, graduation_year FROM users ORDER BY created_at
+SELECT id, username, email, first_name, last_name, password_hash, program, graduation_year, created_at, updated_at FROM users ORDER BY created_at
 `
 
 func (q *Queries) GetAllUsers(ctx context.Context) ([]User, error) {
@@ -301,10 +346,10 @@ func (q *Queries) GetAllUsers(ctx context.Context) ([]User, error) {
 			&i.FirstName,
 			&i.LastName,
 			&i.PasswordHash,
-			&i.CreatedAt,
-			&i.UpdatedAt,
 			&i.Program,
 			&i.GraduationYear,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -457,7 +502,7 @@ func (q *Queries) GetUserArtists(ctx context.Context, userID uuid.UUID) ([]Artis
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, username, email, first_name, last_name, password_hash, created_at, updated_at, program, graduation_year FROM users WHERE email = $1 LIMIT 1
+SELECT id, username, email, first_name, last_name, password_hash, program, graduation_year, created_at, updated_at FROM users WHERE email = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -470,16 +515,16 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.FirstName,
 		&i.LastName,
 		&i.PasswordHash,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 		&i.Program,
 		&i.GraduationYear,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, username, email, first_name, last_name, password_hash, created_at, updated_at, program, graduation_year FROM users WHERE id = $1 LIMIT 1
+SELECT id, username, email, first_name, last_name, password_hash, program, graduation_year, created_at, updated_at FROM users WHERE id = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
@@ -492,16 +537,16 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.FirstName,
 		&i.LastName,
 		&i.PasswordHash,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 		&i.Program,
 		&i.GraduationYear,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, username, email, first_name, last_name, password_hash, created_at, updated_at, program, graduation_year FROM users WHERE username = $1 LIMIT 1
+SELECT id, username, email, first_name, last_name, password_hash, program, graduation_year, created_at, updated_at FROM users WHERE username = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
@@ -514,17 +559,16 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.FirstName,
 		&i.LastName,
 		&i.PasswordHash,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 		&i.Program,
 		&i.GraduationYear,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const getUserByUsernameWithPassword = `-- name: GetUserByUsernameWithPassword :one
-SELECT id, username, email, first_name, last_name, password_hash, created_at, updated_at, program, graduation_year 
-FROM users WHERE username = $1 LIMIT 1
+SELECT id, username, email, first_name, last_name, password_hash, program, graduation_year, created_at, updated_at FROM users WHERE username = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByUsernameWithPassword(ctx context.Context, username string) (User, error) {
@@ -537,10 +581,10 @@ func (q *Queries) GetUserByUsernameWithPassword(ctx context.Context, username st
 		&i.FirstName,
 		&i.LastName,
 		&i.PasswordHash,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 		&i.Program,
 		&i.GraduationYear,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -693,7 +737,7 @@ const updateUser = `-- name: UpdateUser :one
 UPDATE users 
 SET first_name = $2, last_name = $3, email = $4
 WHERE id = $1
-RETURNING id, username, email, first_name, last_name, password_hash, created_at, updated_at, program, graduation_year
+RETURNING id, username, email, first_name, last_name, password_hash, program, graduation_year, created_at, updated_at
 `
 
 type UpdateUserParams struct {
@@ -718,10 +762,10 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		&i.FirstName,
 		&i.LastName,
 		&i.PasswordHash,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 		&i.Program,
 		&i.GraduationYear,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
