@@ -21,9 +21,12 @@ help: ## Show this help message
 	@echo "  test-quick           Run quick unit tests only"
 	@echo ""
 	@echo "Schema management:"
-	@echo "  schema-sync           Sync DATABASE_SCHEMA.sql from backend/db/schema/*.sql"
+	@echo "  sync-schema           Sync DATABASE_SCHEMA.sql from backend/db/schema/*.sql"
 	@echo "  check-schema-sync     Verify schema files are synchronized"
 	@echo "  create-migration      Create new migration file (make create-migration name=add_feature)"
+	@echo "  db-reset              Reset database with guaranteed fresh schema"
+	@echo "  db-schema-verify      Verify database schema matches expected structure"
+	@echo "  db-force-schema-sync  Nuclear option: force complete reset with schema sync"
 	@echo ""
 	@echo "Quick development workflow:"
 	@echo "  ./dev.sh start        Start full application"
@@ -217,10 +220,31 @@ db-test: ## Test database setup
 	@echo "🧪 Testing database..."
 	@./test-docker-compose.sh
 
-db-reset: ## Reset database (clean + restart)
-	@echo "🔄 Resetting database..."
-	@./dev.sh cleanup
-	@./dev.sh db-only
+db-reset: sync-schema ## Reset database with guaranteed fresh schema (includes schema sync)
+	@echo "🔄 Resetting database with fresh schema..."
+	@echo "📋 Step 1: Synchronizing schema files..."
+	@echo "� Step 2: Stopping containers..."
+	@docker-compose down
+	@echo "🗑️  Step 3: Removing postgres volume to force reinitialization..."
+	@docker volume rm kellogg-music-match_postgres_data 2>/dev/null || true
+	@echo "🚀 Step 4: Starting postgres with fresh schema..."
+	@docker-compose up -d postgres
+	@echo "⏳ Step 5: Waiting for database to be ready..."
+	@sleep 10
+	@echo "✅ Database reset complete with latest schema!"
+
+db-schema-verify: ## Verify database schema matches expected structure
+	@echo "🔍 Verifying database schema..."
+	@docker exec kmm-postgres psql -U kellogg_user -d kellogg_music_match -c "\d users" | grep -q "program\|graduation_year" && \
+		echo "✅ Users table has program and graduation_year fields" || \
+		(echo "❌ Users table missing program/graduation_year fields" && exit 1)
+	@docker exec kmm-postgres psql -U kellogg_user -d kellogg_music_match -c "\d user_artists" | grep -q "rank" && \
+		echo "✅ User_artists table has rank field" || \
+		(echo "❌ User_artists table missing rank field" && exit 1)
+	@echo "✅ Database schema verification passed!"
+
+db-force-schema-sync: sync-schema db-reset ## Force complete database reset and schema sync (nuclear option)
+	@echo "🚀 Complete database reset with schema sync completed!"
 
 db-backup: ## Create database backup
 	@echo "💾 Creating database backup..."

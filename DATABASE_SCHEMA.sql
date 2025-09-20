@@ -4,14 +4,6 @@
 -- 
 -- Schema files are processed in alphabetical order:
 -- backend/db/schema/001_initial.sql
--- backend/db/schema/002_spearman_func.sql
--- backend/db/schema/003_add_rank.sql
--- backend/db/schema/004_spearman_distance.sql
--- backend/db/schema/005_artist_name_limit.sql
--- backend/db/schema/006_feedback_table.sql
--- backend/db/schema/007_add_user_program_graduation_year.sql
--- backend/db/schema/008_fix_graduation_year_constraint.sql
--- backend/db/schema/009_enhance_hybrid_similarity.sql
 
 -- ============================================================================
 -- CONSOLIDATED SCHEMA (Auto-generated from backend/db/schema/*.sql)
@@ -20,7 +12,8 @@
 -- -------------------------------------------------------------------------
 -- From: backend/db/schema/001_initial.sql
 -- -------------------------------------------------------------------------
--- Schema for Kellogg Music Match application
+-- Kellogg Music Match Database Schema
+-- Complete initial schema with all tables, functions, and constraints
 -- PostgreSQL database schema
 -- 
 -- This directory (backend/db/schema/) is the SINGLE SOURCE OF TRUTH for database schema
@@ -31,10 +24,21 @@
 -- Auto-sync: Runs automatically when SQLC generates (make generate-sqlc)
 -- Validation: make check-schema-sync
 
+-- ============================================================================
+-- EXTENSIONS
+-- ============================================================================
+
 -- Create extension for UUID generation
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Users table
+-- Enable plpython3u extension for advanced statistical functions
+CREATE EXTENSION IF NOT EXISTS plpython3u;
+
+-- ============================================================================
+-- TABLES
+-- ============================================================================
+
+-- Users table with program and graduation year fields
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     username VARCHAR(50) UNIQUE NOT NULL,
@@ -42,31 +46,62 @@ CREATE TABLE users (
     first_name VARCHAR(100) NOT NULL,
     last_name VARCHAR(100) NOT NULL,
     password_hash TEXT NOT NULL,
+    program VARCHAR(10) CHECK (program IN ('2Y', '1Y', 'MMM', 'MBAi', 'JD-MBA', 'MD-MBA', 'EWMBA')),
+    graduation_year INTEGER CHECK (graduation_year >= 2025 AND graduation_year <= 2030),
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Artists table for normalization
+-- Artists table for normalization (240 char limit)
 CREATE TABLE artists (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(255) UNIQUE NOT NULL,
+    name VARCHAR(240) UNIQUE NOT NULL CHECK (char_length(name) <= 240),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Junction table for user-artist relationships
+-- Junction table for user-artist relationships with ranking
 CREATE TABLE user_artists (
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     artist_id INTEGER REFERENCES artists(id) ON DELETE CASCADE,
+    rank SMALLINT NOT NULL DEFAULT 1,
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    PRIMARY KEY (user_id, artist_id)
+    PRIMARY KEY (user_id, artist_id),
+    CONSTRAINT user_rank_unique UNIQUE (user_id, rank)
 );
 
--- Indexes for performance
+-- Feedback table for user suggestions
+CREATE TABLE feedback (
+    id SERIAL PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    feedback_text TEXT NOT NULL CHECK (char_length(feedback_text) <= 1000 AND char_length(feedback_text) > 0),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ============================================================================
+-- INDEXES
+-- ============================================================================
+
+-- Users table indexes
 CREATE INDEX idx_users_username ON users(username);
 CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_program ON users(program);
+CREATE INDEX idx_users_graduation_year ON users(graduation_year);
+
+-- Artists table indexes
 CREATE INDEX idx_artists_name ON artists(name);
+
+-- User-artists junction table indexes
 CREATE INDEX idx_user_artists_user_id ON user_artists(user_id);
 CREATE INDEX idx_user_artists_artist_id ON user_artists(artist_id);
+
+-- Feedback table indexes
+CREATE INDEX idx_feedback_user_id ON feedback(user_id);
+CREATE INDEX idx_feedback_created_at ON feedback(created_at);
+
+-- ============================================================================
+-- FUNCTIONS
+-- ============================================================================
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -77,62 +112,7 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
--- Trigger to automatically update updated_at
-CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
--- -------------------------------------------------------------------------
--- From: backend/db/schema/002_spearman_func.sql
--- -------------------------------------------------------------------------
-CREATE EXTENSION IF NOT EXISTS plpython3u;
-
-CREATE OR REPLACE FUNCTION spearman_distance(list1 TEXT[], list2 TEXT[])
-RETURNS FLOAT AS $$
-    # 1. Find the union of all preferences
-    all_items = set(list1) | set(list2)
-    n = len(all_items)
-
-    # If lists are too small, correlation is undefined. Return max distance.
-    if n <= 1:
-        return 2.0
-
-    # 2. Create rank dictionaries for each list
-    ranks1 = {item: i + 1 for i, item in enumerate(list1)}
-    ranks2 = {item: i + 1 for i, item in enumerate(list2)}
-
-    # 3. Calculate sum of squared differences (d^2)
-    sum_sq_diff = 0
-    for item in all_items:
-        # Assign a penalty rank (n + 1) if an item is missing
-        rank1 = ranks1.get(item, n + 1)
-        rank2 = ranks2.get(item, n + 1)
-        diff = rank1 - rank2
-        sum_sq_diff += diff ** 2
-
-    # 4. Calculate Spearman's rank correlation coefficient (rho)
-    rho = 1 - (6 * sum_sq_diff) / (n * (n**2 - 1))
-
-    # 5. Convert correlation to distance
-    distance = 1 - rho
-    return distance
-
-$$ LANGUAGE plpython3u;
--- -------------------------------------------------------------------------
--- From: backend/db/schema/003_add_rank.sql
--- -------------------------------------------------------------------------
-ALTER TABLE user_artists
-ADD COLUMN rank SMALLINT NOT NULL DEFAULT 1;
-
-ALTER TABLE user_artists
-ADD CONSTRAINT user_rank_unique UNIQUE (user_id, rank);
-
-
--- -------------------------------------------------------------------------
--- From: backend/db/schema/004_spearman_distance.sql
--- -------------------------------------------------------------------------
--- Enable plpython3u extension for advanced statistical functions
-CREATE EXTENSION IF NOT EXISTS plpython3u;
-
--- Create Spearman rank correlation distance function for text arrays (artist names)
+-- Enhanced hybrid similarity function with size penalty for variable-length lists
 -- This function calculates a distance metric based on artist preference similarity
 -- Returns a distance where 0 = identical preferences, higher values = less similar
 CREATE OR REPLACE FUNCTION spearman_distance(arr1 TEXT[], arr2 TEXT[])
@@ -270,189 +250,29 @@ BEGIN
 END;
 $$;
 
--- Create a comment explaining the function
+-- ============================================================================
+-- TRIGGERS
+-- ============================================================================
+
+-- Trigger to automatically update updated_at for users
+CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Trigger to automatically update updated_at for feedback
+CREATE TRIGGER update_feedback_updated_at BEFORE UPDATE ON feedback
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================================================
+-- COMMENTS
+-- ============================================================================
+
+-- Function comments
 COMMENT ON FUNCTION spearman_distance(TEXT[], TEXT[]) IS 
-'Calculates Spearman rank correlation distance between two text arrays (artist names). Returns 1 - correlation coefficient as distance metric (0 = identical rankings, 1 = no correlation, 2 = opposite rankings). Requires plpython3u extension with scipy.stats.';
+'Enhanced hybrid similarity function that calculates distance between two text arrays (artist names). Combines Jaccard similarity (60%), positional correlation (20%), and size penalty for variable-length lists. Returns 0 = identical rankings, 2 = completely different. Requires plpython3u extension with scipy.stats.';
 
 COMMENT ON FUNCTION spearman_distance_simple(TEXT[], TEXT[]) IS 
 'Simple fallback implementation using Jaccard similarity for text arrays. Calculates 1 - (intersection / union) as distance metric. Pure PostgreSQL implementation without external dependencies.';
--- -------------------------------------------------------------------------
--- From: backend/db/schema/005_artist_name_limit.sql
--- -------------------------------------------------------------------------
--- Migration to update artist name limit to 240 characters
--- This ensures consistency with the frontend character limit
 
--- First, check if there are any existing artists longer than 240 characters
--- (This query is for information only, will be removed in production)
--- SELECT name, length(name) FROM artists WHERE length(name) > 240;
-
--- Update the artists table to enforce 240 character limit
-ALTER TABLE artists ALTER COLUMN name TYPE VARCHAR(240);
-
--- Add constraint to ensure artist names don't exceed 240 characters
-ALTER TABLE artists ADD CONSTRAINT check_artist_name_length CHECK (char_length(name) <= 240);
--- -------------------------------------------------------------------------
--- From: backend/db/schema/006_feedback_table.sql
--- -------------------------------------------------------------------------
--- Migration to add feedback table for user suggestions
--- Allows registered users to submit feedback and suggestions
-
--- Create feedback table
-CREATE TABLE feedback (
-    id SERIAL PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    feedback_text TEXT NOT NULL CHECK (char_length(feedback_text) <= 1000 AND char_length(feedback_text) > 0),
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Create indexes for performance
-CREATE INDEX idx_feedback_user_id ON feedback(user_id);
-CREATE INDEX idx_feedback_created_at ON feedback(created_at);
-
--- Add trigger to automatically update updated_at
-CREATE TRIGGER update_feedback_updated_at BEFORE UPDATE ON feedback
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
--- -------------------------------------------------------------------------
--- From: backend/db/schema/007_add_user_program_graduation_year.sql
--- -------------------------------------------------------------------------
--- Add program and graduation year fields to users table
--- Migration: 007_add_user_program_graduation_year.sql
-
--- Add program field with enum-like constraint
-ALTER TABLE users 
-ADD COLUMN program VARCHAR(10) CHECK (program IN ('2Y', '1Y', 'MMM', 'MBAi', 'JD-MBA', 'MD-MBA', 'EWMBA'));
-
--- Add graduation year field with reasonable range constraint
-ALTER TABLE users 
-ADD COLUMN graduation_year INTEGER CHECK (graduation_year >= 2025 AND graduation_year <= 2030);
-
--- Create indexes for performance
-CREATE INDEX idx_users_program ON users(program);
-CREATE INDEX idx_users_graduation_year ON users(graduation_year);
-
--- Add comments for documentation
+-- Column comments
 COMMENT ON COLUMN users.program IS 'MBA program type: 2Y, 1Y, MBAi, MMM, or EWMBA';
 COMMENT ON COLUMN users.graduation_year IS 'Expected graduation year (current year to 2030)';
--- -------------------------------------------------------------------------
--- From: backend/db/schema/008_fix_graduation_year_constraint.sql
--- -------------------------------------------------------------------------
--- Fix graduation year constraint to use fixed range instead of dynamic current year
--- Migration: 008_fix_graduation_year_constraint.sql
-
--- Drop the existing constraint (if it exists)
-DO $$ 
-BEGIN
-    IF EXISTS (
-        SELECT 1 FROM information_schema.constraint_column_usage 
-        WHERE table_name = 'users' AND column_name = 'graduation_year'
-    ) THEN
-        ALTER TABLE users DROP CONSTRAINT users_graduation_year_check;
-    END IF;
-END $$;
-
--- Add the corrected constraint with fixed range
-ALTER TABLE users 
-ADD CONSTRAINT users_graduation_year_check 
-CHECK (graduation_year >= 2025 AND graduation_year <= 2030);
--- -------------------------------------------------------------------------
--- From: backend/db/schema/009_enhance_hybrid_similarity.sql
--- -------------------------------------------------------------------------
--- Enhanced hybrid similarity function with size penalty for variable-length lists
--- This migration updates the spearman_distance function to handle lists of very different sizes better
-
--- Drop the existing function and recreate with enhancements
-DROP FUNCTION IF EXISTS spearman_distance(TEXT[], TEXT[]);
-
--- Create enhanced Spearman rank correlation distance function for text arrays (artist names)
--- This function calculates a distance metric based on artist preference similarity
--- Returns a distance where 0 = identical preferences, higher values = less similar
-CREATE OR REPLACE FUNCTION spearman_distance(arr1 TEXT[], arr2 TEXT[])
-RETURNS FLOAT
-LANGUAGE plpython3u
-AS $$
-import scipy.stats
-import numpy as np
-
-# Convert PostgreSQL arrays to Python lists
-list1 = arr1 if arr1 else []
-list2 = arr2 if arr2 else []
-
-# Handle edge cases
-if len(list1) == 0 and len(list2) == 0:
-    return 0.0  # Both empty, perfect match
-    
-if len(list1) == 0 or len(list2) == 0:
-    return 1.0  # One empty, maximum distance
-
-# If arrays are identical, return perfect match
-if list1 == list2:
-    return 0.0
-
-# Calculate similarity using a hybrid approach that considers:
-# 1. Jaccard similarity (intersection over union)
-# 2. Positional similarity (rank correlation for shared items)
-# 3. Size penalty for very different list lengths
-
-# Calculate set operations
-set1 = set(list1)
-set2 = set(list2)
-intersection = set1.intersection(set2)
-union = set1.union(set2)
-
-# If no common items, return maximum distance
-if len(intersection) == 0:
-    return 2.0
-
-# Calculate Jaccard similarity
-jaccard_similarity = len(intersection) / len(union)
-
-# Calculate size penalty for very different list lengths
-len1, len2 = len(list1), len(list2)
-size_ratio = min(len1, len2) / max(len1, len2) if max(len1, len2) > 0 else 1.0
-# Size penalty ranges from 0 (very different sizes) to 1 (same size)
-# Apply penalty more strongly for extreme size differences
-if size_ratio < 0.5:  # One list is more than 2x the other
-    size_penalty = size_ratio * 0.5  # Stronger penalty
-else:
-    size_penalty = 0.5 + (size_ratio - 0.5)  # Gentle penalty
-
-# For shared items, calculate positional similarity
-if len(intersection) > 1:
-    # Extract ranks of shared items in both lists
-    shared_ranks1 = []
-    shared_ranks2 = []
-    
-    for item in intersection:
-        rank1 = list1.index(item) + 1  # 1-based ranking
-        rank2 = list2.index(item) + 1
-        shared_ranks1.append(rank1)
-        shared_ranks2.append(rank2)
-    
-    # Calculate Spearman correlation for shared items only
-    try:
-        correlation, _ = scipy.stats.spearmanr(shared_ranks1, shared_ranks2)
-        if np.isnan(correlation):
-            correlation = 0.0
-        positional_similarity = (correlation + 1.0) / 2.0  # Convert [-1,1] to [0,1]
-    except:
-        positional_similarity = 0.5  # Default middle value if calculation fails
-else:
-    # Only one shared item, perfect positional agreement
-    positional_similarity = 1.0
-
-# Combine Jaccard, positional similarities, and size penalty
-# Adjust weights to account for size penalty
-# For music preferences: Jaccard (overlap) is most important, 
-# position matters less, and size differences should be penalized
-combined_similarity = (0.6 * jaccard_similarity + 0.2 * positional_similarity) * size_penalty
-
-# Convert to distance (0 = identical, 2 = completely different)
-distance = 2.0 * (1.0 - combined_similarity)
-
-return max(0.0, min(2.0, float(distance)))
-$$;
-
--- Update the comment explaining the enhanced function
-COMMENT ON FUNCTION spearman_distance(TEXT[], TEXT[]) IS 
-'Enhanced hybrid similarity function that calculates distance between two text arrays (artist names). Combines Jaccard similarity (60%), positional correlation (20%), and size penalty for variable-length lists. Returns 0 = identical rankings, 2 = completely different. Requires plpython3u extension with scipy.stats.';
