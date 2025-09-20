@@ -1,7 +1,9 @@
 name: kellogg-music-match
-description: Pulumi program for KMM
+description: Pulumi program for Kellogg Music Match - Enhanced student music matching with scientific similarity algorithms
 runtime: go
 config:
   pulumi:tags:
     value:
       pulumi:template: kubernetes-go
+      app: kellogg-music-match
+      team: kellogg-students

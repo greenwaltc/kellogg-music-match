@@ -1,14 +1,15 @@
 # Kellogg Music Match - Kubernetes Deployment
 
-This Pulumi program deploys the Kellogg Music Match application to a Kubernetes cluster.
+This Pulumi program deploys the Kellogg Music Match application to a Kubernetes cluster with consolidated database schema, enhanced Kellogg student features, and scientific similarity calculations.
 
 ## Prerequisites
 
 1. **Pulumi CLI**: Install from [pulumi.com](https://www.pulumi.com/docs/get-started/install/)
 2. **kubectl**: Configured to connect to your Kubernetes cluster
 3. **Docker Images**: Ensure your application images are built and available:
-   - `kellogg-music-match-backend:latest`
-   - `kellogg-music-match-ui:latest`
+   - `kellogg-music-match-postgres:latest` (Custom PostgreSQL 15 with scientific extensions)
+   - `kellogg-music-match-backend:latest` (Go backend with enhanced features)
+   - `kellogg-music-match-ui:latest` (Angular UI with Kellogg student profiles)
 4. **Ingress Controller**: NGINX Ingress Controller installed in your cluster
 
 ## Building Docker Images
@@ -19,13 +20,13 @@ Before deploying, build and tag your Docker images:
 # From the project root
 cd ../
 
-# Build custom PostgreSQL image with scientific libraries
+# Build custom PostgreSQL image with scientific libraries and consolidated schema
 docker build -f postgres.dockerfile -t kellogg-music-match-postgres:latest .
 
-# Build backend image
+# Build backend image with enhanced database features
 docker build -t kellogg-music-match-backend:latest ./backend
 
-# Build UI image
+# Build UI image with Kellogg student profile support
 docker build -t kellogg-music-match-ui:latest ./ui
 
 # If using a container registry, tag and push:
@@ -78,25 +79,30 @@ The Pulumi program creates the following Kubernetes resources:
 - **Replicas**: 2
 - **Port**: 8080
 - **Health Checks**: `/health` endpoint
+- **Features**: Enhanced SQLC integration, consolidated schema support
 - **Database Environment Variables**: Pre-configured for PostgreSQL connection
 - **Resources**: 
   - Requests: 100m CPU, 128Mi memory
   - Limits: 500m CPU, 512Mi memory
 
-### PostgreSQL Database (Scientific Extensions)
+### PostgreSQL Database (Enhanced with Scientific Extensions)
 - **StatefulSet**: `postgres`
 - **Service**: `postgres`
 - **Image**: `kellogg-music-match-postgres:latest` (Custom PostgreSQL 15 with scientific libraries)
 - **Extensions**: plpython3u, scipy, numpy for advanced music similarity calculations
+- **Schema**: Consolidated single migration file with Kellogg-specific enhancements
 - **Port**: 5432
 - **Storage**: 10Gi persistent volume
 - **Database**: `kellogg_music_match`
 - **User**: `kellogg_user`
 - **Secret**: `postgres-secret` (contains credentials)
 - **Health Checks**: `pg_isready` probes
-- **Scientific Functions**: 
+- **Enhanced Features**: 
+  - Kellogg student profiles with `program` and `graduation_year` fields
+  - Program validation (2Y, 1Y, MMM, MBAi, JD-MBA, MD-MBA, EWMBA)
+  - Graduation year constraints (2025-2030)
   - `spearman_distance()`: Hybrid Jaccard + positional correlation algorithm
-  - Custom similarity calculations for music preference matching
+  - Complete consolidated schema initialization
 - **Resources**:
   - Requests: 200m CPU, 512Mi memory
   - Limits: 1000m CPU, 1Gi memory
@@ -107,6 +113,7 @@ The Pulumi program creates the following Kubernetes resources:
 - **Replicas**: 2
 - **Port**: 80
 - **Health Checks**: `/` endpoint
+- **Features**: Kellogg student registration with program and graduation year
 - **Resources**:
   - Requests: 50m CPU, 64Mi memory
   - Limits: 200m CPU, 256Mi memory
@@ -191,7 +198,7 @@ kubectl describe ingress -n kellogg-music-match
 
 ## Database Access
 
-### PostgreSQL Connection Information (Scientific Database)
+### PostgreSQL Connection Information (Enhanced Scientific Database)
 After deployment, use these connection details:
 
 - **Host**: `postgres.kellogg-music-match.svc.cluster.local`
@@ -199,8 +206,9 @@ After deployment, use these connection details:
 - **Database**: `kellogg_music_match`
 - **Username**: `kellogg_user`
 - **Password**: Retrieved from `postgres-secret`
+- **Schema**: Consolidated schema with Kellogg-specific enhancements
 - **Extensions**: plpython3u, scipy, numpy available for advanced calculations
-- **Scientific Functions**: Access to `spearman_distance()` and other similarity algorithms
+- **Enhanced Features**: Kellogg student profiles, program validation, scientific similarity functions
 
 ### Port Forward for Local Access
 ```bash
@@ -216,8 +224,11 @@ psql -h localhost -p 5432 -U kellogg_user -d kellogg_music_match
 # Execute psql in the PostgreSQL pod
 kubectl exec -it -n kellogg-music-match postgres-0 -- psql -U kellogg_user -d kellogg_music_match
 
-# Test scientific functions
-kubectl exec -it -n kellogg-music-match postgres-0 -- psql -U kellogg_user -d kellogg_music_match -c "SELECT spearman_distance(ARRAY[1,2,3], ARRAY[1,2,3]);"
+# Test scientific similarity function
+kubectl exec -it -n kellogg-music-match postgres-0 -- psql -U kellogg_user -d kellogg_music_match -c "SELECT spearman_distance(ARRAY['Tool', 'Radiohead'], ARRAY['Tool', 'Radiohead']);"
+
+# Verify Kellogg student schema
+kubectl exec -it -n kellogg-music-match postgres-0 -- psql -U kellogg_user -d kellogg_music_match -c "SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name IN ('program', 'graduation_year');"
 
 # Verify Python scientific libraries
 kubectl exec -it -n kellogg-music-match postgres-0 -- python3 -c "import scipy.stats; import numpy; print('✅ Scientific libraries available')"

@@ -12,12 +12,14 @@ import (
 
 func main() {
 	pulumi.Run(func(ctx *pulumi.Context) error {
-		// Read database schema and init script files
+		// Read consolidated database schema file
+		// This schema includes Kellogg-specific enhancements and scientific functions
 		schemaContent, err := os.ReadFile("../DATABASE_SCHEMA.sql")
 		if err != nil {
 			return err
 		}
 
+		// Read database initialization script
 		initScriptContent, err := os.ReadFile("../init-database.sh")
 		if err != nil {
 			return err
@@ -49,7 +51,7 @@ func main() {
 			return err
 		}
 
-		// Create ConfigMap for UI configuration
+		// Create ConfigMap for UI configuration with Kellogg-specific backend URL
 		uiConfigMap, err := corev1.NewConfigMap(ctx, "ui-config", &corev1.ConfigMapArgs{
 			Metadata: &metav1.ObjectMetaArgs{
 				Name:      pulumi.String("kellogg-music-match-ui-config"),
@@ -67,7 +69,7 @@ func main() {
 			return err
 		}
 
-		// Create backend deployment
+		// Create backend deployment with enhanced database integration
 		backendDeployment, err := appsv1.NewDeployment(ctx, "backend-deployment", &appsv1.DeploymentArgs{
 			Metadata: &metav1.ObjectMetaArgs{
 				Name:      pulumi.String("kellogg-music-match-backend"),
@@ -201,7 +203,7 @@ func main() {
 			return err
 		}
 
-		// Create UI deployment
+		// Create UI deployment with Kellogg student profile support
 		uiDeployment, err := appsv1.NewDeployment(ctx, "ui-deployment", &appsv1.DeploymentArgs{
 			Metadata: &metav1.ObjectMetaArgs{
 				Name:      pulumi.String("kellogg-music-match-ui"),
@@ -403,7 +405,7 @@ func main() {
 			return err
 		}
 
-		// Create PostgreSQL ConfigMap with schema and init script
+		// Create PostgreSQL ConfigMap with consolidated schema and init script
 		pgConfigMap, err := corev1.NewConfigMap(ctx, "postgres-config", &corev1.ConfigMapArgs{
 			Metadata: &metav1.ObjectMetaArgs{
 				Name:      pulumi.String("postgres-config"),
@@ -423,7 +425,7 @@ func main() {
 			return err
 		}
 
-		// Create PostgreSQL StatefulSet
+		// Create PostgreSQL StatefulSet with custom image (scientific extensions)
 		pgStatefulSet, err := appsv1.NewStatefulSet(ctx, "postgres-statefulset", &appsv1.StatefulSetArgs{
 			Metadata: &metav1.ObjectMetaArgs{
 				Name:      pulumi.String("postgres"),
@@ -599,7 +601,7 @@ func main() {
 			return err
 		}
 
-		// Export useful information
+		// Export useful information for Kellogg Music Match deployment
 		ctx.Export("namespaceName", namespace.Metadata.Name())
 		ctx.Export("serviceAccountName", serviceAccount.Metadata.Name())
 		ctx.Export("backendDeploymentName", backendDeployment.Metadata.Name())
@@ -611,9 +613,16 @@ func main() {
 		ctx.Export("postgresServiceName", pgService.Metadata.Name())
 		ctx.Export("postgresSecretName", pgSecret.Metadata.Name())
 
-		// Export application URLs
+		// Export application URLs for easy access
 		ctx.Export("uiUrl", pulumi.String("http://kmm-ui.traefik.me"))
 		ctx.Export("backendUrl", pulumi.String("http://kmm-backend.traefik.me"))
+		ctx.Export("healthCheckUrl", pulumi.String("http://kmm-backend.traefik.me/health"))
+
+		// Export database connection information
+		ctx.Export("databaseHost", pulumi.String("postgres.kellogg-music-match.svc.cluster.local"))
+		ctx.Export("databasePort", pulumi.String("5432"))
+		ctx.Export("databaseName", pulumi.String("kellogg_music_match"))
+		ctx.Export("databaseUser", pulumi.String("kellogg_user"))
 
 		// Export ingress status (will show external IP when available)
 		ctx.Export("ingressStatus", ingress.Status)
