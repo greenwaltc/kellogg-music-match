@@ -33,12 +33,14 @@ This document describes the PostgreSQL database setup for the Kellogg Music Matc
 
 ## 🏗️ Database Schema Management
 
-### Schema Files Organization
+### Consolidated Schema Architecture
+The database schema has been consolidated into a single initial migration for better maintainability:
+
 ```
 backend/db/
 ├── schema/                    # Source schema files (single source of truth)
-│   ├── 001_initial.sql       # Initial schema with users, artists, user_artists
-│   └── [future migrations]   # Additional schema changes
+│   ├── 001_initial.sql       # ✅ Consolidated initial schema (replaces 9 migration files)
+│   └── [future migrations]   # Additional schema changes as needed
 ├── queries/                  # SQLC query definitions
 │   └── queries.sql          # Type-safe SQL queries for Go code generation
 └── sqlc/                    # Generated Go code (do not edit directly)
@@ -47,6 +49,12 @@ backend/db/
     ├── querier.go          # Query interface
     └── queries.sql.go      # Generated query methods
 ```
+
+### Schema Synchronization Process
+1. **Source Files**: All schema changes made in `backend/db/schema/*.sql`
+2. **Auto-Generation**: `DATABASE_SCHEMA.sql` is automatically generated from schema files
+3. **Docker Integration**: The generated schema is mounted as `/docker-entrypoint-initdb.d/01-schema.sql`
+4. **Fresh Initialization**: Database containers initialize with the consolidated schema
 
 ### Schema Synchronization
 The project uses a multi-file schema system with automatic synchronization:
@@ -159,7 +167,45 @@ dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 )
 ```
 
-## 🚀 Development & Deployment Commands
+## �️ Enhanced Database Management Pipeline
+
+### Development Workflow Commands
+The project includes comprehensive database management commands for reliable development:
+
+```bash
+# Schema Management
+make sync-schema           # Sync DATABASE_SCHEMA.sql from backend/db/schema/*.sql
+make check-schema-sync     # Verify schema files are synchronized
+make create-migration name=feature  # Create new migration file
+
+# Database Reset & Verification
+make db-reset              # Complete database reset with guaranteed fresh schema
+make db-schema-verify      # Verify database schema matches expected structure
+make db-force-schema-sync  # Nuclear option: force complete reset with schema sync
+
+# Development Database Operations
+make db-start              # Start PostgreSQL database only
+make db-status             # Show database status and connection info
+make db-connect            # Connect with psql interactive shell
+make db-logs               # Show recent database logs
+make db-backup             # Create timestamped backup
+```
+
+### Database Reset Guarantees
+The enhanced reset pipeline provides development guarantees:
+
+1. **Complete Volume Removal**: Removes Docker volumes for truly fresh state
+2. **Schema Synchronization**: Auto-syncs from source files before reset
+3. **Structure Verification**: Validates schema was applied correctly
+4. **SQLC Regeneration**: Ensures Go code matches database structure
+
+### Schema Evolution Strategy
+- **Initial Schema**: Single `001_initial.sql` with complete table definitions
+- **Future Changes**: Add sequential migration files (002_*, 003_*, etc.)
+- **Automatic Sync**: `DATABASE_SCHEMA.sql` reflects current consolidated state
+- **Docker Integration**: Schema auto-applied on container initialization
+
+## �🚀 Development & Deployment Commands
 
 ### Local Development
 ```bash

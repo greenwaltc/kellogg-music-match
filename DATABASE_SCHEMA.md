@@ -2,7 +2,24 @@
 
 ## Overview
 
-The Kellogg Music Match application uses a **custom PostgreSQL database** with scientific extensions for advanced similarity calculations. The database features normalized schema design, plpython3u extension with scipy/numpy libraries, and a hybrid Jaccard + positional similarity algorithm for accurate music taste matching.
+The Kellogg Music Match application uses a **custom PostgreSQL 15 database** with scientific extensions for advanced similarity calculations. The database features a consolidated schema design, plpython3u extension with scipy/numpy libraries, and a hybrid Jaccard + positional similarity algorithm for accurate music taste matching between Kellogg students.
+
+## 🏗️ Schema Architecture
+
+### Consolidated Schema Management
+The database schema has been consolidated from multiple migration files into a single, comprehensive initial schema:
+
+- **Source**: `backend/db/schema/001_initial.sql` (consolidated from 9 migration files)
+- **Auto-Generated**: `DATABASE_SCHEMA.sql` (synchronized from source files)
+- **Docker Integration**: Automatically applied during container initialization
+- **Development Pipeline**: Enhanced reset and verification commands
+
+### Key Improvements
+- ✅ **Single Source of Truth**: All table definitions in one place
+- ✅ **Complete User Profiles**: Added `program` and `graduation_year` fields
+- ✅ **Enhanced Validation**: Program constraints for Kellogg programs (2Y, 1Y, MMM, etc.)
+- ✅ **SQLC Compatibility**: Optimized queries for Go code generation
+- ✅ **Reset Guarantees**: Reliable database reset with schema verification
 
 ## 🧪 Scientific Database Features
 

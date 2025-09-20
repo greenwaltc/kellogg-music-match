@@ -254,13 +254,15 @@ db-backup: ## Create database backup
 
 db-help: ## Show database commands
 	@echo "🗄️ Database Commands:"
-	@echo "  db-start    Start PostgreSQL database"
-	@echo "  db-status   Show database status"
-	@echo "  db-logs     Show database logs"
-	@echo "  db-connect  Connect with psql"
-	@echo "  db-test     Test database setup"
-	@echo "  db-reset    Reset database"
-	@echo "  db-backup   Create backup"
+	@echo "  db-start              Start PostgreSQL database"
+	@echo "  db-status             Show database status"
+	@echo "  db-logs               Show database logs"
+	@echo "  db-connect            Connect with psql"
+	@echo "  db-test               Test database setup"
+	@echo "  db-reset              Reset database with guaranteed fresh schema"
+	@echo "  db-schema-verify      Verify database schema matches expected structure"
+	@echo "  db-force-schema-sync  Nuclear option: force complete reset with schema sync"
+	@echo "  db-backup             Create backup"
 
 ## =============================================================================
 ## 🏗️  BACKEND OPERATIONS

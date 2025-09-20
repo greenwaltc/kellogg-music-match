@@ -45,21 +45,59 @@ docker-compose exec postgres psql -U kellogg_user -d kellogg_music_match -c "SEL
 ```
 
 ### Schema Management
-The project uses a multi-file schema system with automatic synchronization and scientific functions:
+The project uses a consolidated schema system with enhanced development pipeline:
 
 ```bash
+# Schema Synchronization
+make sync-schema           # Auto-sync DATABASE_SCHEMA.sql from backend/db/schema/*.sql
+make check-schema-sync     # Verify schema files are synchronized
+
+# Database Reset Pipeline (Enhanced Development Workflow)
+make db-reset              # Complete database reset with guaranteed fresh schema
+make db-schema-verify      # Verify database schema matches expected structure  
+make db-force-schema-sync  # Nuclear option: complete reset with schema sync
+
+# Traditional Database Operations
+make db-start              # Start PostgreSQL database only
+make db-connect            # Connect with psql interactive shell
+make db-logs               # Show recent database logs
+make db-backup             # Create timestamped backup
+```
+
+### Enhanced Reset Guarantees
+The development pipeline provides reliable database management:
+
+1. **Complete Volume Removal**: Docker volumes removed for truly fresh state
+2. **Schema Synchronization**: Auto-syncs from `backend/db/schema/*.sql` before reset
+3. **Structure Verification**: Validates all tables, indexes, and functions exist
+4. **SQLC Regeneration**: Ensures Go code matches database structure
+
+### Consolidated Schema Benefits
+- **Single Source of Truth**: All schema in `backend/db/schema/001_initial.sql`
+- **Complete Profiles**: Users include `program` and `graduation_year` fields
+- **Kellogg Validation**: Program constraints (2Y, 1Y, MMM, MBAi, JD-MBA, etc.)
+- **Docker Integration**: Schema auto-applied on container initialization
+
+### Schema Development Workflow
+```bash
 # 1. Edit schema files in backend/db/schema/
-vim backend/db/schema/004_spearman_distance.sql  # Hybrid similarity algorithm
+vim backend/db/schema/001_initial.sql  # Main consolidated schema
 
-# 2. Synchronize to main schema file
-make schema-sync
+# 2. Synchronize to main schema file (if adding new files)
+make sync-schema
 
-# 3. Generate SQLC code
+# 3. Generate SQLC code from updated schema
 make backend-sqlc
 
-# 4. Commit changes
-git add backend/db/ DATABASE_SCHEMA.sql postgres.dockerfile
-git commit -m "Update database schema with scientific functions"
+# 4. Reset database with new schema
+make db-reset
+
+# 5. Verify schema was applied correctly
+make db-schema-verify
+
+# 6. Commit changes
+git add backend/db/ DATABASE_SCHEMA.sql
+git commit -m "Update database schema"
 ```
 
 ### Scientific Distance Function
@@ -149,7 +187,7 @@ curl http://localhost:8080/health
 # User registration
 curl -X POST http://localhost:8080/register \
   -H "Content-Type: application/json" \
-  -d '{"username":"testuser","email":"test@example.com","password":"TestPassword123!","firstName":"Test","lastName":"User"}'
+  -d '{"username":"testuser","email":"test@kellogg.northwestern.edu","password":"TestPassword123!","firstName":"Test","lastName":"User","program":"2Y","graduationYear":2026}'
 
 # User login
 curl -X POST http://localhost:8080/login \

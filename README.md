@@ -1,16 +1,6 @@
 # 🎵 Kellogg Music Match
 
-### 🗄️ Database
-- **Custom PostgreSQL 15** with **plpython3u extension** and scientific libraries (scipy, numpy)
-- **Scientific Similarity Calculations** - Custom `spearman_distance` function with hybrid Jaccard + positional correlation algorithm
-- **SQLC Integration** - Type-safe Go code generated from SQL queries
-- **Multi-file Schema Management** - Automatic synchronization from backend/db/schema/*.sql
-- **UserRepository Interface** - Clean abstraction layer for database operations
-- **UUID Support** - Proper UUID format with performance indexes
-- **Automatic initialization** with sample data for development
-- **User management** with bcrypt password hashing
-- **Music matching** with artist relationships and scientifically accurate similarity scoring
-- **Performance optimized** with indexes and comprehensive foreign key constraintsonal full-stack music taste matching application with Go backend, Angular frontend, PostgreSQL database, and automated infrastructure deployment.
+A professional full-stack music taste matching application designed for Kellogg students, featuring Go backend, Angular frontend, PostgreSQL database with scientific extensions, and automated infrastructure deployment.
 
 ## 🏗️ Architecture Overview
 
@@ -37,15 +27,17 @@ kellogg-music-match/
 - **Docker** containerization with multi-stage builds
 
 ### 🗄️ Database
-- **PostgreSQL 15** with normalized schema design
+- **Custom PostgreSQL 15** with **plpython3u extension** and scientific libraries (scipy, numpy)
+- **Scientific Similarity Calculations** - Custom `spearman_distance` function with hybrid Jaccard + positional correlation algorithm
 - **SQLC Integration** - Type-safe Go code generated from SQL queries
-- **Multi-file Schema Management** - Automatic synchronization from backend/db/schema/*.sql
-- **User Repository Pattern** - Clean database abstraction layer
+- **Consolidated Schema Management** - Single migration file in `backend/db/schema/001_initial.sql`
+- **Automatic Schema Synchronization** - `DATABASE_SCHEMA.sql` auto-generated from schema files
+- **Enhanced Database Pipeline** - Reset, verification, and sync guarantees in development workflow
+- **UserRepository Interface** - Clean abstraction layer for database operations
 - **UUID Support** - Proper UUID format with performance indexes
-- **Automatic initialization** with sample data for development
-- **User management** with bcrypt password hashing
-- **Music matching** with artist relationships and similarity scoring
-- **Performance optimized** with indexes and comprehensive foreign key constraints
+- **User Management** - Complete profile support including program and graduation year
+- **Music Matching** - Artist relationships with scientifically accurate similarity scoring
+- **Performance Optimized** - Comprehensive indexes and foreign key constraints
 
 ### 🎨 Frontend  
 - **Angular 17+** with reactive forms and modern UI
@@ -108,10 +100,10 @@ make ui-dev       # Frontend with live reload
 # Health check
 curl http://localhost:8080/health
 
-# Test user registration
+# Test user registration with full profile
 curl -X POST http://localhost:8080/register \
   -H "Content-Type: application/json" \
-  -d '{"username":"testuser","email":"test@example.com","password":"TestPassword123!","firstName":"Test","lastName":"User"}'
+  -d '{"username":"testuser","email":"test@kellogg.northwestern.edu","password":"TestPassword123!","firstName":"Test","lastName":"User","program":"2Y","graduationYear":2026}'
 
 # Test user login  
 curl -X POST http://localhost:8080/login \
@@ -144,6 +136,19 @@ docker-compose up -d
 
 # Start PostgreSQL database only
 docker-compose up -d postgres
+
+# Database management (new enhanced pipeline)
+make db-reset              # Complete database reset with fresh schema
+make db-schema-verify      # Verify database structure matches expected
+make db-force-schema-sync  # Nuclear option: complete reset with schema sync
+make sync-schema           # Sync DATABASE_SCHEMA.sql from backend files
+
+# Schema management
+make create-migration name=add_feature  # Create new migration file
+make check-schema-sync     # Verify schema files are synchronized
+
+# Direct database access
+docker exec -it kmm-postgres psql -U kellogg_user -d kellogg_music_match
 
 # View logs
 docker-compose logs backend

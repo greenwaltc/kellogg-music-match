@@ -132,7 +132,7 @@ curl http://localhost:8080/health
 # User registration
 curl -X POST http://localhost:8080/register \
   -H "Content-Type: application/json" \
-  -d '{"username":"testuser","email":"test@example.com","password":"TestPassword123!","firstName":"Test","lastName":"User"}'
+  -d '{"username":"testuser","email":"test@kellogg.northwestern.edu","password":"TestPassword123!","firstName":"Test","lastName":"User","program":"2Y","graduationYear":2026}'
 
 # User login
 curl -X POST http://localhost:8080/login \

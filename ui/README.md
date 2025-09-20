@@ -1,11 +1,16 @@
 # Kellogg Music Match UI
 
-Angular standalone (v17+) application for secure user registration, authentication, and music taste matching.
+Angular standalone (v17+) application for Kellogg student registration, authentication, and music taste matching with enhanced profile management.
 
 ## Features
 
 ### 🔐 Authentication & Registration
-- **Secure Registration**: Username, email, first name, last name, and password
+- **Enhanced Student Registration**: 
+  - Personal Details: Username, email, first name, last name
+  - Kellogg Profile: Program selection and graduation year
+  - Password Security: Strong password requirements with real-time validation
+- **Program Selection**: Dropdown for Kellogg programs (2Y, 1Y, MMM, MBAi, JD-MBA, MD-MBA, EWMBA)
+- **Graduation Year**: Validation for years 2025-2030
 - **Strong Password Requirements**: 
   - Minimum 8 characters
   - Uppercase, lowercase, number, and special character (!@#$%^&*(),.?":{}|<>_)
@@ -13,7 +18,7 @@ Angular standalone (v17+) application for secure user registration, authenticati
   - Password strength indicator (Weak/Fair/Good/Strong)
 - **Password Confirmation**: Real-time matching validation
 - **Show/Hide Password**: Toggle visibility for both password fields
-- **Login**: Secure username/password authentication
+- **Login**: Secure username/password authentication with session management
 
 ### 🎵 Music Features  
 - **Artist Management**: Dynamic list (1–10 artists) with add/remove functionality
@@ -61,6 +66,17 @@ The frontend integrates with the Go backend API for all data operations.
   "firstName": "Jane",
   "lastName": "Doe",
   "password": "SecurePass123!"
+}
+**POST /register**
+```json
+{
+  "username": "student123",
+  "email": "student@kellogg.northwestern.edu",
+  "firstName": "John",
+  "lastName": "Doe", 
+  "password": "SecurePass123!",
+  "program": "2Y",
+  "graduationYear": 2026
 }
 ```
 
