@@ -229,7 +229,7 @@ var _ = Describe("Similarity Algorithm Comprehensive Tests", func() {
 
 			// Rock and Pop should have moderate similarity (some overlap)
 			Expect(rockSimilarity).To(BeNumerically(">", 0.04)) // Adjusted for hybrid algorithm
-			Expect(popSimilarity).To(BeNumerically(">", 0.04)) // Adjusted for hybrid algorithm
+			Expect(popSimilarity).To(BeNumerically(">", 0.04))  // Adjusted for hybrid algorithm
 		})
 	})
 

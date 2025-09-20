@@ -73,20 +73,20 @@ var _ = Describe("Music Matching System", func() {
 			response, err := matchingService.FindMusicMatches(ctx, generated.ArtistsRequest{
 				Artists: []string{"Tool"},
 			}, "tool_user")
-			
+
 			Expect(err).NotTo(HaveOccurred())
 			Expect(response.Code).To(Equal(200))
-			
+
 			matches, ok := response.Body.([]*generated.MatchUser)
 			Expect(ok).To(BeTrue())
-			
+
 			// Should find at least the overlap_user who also has Tool
 			foundOverlapUser := false
 			for _, match := range matches {
 				if match.Name == "Overlap User" {
 					foundOverlapUser = true
 					Expect(match.Score).To(BeNumerically(">=", 0.0)) // Perfect or near-perfect match
-					Expect(match.Overlap).To(BeNumerically(">=", 1))   // At least 1 common artist
+					Expect(match.Overlap).To(BeNumerically(">=", 1)) // At least 1 common artist
 				}
 			}
 			Expect(foundOverlapUser).To(BeTrue())
@@ -99,11 +99,11 @@ var _ = Describe("Music Matching System", func() {
 			response, err := matchingService.FindMusicMatches(ctx, generated.ArtistsRequest{
 				Artists: []string{"Tool"},
 			}, "tool_user")
-			
+
 			Expect(err).NotTo(HaveOccurred())
 			matches, ok := response.Body.([]*generated.MatchUser)
 			Expect(ok).To(BeTrue())
-			
+
 			// Find the Tool+Radiohead user
 			var toolRadioheadMatch *generated.MatchUser
 			for _, match := range matches {
@@ -112,12 +112,12 @@ var _ = Describe("Music Matching System", func() {
 					break
 				}
 			}
-			
+
 			if toolRadioheadMatch != nil {
 				// Should have good similarity but not perfect (distance should be > 0)
 				Expect(toolRadioheadMatch.Score).To(BeNumerically("<", 1.0)) // Not perfect
 				Expect(toolRadioheadMatch.Score).To(BeNumerically(">", 0.0)) // But still positive
-				Expect(toolRadioheadMatch.Overlap).To(Equal(int32(1)))        // Tool overlap count (adjusted to match actual behavior)
+				Expect(toolRadioheadMatch.Overlap).To(Equal(int32(1)))       // Tool overlap count (adjusted to match actual behavior)
 			}
 		})
 	})
@@ -128,11 +128,11 @@ var _ = Describe("Music Matching System", func() {
 			response, err := matchingService.FindMusicMatches(ctx, generated.ArtistsRequest{
 				Artists: []string{"Tool"},
 			}, "tool_user")
-			
+
 			Expect(err).NotTo(HaveOccurred())
 			matches, ok := response.Body.([]*generated.MatchUser)
 			Expect(ok).To(BeTrue())
-			
+
 			// Find the Beatles user (no overlap with Tool)
 			var beatlesMatch *generated.MatchUser
 			for _, match := range matches {
@@ -141,7 +141,7 @@ var _ = Describe("Music Matching System", func() {
 					break
 				}
 			}
-			
+
 			// Beatles user might not appear in results due to no similarity,
 			// but if they do, score should be very low
 			if beatlesMatch != nil {
@@ -152,15 +152,15 @@ var _ = Describe("Music Matching System", func() {
 
 	Context("when matching users with overlapping preferences", func() {
 		It("should return moderate similarity scores based on overlap", func() {
-			// Overlap user (Tool, Beatles) looking for matches  
+			// Overlap user (Tool, Beatles) looking for matches
 			response, err := matchingService.FindMusicMatches(ctx, generated.ArtistsRequest{
 				Artists: []string{"Tool", "Beatles"},
 			}, "overlap_user")
-			
+
 			Expect(err).NotTo(HaveOccurred())
 			matches, ok := response.Body.([]*generated.MatchUser)
 			Expect(ok).To(BeTrue())
-			
+
 			// Should find both Tool user and Beatles user with moderate scores
 			var toolMatch, beatlesMatch *generated.MatchUser
 			for _, match := range matches {
@@ -171,14 +171,14 @@ var _ = Describe("Music Matching System", func() {
 					beatlesMatch = match
 				}
 			}
-			
+
 			if toolMatch != nil {
-				Expect(toolMatch.Score).To(BeNumerically(">", 0.0)) // Positive similarity
+				Expect(toolMatch.Score).To(BeNumerically(">", 0.0))  // Positive similarity
 				Expect(toolMatch.Overlap).To(BeNumerically(">=", 1)) // At least Tool in common
 			}
-			
+
 			if beatlesMatch != nil {
-				Expect(beatlesMatch.Score).To(BeNumerically(">", 0.0)) // Positive similarity  
+				Expect(beatlesMatch.Score).To(BeNumerically(">", 0.0))  // Positive similarity
 				Expect(beatlesMatch.Overlap).To(BeNumerically(">=", 1)) // Beatles in common
 			}
 		})
@@ -190,11 +190,11 @@ var _ = Describe("Music Matching System", func() {
 			response, err := matchingService.FindMusicMatches(ctx, generated.ArtistsRequest{
 				Artists: []string{"Tool", "Radiohead"},
 			}, "tool_radiohead_user")
-			
+
 			Expect(err).NotTo(HaveOccurred())
 			matches, ok := response.Body.([]*generated.MatchUser)
 			Expect(ok).To(BeTrue())
-			
+
 			var reverseMatch *generated.MatchUser
 			for _, match := range matches {
 				if match.Name == "Reverse User" {
@@ -202,12 +202,12 @@ var _ = Describe("Music Matching System", func() {
 					break
 				}
 			}
-			
+
 			if reverseMatch != nil {
 				// Same artists but different order should still have good similarity
 				Expect(reverseMatch.Score).To(BeNumerically(">", 0.0))
 				Expect(reverseMatch.Score).To(BeNumerically("<", 1.0)) // Not perfect due to order
-				Expect(reverseMatch.Overlap).To(Equal(int32(2)))        // Both artists match
+				Expect(reverseMatch.Overlap).To(Equal(int32(2)))       // Both artists match
 			}
 		})
 	})
@@ -217,8 +217,8 @@ var _ = Describe("Music Matching System", func() {
 			response, err := matchingService.FindMusicMatches(ctx, generated.ArtistsRequest{
 				Artists: []string{},
 			}, "tool_user")
-			
-			Expect(err).NotTo(HaveOccurred()) // Should handle empty artists gracefully (actual behavior)
+
+			Expect(err).NotTo(HaveOccurred())    // Should handle empty artists gracefully (actual behavior)
 			Expect(response.Code).To(Equal(400)) // Actual response code for empty artists
 		})
 
@@ -226,8 +226,8 @@ var _ = Describe("Music Matching System", func() {
 			response, err := matchingService.FindMusicMatches(ctx, generated.ArtistsRequest{
 				Artists: []string{"Tool"},
 			}, "non_existent_user")
-			
-			Expect(err).NotTo(HaveOccurred()) // Should handle non-existent users gracefully (actual behavior)
+
+			Expect(err).NotTo(HaveOccurred())    // Should handle non-existent users gracefully (actual behavior)
 			Expect(response.Code).To(Equal(500)) // Actual response code for non-existent users
 		})
 
@@ -238,10 +238,10 @@ var _ = Describe("Music Matching System", func() {
 			response, err := matchingService.FindMusicMatches(ctx, generated.ArtistsRequest{
 				Artists: []string{"Tool"},
 			}, newUser.Username)
-			
+
 			Expect(err).NotTo(HaveOccurred())
 			Expect(response.Code).To(Equal(200))
-			
+
 			// Should return some matches even for new user
 			matches, ok := response.Body.([]*generated.MatchUser)
 			Expect(ok).To(BeTrue())

@@ -246,10 +246,10 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 		// - Positional correlation for shared items
 		// - Size penalty for variable-length lists
 		// Distance ranges from 0 (identical) to 2 (completely different)
-		
+
 		// Convert distance to similarity score (0-1 range, higher is better)
 		score := float32(1.0 - (row.Distance / 2.0))
-		
+
 		fmt.Printf("DEBUG: User %s - hybrid distance: %.3f, similarity score: %.3f\n", row.Username, row.Distance, score)
 
 		match := &generated.MatchUser{
