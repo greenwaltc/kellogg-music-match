@@ -1,7 +1,10 @@
--- Enable plpython3u extension for advanced statistical functions
-CREATE EXTENSION IF NOT EXISTS plpython3u;
+-- Enhanced hybrid similarity function with size penalty for variable-length lists
+-- This migration updates the spearman_distance function to handle lists of very different sizes better
 
--- Create Spearman rank correlation distance function for text arrays (artist names)
+-- Drop the existing function and recreate with enhancements
+DROP FUNCTION IF EXISTS spearman_distance(TEXT[], TEXT[]);
+
+-- Create enhanced Spearman rank correlation distance function for text arrays (artist names)
 -- This function calculates a distance metric based on artist preference similarity
 -- Returns a distance where 0 = identical preferences, higher values = less similar
 CREATE OR REPLACE FUNCTION spearman_distance(arr1 TEXT[], arr2 TEXT[])
@@ -90,58 +93,6 @@ distance = 2.0 * (1.0 - combined_similarity)
 return max(0.0, min(2.0, float(distance)))
 $$;
 
--- Alternative simpler implementation using basic statistics (fallback)
--- This creates a backup function in case plpython3u isn't available
-CREATE OR REPLACE FUNCTION spearman_distance_simple(arr1 TEXT[], arr2 TEXT[])
-RETURNS FLOAT
-LANGUAGE plpgsql
-AS $$
-DECLARE
-    intersection_count INTEGER;
-    union_count INTEGER;
-    jaccard_similarity FLOAT;
-BEGIN
-    -- Handle edge cases
-    IF arr1 IS NULL AND arr2 IS NULL THEN
-        RETURN 0.0;  -- Both null, perfect match
-    END IF;
-    
-    IF arr1 IS NULL OR arr2 IS NULL THEN
-        RETURN 1.0;  -- One null, maximum distance
-    END IF;
-    
-    -- If arrays are identical, return perfect match
-    IF arr1 = arr2 THEN
-        RETURN 0.0;
-    END IF;
-    
-    -- Calculate Jaccard similarity as a simple alternative
-    -- intersection_count = |A ∩ B|
-    SELECT COUNT(*)
-    INTO intersection_count
-    FROM (SELECT unnest(arr1) INTERSECT SELECT unnest(arr2)) AS intersection;
-    
-    -- union_count = |A ∪ B|
-    SELECT COUNT(*)
-    INTO union_count
-    FROM (SELECT unnest(arr1) UNION SELECT unnest(arr2)) AS union_set;
-    
-    -- Avoid division by zero
-    IF union_count = 0 THEN
-        RETURN 0.0;
-    END IF;
-    
-    -- Jaccard similarity = |A ∩ B| / |A ∪ B|
-    jaccard_similarity := CAST(intersection_count AS FLOAT) / CAST(union_count AS FLOAT);
-    
-    -- Convert to distance (1 - similarity)
-    RETURN 1.0 - jaccard_similarity;
-END;
-$$;
-
--- Create a comment explaining the function
+-- Update the comment explaining the enhanced function
 COMMENT ON FUNCTION spearman_distance(TEXT[], TEXT[]) IS 
-'Calculates Spearman rank correlation distance between two text arrays (artist names). Returns 1 - correlation coefficient as distance metric (0 = identical rankings, 1 = no correlation, 2 = opposite rankings). Requires plpython3u extension with scipy.stats.';
-
-COMMENT ON FUNCTION spearman_distance_simple(TEXT[], TEXT[]) IS 
-'Simple fallback implementation using Jaccard similarity for text arrays. Calculates 1 - (intersection / union) as distance metric. Pure PostgreSQL implementation without external dependencies.';
+'Enhanced hybrid similarity function that calculates distance between two text arrays (artist names). Combines Jaccard similarity (60%), positional correlation (20%), and size penalty for variable-length lists. Returns 0 = identical rankings, 2 = completely different. Requires plpython3u extension with scipy.stats.';

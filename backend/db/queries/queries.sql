@@ -125,26 +125,26 @@ SELECT
   u1.last_name,
   u1.program,
   u1.graduation_year,
-  (SELECT array_agg(a1.name ORDER BY ua1.rank ASC)
+  COALESCE((SELECT array_agg(a1.name ORDER BY ua1.rank ASC)
    FROM user_artists ua1
    JOIN artists a1 ON ua1.artist_id = a1.id
-   WHERE ua1.user_id = u1.id) AS artists,
+   WHERE ua1.user_id = u1.id), '{}') AS artists,
   spearman_distance(
-    (SELECT array_agg(a1.name ORDER BY ua1.rank ASC)
+    COALESCE((SELECT array_agg(a1.name ORDER BY ua1.rank ASC)
      FROM user_artists ua1
      JOIN artists a1 ON ua1.artist_id = a1.id
-     WHERE ua1.user_id = u1.id),
-    (SELECT array_agg(a2.name ORDER BY ua2.rank ASC)
+     WHERE ua1.user_id = u1.id), '{}'),
+    COALESCE((SELECT array_agg(a2.name ORDER BY ua2.rank ASC)
      FROM users u2
      JOIN user_artists ua2 ON u2.id = ua2.user_id
      JOIN artists a2 ON ua2.artist_id = a2.id
-     WHERE u2.username = $1)
+     WHERE u2.username = $1), '{}')
   ) AS distance
 FROM users u1
 WHERE u1.username != $1
   AND EXISTS (SELECT 1 FROM user_artists WHERE user_id = u1.id)
 ORDER BY distance ASC
-LIMIT 10;
+LIMIT 50;
 
 -- Feedback queries
 -- name: CreateFeedback :one

@@ -70,9 +70,12 @@ interface ArtistsFormShape { artists: FormArray<FormControl<string | null>>; }
         </div>
         
         <!-- Duplicate artists error -->
-        <div class="form-error" *ngIf="form.hasError('duplicateArtists') && (form.touched || form.dirty)">
+        <div class="form-error" *ngIf="form.hasError('duplicateArtists')">
           <span class="error-icon">⚠️</span>
-          Duplicate artists are not allowed. Please remove or change duplicate entries.
+          <div>
+            <strong>Duplicate artists detected!</strong><br>
+            Please remove or change the duplicate entries. Each artist should only appear once in your list.
+          </div>
         </div>
       </div>
       
@@ -370,8 +373,14 @@ export class ArtistsComponent {
   onArtistSelected(artist: Artist, index: number): void {
     // Artist was selected from dropdown, the control value is already set
     console.log('Artist selected:', artist.name, 'at index:', index);
-    // Trigger validation for duplicates
+    // Trigger validation for duplicates immediately
     this.artistsArray.updateValueAndValidity();
+  }
+
+  // Helper method to get duplicate artist names for display
+  getDuplicateArtists(): string[] {
+    const duplicateErrors = this.form.get('artists')?.errors?.['duplicateArtists'];
+    return duplicateErrors?.duplicates || [];
   }
 
   add(): void { 

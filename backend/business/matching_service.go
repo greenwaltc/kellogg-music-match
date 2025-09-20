@@ -105,7 +105,9 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 		if artistLower == "" {
 			continue // Skip empty artists
 		}
+		fmt.Printf("DEBUG: Checking artist: '%s' -> '%s'\n", artist, artistLower)
 		if artistSet[artistLower] {
+			fmt.Printf("DEBUG: Found duplicate: '%s'\n", artistLower)
 			return generated.Response(http.StatusBadRequest, generated.ErrorResponse{
 				Message: "duplicate artists are not allowed",
 			}), nil
@@ -191,16 +193,19 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 			case []string:
 				artistNames = v
 			case []uint8:
-				// PostgreSQL array as byte array - convert to string first
-				arrayStr := string(v)
-				if len(arrayStr) > 2 && arrayStr[0] == '{' && arrayStr[len(arrayStr)-1] == '}' {
-					arrayStr = arrayStr[1 : len(arrayStr)-1] // Remove { and }
-					if arrayStr != "" {
-						artistNames = strings.Split(arrayStr, ",")
-						// Trim whitespace and quotes from each artist name
-						for i, artist := range artistNames {
-							artist = strings.Trim(artist, ` "`)
-							artistNames[i] = artist
+				// PostgreSQL array as byte array representing JSON - convert to string first
+				jsonStr := string(v)
+				if len(jsonStr) > 2 && jsonStr[0] == '{' && jsonStr[len(jsonStr)-1] == '}' {
+					jsonStr = jsonStr[1 : len(jsonStr)-1] // Remove { and }
+					if jsonStr != "" {
+						// Split by comma and handle quoted values
+						parts := strings.Split(jsonStr, ",")
+						for _, part := range parts {
+							part = strings.TrimSpace(part)
+							part = strings.Trim(part, `"`) // Remove quotes
+							if part != "" {
+								artistNames = append(artistNames, part)
+							}
 						}
 					}
 				}
@@ -230,16 +235,30 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 			normalizedArtist := strings.ToLower(strings.TrimSpace(artist))
 			if userArtistsMap[normalizedArtist] {
 				overlapCount++
+				fmt.Printf("DEBUG: Found overlap: %s\n", artist)
 			}
 		}
+		fmt.Printf("DEBUG: User %s - overlap: %d, distance: %.3f, artists: %v\n", row.Username, overlapCount, row.Distance, artistNames)
+
+		// Use the enhanced hybrid similarity score directly from PostgreSQL
+		// The spearman_distance function now includes:
+		// - Jaccard similarity (intersection/union)
+		// - Positional correlation for shared items
+		// - Size penalty for variable-length lists
+		// Distance ranges from 0 (identical) to 2 (completely different)
+		
+		// Convert distance to similarity score (0-1 range, higher is better)
+		score := float32(1.0 - (row.Distance / 2.0))
+		
+		fmt.Printf("DEBUG: User %s - hybrid distance: %.3f, similarity score: %.3f\n", row.Username, row.Distance, score)
 
 		match := &generated.MatchUser{
 			Name:           fmt.Sprintf("%s %s", row.FirstName, row.LastName),
 			Program:        row.Program.String,
 			GraduationYear: row.GraduationYear.Int32,
 			Overlap:        int32(overlapCount),
-			Score:          float32(1.0 - (row.Distance / 2.0)), // Convert distance to similarity score: 0-2 distance → 1-0 similarity
-			Artists:        artistNames,                         // Include the artists array
+			Score:          score,
+			Artists:        artistNames,
 		}
 		matches = append(matches, match)
 	}
