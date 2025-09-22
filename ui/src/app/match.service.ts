@@ -24,21 +24,36 @@ export class MatchService {
   matches = signal<MatchUser[] | null>(null);
   loading = signal(false);
   private apiBase = window.__kmmConfig?.apiBaseUrl || environment.apiBaseUrl;
+  private lastFetchedForUser: string | null = null;
 
   constructor(private http: HttpClient, private auth: AuthService) {}
 
   set(matches: MatchUser[]): void { this.matches.set(matches); }
-  clear(): void { this.matches.set(null); }
+  clear(): void { 
+    this.matches.set(null); 
+    this.lastFetchedForUser = null;
+  }
 
   fetchIfReady(): void {
-    if (this.matches() || !this.auth.user()) return;
-    const user = this.auth.user();
-    if (user?.artists?.length) {
+    const currentUser = this.auth.user();
+    
+    // Clear matches if user has changed
+    if (this.lastFetchedForUser && currentUser?.username !== this.lastFetchedForUser) {
+      this.clear();
+    }
+    
+    if (this.matches() || !currentUser) return;
+    
+    if (currentUser?.artists?.length) {
       this.loading.set(true);
-  const username = user.username;
-  const headers = username ? new HttpHeaders({ 'X-User-Username': username }) : undefined;
-  this.http.post<MatchUser[]>(this.url('/findMusicMatches'), { artists: user.artists }, { headers }).subscribe({
-        next: (res: MatchUser[]) => { this.matches.set(res); this.loading.set(false); },
+      const username = currentUser.username;
+      const headers = username ? new HttpHeaders({ 'X-User-Username': username }) : undefined;
+      this.http.post<MatchUser[]>(this.url('/findMusicMatches'), { artists: currentUser.artists }, { headers }).subscribe({
+        next: (res: MatchUser[]) => { 
+          this.matches.set(res); 
+          this.loading.set(false);
+          this.lastFetchedForUser = username;
+        },
         error: () => { this.loading.set(false); }
       });
     }
