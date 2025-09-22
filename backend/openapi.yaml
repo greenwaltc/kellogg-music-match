@@ -405,14 +405,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               examples:
-                noArtists:
-                  summary: No artists provided
+                tooFewArtists:
+                  summary: Less than 5 artists provided
                   value:
-                    message: "artists required"
+                    message: "at least 5 artists are required"
+                tooManyArtists:
+                  summary: More than 20 artists provided
+                  value:
+                    message: "maximum of 20 artists allowed"
                 invalidArtists:
                   summary: No valid artists after cleanup
                   value:
-                    message: "no valid artists provided"
+                    message: "at least 5 valid artists are required"
 
 components:
   schemas:
@@ -591,8 +595,9 @@ components:
           description: |
             List of favorite artists (maximum 240 characters each). Duplicates are not allowed and will be automatically rejected (case-insensitive comparison).
             Empty strings are automatically removed. Artist names are case-insensitive for matching purposes.
-          minItems: 1
-          example: ["Taylor Swift", "The Beatles", "Radiohead", "Beyoncé"]
+          minItems: 5
+          maxItems: 20
+          example: ["Taylor Swift", "The Beatles", "Radiohead", "Beyoncé", "Daft Punk"]
       required:
         - artists
 

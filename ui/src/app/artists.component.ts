@@ -18,7 +18,7 @@ interface ArtistsFormShape { artists: FormArray<FormControl<string | null>>; }
   <section class="artists-section">
     <div class="page-header">
       <h2>Your Favorite Artists</h2>
-      <p class="subtitle">List from most to least favorite. Add up to {{ maxArtists }} artists.</p>
+      <p class="subtitle">List from most to least favorite. Add {{ minArtists }} to {{ maxArtists }} artists.</p>
     </div>
     
     <form [formGroup]="form" (ngSubmit)="submit()" novalidate class="artists-form">
@@ -42,7 +42,7 @@ interface ArtistsFormShape { artists: FormArray<FormControl<string | null>>; }
                 type="button" 
                 class="remove-btn" 
                 (click)="remove(i)" 
-                *ngIf="artistsArray.length > 1" 
+                *ngIf="artistsArray.length > minArtists" 
                 aria-label="Remove artist"
                 title="Remove this artist">
                 ×
@@ -75,6 +75,15 @@ interface ArtistsFormShape { artists: FormArray<FormControl<string | null>>; }
           <div>
             <strong>Duplicate artists detected!</strong><br>
             Please remove or change the duplicate entries. Each artist should only appear once in your list.
+          </div>
+        </div>
+        
+        <!-- Minimum artists error -->
+        <div class="form-error" *ngIf="form.hasError('minArtists')">
+          <span class="error-icon">⚠️</span>
+          <div>
+            <strong>Not enough artists!</strong><br>
+            Please add at least {{ minArtists }} artists to continue.
           </div>
         </div>
       </div>
@@ -339,20 +348,33 @@ interface ArtistsFormShape { artists: FormArray<FormControl<string | null>>; }
   `]
 })
 export class ArtistsComponent {
-  maxArtists = 10;
+  maxArtists = 20;
+  minArtists = 5;
   loading = signal(false);
   error = signal<string | null>(null);
   form!: FormGroup<ArtistsFormShape>;
   private apiBase = environment.apiBaseUrl;
 
   constructor(private fb: FormBuilder, private http: HttpClient, private matches: MatchService, private router: Router, private auth: AuthService) {
-    this.form = this.fb.group<ArtistsFormShape>({ artists: this.fb.array([this.artistControl()], { validators: [this.noDuplicatesValidator] }) });
+    // Initialize with 5 empty artist controls
+    const initialControls = Array.from({ length: this.minArtists }, () => this.artistControl());
+    this.form = this.fb.group<ArtistsFormShape>({ artists: this.fb.array(initialControls, { validators: [this.noDuplicatesValidator, this.minArtistsValidator] }) });
+    
     // Prefill for returning users
     const user = this.auth.user();
     if (user?.artists?.length) {
       const arr = this.artistsArray;
       while (arr.length) arr.removeAt(0);
-      user.artists.slice(0, this.maxArtists).forEach((a: string) => arr.push(this.fb.control<string | null>(a, [Validators.required, Validators.minLength(2), Validators.maxLength(240)])));
+      
+      // Add user's existing artists
+      user.artists.slice(0, this.maxArtists).forEach((a: string) => 
+        arr.push(this.fb.control<string | null>(a, [Validators.required, Validators.minLength(2), Validators.maxLength(240)]))
+      );
+      
+      // Fill remaining slots up to minimum if needed
+      while (arr.length < this.minArtists) {
+        arr.push(this.artistControl());
+      }
     }
   }
 
@@ -365,6 +387,16 @@ export class ArtistsComponent {
     
     const duplicates = artists.filter((artist: string, index: number) => artists.indexOf(artist) !== index);
     return duplicates.length > 0 ? { duplicateArtists: { duplicates } } : null;
+  };
+
+  // Custom validator to check minimum number of artists
+  private minArtistsValidator = (control: AbstractControl): { [key: string]: any } | null => {
+    const formArray = control as FormArray;
+    const validArtists = formArray.controls
+      .map((ctrl: AbstractControl) => (ctrl.value || '').toString().trim())
+      .filter((artist: string) => artist.length > 0);
+    
+    return validArtists.length < this.minArtists ? { minArtists: { required: this.minArtists, actual: validArtists.length } } : null;
   };
 
   get artistsArray(): FormArray<FormControl<string | null>> { return this.form.controls.artists; }
@@ -391,7 +423,7 @@ export class ArtistsComponent {
   }
   
   remove(i: number): void { 
-    if (this.artistsArray.length > 1) {
+    if (this.artistsArray.length > this.minArtists) {
       this.artistsArray.removeAt(i);
       this.artistsArray.updateValueAndValidity();
     }
@@ -402,11 +434,19 @@ export class ArtistsComponent {
       this.form.markAllAsTouched();
       if (this.form.hasError('duplicateArtists')) {
         this.error.set('Please remove duplicate artists before submitting.');
+        return;
+      }
+      if (this.form.hasError('minArtists')) {
+        this.error.set(`Please add at least ${this.minArtists} artists before submitting.`);
+        return;
       }
       return; 
     }
     const artists = this.artistsArray.controls.map((c: FormControl<string | null>) => (c.value || '').trim()).filter(Boolean) as string[];
-    if (!artists.length) { this.error.set('Enter at least one artist.'); return; }
+    if (artists.length < this.minArtists) { 
+      this.error.set(`Please add at least ${this.minArtists} artists.`); 
+      return; 
+    }
     
     // Additional duplicate check at submit time (case-insensitive)
     const lowerCaseArtists = artists.map(a => a.toLowerCase());

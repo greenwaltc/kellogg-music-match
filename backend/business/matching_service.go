@@ -85,7 +85,19 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 
 	if len(artistsRequest.Artists) == 0 {
 		return generated.Response(http.StatusBadRequest, generated.ErrorResponse{
-			Message: "at least one artist is required",
+			Message: "at least 5 artists are required",
+		}), nil
+	}
+
+	if len(artistsRequest.Artists) < 5 {
+		return generated.Response(http.StatusBadRequest, generated.ErrorResponse{
+			Message: "at least 5 artists are required",
+		}), nil
+	}
+
+	if len(artistsRequest.Artists) > 20 {
+		return generated.Response(http.StatusBadRequest, generated.ErrorResponse{
+			Message: "maximum of 20 artists allowed",
 		}), nil
 	}
 
@@ -113,6 +125,19 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 			}), nil
 		}
 		artistSet[artistLower] = true
+	}
+
+	// Validate we have enough valid artists after filtering
+	validArtistCount := len(artistSet)
+	if validArtistCount < 5 {
+		return generated.Response(http.StatusBadRequest, generated.ErrorResponse{
+			Message: "at least 5 valid artists are required",
+		}), nil
+	}
+	if validArtistCount > 20 {
+		return generated.Response(http.StatusBadRequest, generated.ErrorResponse{
+			Message: "maximum of 20 artists allowed",
+		}), nil
 	}
 
 	// If username is provided, update user's artist preferences
