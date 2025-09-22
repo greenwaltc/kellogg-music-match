@@ -7,20 +7,33 @@ import (
 	"strings"
 	"time"
 
+	"github.com/greenwaltc/kellogg-music-match/backend/config"
 	"github.com/greenwaltc/kellogg-music-match/backend/generated"
 )
 
 // MatchingService implements the business logic for music matching
 type MatchingService struct {
-	userRepo UserRepository
-	matching *MatchingEngine
+	userRepo     UserRepository
+	matching     *MatchingEngine
+	artistConfig *config.ArtistConfig
 }
 
-// NewMatchingService creates a new matching service
+// NewMatchingService creates a new matching service with default config
 func NewMatchingService(userRepo UserRepository, matching *MatchingEngine) *MatchingService {
+	cfg := config.Load()
 	return &MatchingService{
-		userRepo: userRepo,
-		matching: matching,
+		userRepo:     userRepo,
+		matching:     matching,
+		artistConfig: &cfg.Artist,
+	}
+}
+
+// NewMatchingServiceWithConfig creates a new matching service with provided config
+func NewMatchingServiceWithConfig(userRepo UserRepository, matching *MatchingEngine, artistConfig *config.ArtistConfig) *MatchingService {
+	return &MatchingService{
+		userRepo:     userRepo,
+		matching:     matching,
+		artistConfig: artistConfig,
 	}
 }
 
@@ -33,18 +46,18 @@ func (s *MatchingService) SearchArtists(ctx context.Context, query string, limit
 		}), nil
 	}
 
-	if len(query) > 240 {
+	if len(query) > s.artistConfig.SearchMaxLength {
 		return generated.Response(http.StatusBadRequest, generated.ErrorResponse{
-			Message: "search query must be 240 characters or less",
+			Message: fmt.Sprintf("search query must be %d characters or less", s.artistConfig.SearchMaxLength),
 		}), nil
 	}
 
 	// Set default limit if not provided
 	if limit <= 0 {
-		limit = 10
+		limit = int32(s.artistConfig.SearchLimit)
 	}
-	if limit > 50 {
-		limit = 50
+	if limit > int32(s.artistConfig.SearchLimit) {
+		limit = int32(s.artistConfig.SearchLimit)
 	}
 
 	// Perform fuzzy search using the repository
@@ -85,27 +98,27 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 
 	if len(artistsRequest.Artists) == 0 {
 		return generated.Response(http.StatusBadRequest, generated.ErrorResponse{
-			Message: "at least 5 artists are required",
+			Message: fmt.Sprintf("at least %d artists are required", s.artistConfig.MinCount),
 		}), nil
 	}
 
-	if len(artistsRequest.Artists) < 5 {
+	if len(artistsRequest.Artists) < s.artistConfig.MinCount {
 		return generated.Response(http.StatusBadRequest, generated.ErrorResponse{
-			Message: "at least 5 artists are required",
+			Message: fmt.Sprintf("at least %d artists are required", s.artistConfig.MinCount),
 		}), nil
 	}
 
-	if len(artistsRequest.Artists) > 20 {
+	if len(artistsRequest.Artists) > s.artistConfig.MaxCount {
 		return generated.Response(http.StatusBadRequest, generated.ErrorResponse{
-			Message: "maximum of 20 artists allowed",
+			Message: fmt.Sprintf("maximum of %d artists allowed", s.artistConfig.MaxCount),
 		}), nil
 	}
 
 	// Validate artist name lengths
 	for _, artist := range artistsRequest.Artists {
-		if len(artist) > 240 {
+		if len(artist) > s.artistConfig.MaxNameLength {
 			return generated.Response(http.StatusBadRequest, generated.ErrorResponse{
-				Message: "artist names must be 240 characters or less",
+				Message: fmt.Sprintf("artist names must be %d characters or less", s.artistConfig.MaxNameLength),
 			}), nil
 		}
 	}

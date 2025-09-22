@@ -4,40 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/greenwaltc/kellogg-music-match/backend/config"
 	sqlc "github.com/greenwaltc/kellogg-music-match/backend/db/sqlc"
 )
-
-// DatabaseConfig holds configuration for database connection
-type DatabaseConfig struct {
-	Host     string
-	Port     string
-	Name     string
-	User     string
-	Password string
-	SSLMode  string
-}
-
-// NewDatabaseConfigFromEnv creates a database config from environment variables
-func NewDatabaseConfigFromEnv() *DatabaseConfig {
-	return &DatabaseConfig{
-		Host:     getEnvWithDefault("DB_HOST", "localhost"),
-		Port:     getEnvWithDefault("DB_PORT", "5432"),
-		Name:     getEnvWithDefault("DB_NAME", "kellogg_music_match"),
-		User:     getEnvWithDefault("DB_USER", "kellogg_user"),
-		Password: getEnvWithDefault("DB_PASSWORD", "kellogg_secure_pass_2024"),
-		SSLMode:  getEnvWithDefault("DB_SSLMODE", "disable"),
-	}
-}
-
-// ConnectionString returns the PostgreSQL connection string
-func (c *DatabaseConfig) ConnectionString() string {
-	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		c.Host, c.Port, c.User, c.Password, c.Name, c.SSLMode)
-}
 
 // UserRepository defines the interface for user data operations
 type UserRepository interface {
@@ -67,14 +39,16 @@ type UserRepository interface {
 	// Feedback operations
 	CreateFeedback(ctx context.Context, userID uuid.UUID, feedbackText string) (*sqlc.Feedback, error)
 	GetFeedbackByUser(ctx context.Context, userID uuid.UUID) ([]sqlc.Feedback, error)
-} // PostgreSQLUserRepository implements UserRepository using PostgreSQL
+}
+
+// PostgreSQLUserRepository implements UserRepository using PostgreSQL
 type PostgreSQLUserRepository struct {
 	db      *sql.DB
 	queries *sqlc.Queries
 }
 
 // NewPostgreSQLUserRepository creates a new PostgreSQL user repository
-func NewPostgreSQLUserRepository(config *DatabaseConfig) (*PostgreSQLUserRepository, error) {
+func NewPostgreSQLUserRepository(config *config.DatabaseConfig) (*PostgreSQLUserRepository, error) {
 	db, err := sql.Open("postgres", config.ConnectionString())
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database connection: %w", err)
@@ -93,13 +67,17 @@ func NewPostgreSQLUserRepository(config *DatabaseConfig) (*PostgreSQLUserReposit
 
 // NewUserRepository creates a new UserRepository with default database configuration
 func NewUserRepository() (UserRepository, error) {
-	config := NewDatabaseConfigFromEnv()
+	cfg := config.Load()
+	return NewUserRepositoryWithConfig(&cfg.Database)
+}
 
+// NewUserRepositoryWithConfig creates a new UserRepository with provided database configuration
+func NewUserRepositoryWithConfig(dbConfig *config.DatabaseConfig) (UserRepository, error) {
 	// Log connection attempt (without password)
 	fmt.Printf("Attempting database connection to %s:%s@%s:%s/%s\n",
-		config.User, "***", config.Host, config.Port, config.Name)
+		dbConfig.User, "***", dbConfig.Host, dbConfig.Port, dbConfig.Name)
 
-	repo, err := NewPostgreSQLUserRepository(config)
+	repo, err := NewPostgreSQLUserRepository(dbConfig)
 	if err != nil {
 		fmt.Printf("Database connection failed: %v\n", err)
 		return nil, fmt.Errorf("failed to create user repository: %w", err)
@@ -276,12 +254,4 @@ func (repo *PostgreSQLUserRepository) CreateFeedback(ctx context.Context, userID
 
 func (repo *PostgreSQLUserRepository) GetFeedbackByUser(ctx context.Context, userID uuid.UUID) ([]sqlc.Feedback, error) {
 	return repo.queries.GetFeedbackByUser(ctx, userID)
-}
-
-// getEnvWithDefault returns environment variable value or default if not set
-func getEnvWithDefault(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
 }

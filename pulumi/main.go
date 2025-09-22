@@ -108,10 +108,12 @@ func main() {
 									},
 								},
 								Env: corev1.EnvVarArray{
+									// Server Configuration
 									&corev1.EnvVarArgs{
-										Name:  pulumi.String("PORT"),
+										Name:  pulumi.String("SERVER_PORT"),
 										Value: pulumi.String("8080"),
 									},
+									// Database Configuration
 									&corev1.EnvVarArgs{
 										Name:  pulumi.String("DB_HOST"),
 										Value: pulumi.String("postgres"),
@@ -131,6 +133,58 @@ func main() {
 									&corev1.EnvVarArgs{
 										Name:  pulumi.String("DB_NAME"),
 										Value: pulumi.String("kellogg_music_match"),
+									},
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("DB_SSLMODE"),
+										Value: pulumi.String("disable"),
+									},
+									// CORS Configuration
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("CORS_ALLOWED_ORIGINS"),
+										Value: pulumi.String("http://localhost:4200,http://kmm-ui.traefik.me"),
+									},
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("CORS_ALLOWED_METHODS"),
+										Value: pulumi.String("GET, POST, PUT, DELETE, OPTIONS"),
+									},
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("CORS_ALLOWED_HEADERS"),
+										Value: pulumi.String("Content-Type, Authorization, X-User-Username"),
+									},
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("CORS_ALLOW_CREDENTIALS"),
+										Value: pulumi.String("true"),
+									},
+									// Artist Configuration
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("ARTIST_MIN_COUNT"),
+										Value: pulumi.String("5"),
+									},
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("ARTIST_MAX_COUNT"),
+										Value: pulumi.String("20"),
+									},
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("ARTIST_MAX_NAME_LENGTH"),
+										Value: pulumi.String("240"),
+									},
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("ARTIST_SEARCH_MAX_LENGTH"),
+										Value: pulumi.String("240"),
+									},
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("ARTIST_SEARCH_LIMIT"),
+										Value: pulumi.String("10"),
+									},
+									// Debug Configuration
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("DEBUG_ENABLED"),
+										Value: pulumi.String("false"),
+									},
+									// Legacy environment variables for backward compatibility
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("PORT"),
+										Value: pulumi.String("8080"),
 									},
 									&corev1.EnvVarArgs{
 										Name:  pulumi.String("DATABASE_URL"),
