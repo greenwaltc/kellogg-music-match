@@ -99,7 +99,7 @@ The Pulumi program creates the following Kubernetes resources:
 - **Health Checks**: `pg_isready` probes
 - **Enhanced Features**: 
   - Kellogg student profiles with `program` and `graduation_year` fields
-  - Program validation (2Y, 1Y, MMM, MBAi, JD-MBA, MD-MBA, EWMBA)
+  - Program validation (2Y, 1Y, MMM, MBAi, JD-MBA, MD-MBA, EWMBA, JV)
   - Graduation year constraints (2025-2030)
   - `spearman_distance()`: Hybrid Jaccard + positional correlation algorithm
   - Complete consolidated schema initialization

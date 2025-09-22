@@ -11,8 +11,28 @@ import (
 // corsMiddleware handles CORS headers for cross-origin requests
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Get the origin from the request
+		origin := r.Header.Get("Origin")
+
+		// List of allowed origins
+		allowedOrigins := []string{
+			"http://localhost:4200",    // Local development
+			"http://kmm-ui.traefik.me", // Kubernetes ingress
+		}
+
+		// Check if the origin is allowed
+		var allowedOrigin string
+		for _, allowed := range allowedOrigins {
+			if origin == allowed {
+				allowedOrigin = origin
+				break
+			}
+		}
+
 		// Set CORS headers
-		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:4200")
+		if allowedOrigin != "" {
+			w.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
+		}
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-User-Username")
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
@@ -62,6 +82,6 @@ func main() {
 	// Wrap router with CORS middleware
 	corsRouter := corsMiddleware(router)
 
-	log.Printf("Server listening on :8080 with CORS enabled for http://localhost:4200")
+	log.Printf("Server listening on :8080 with CORS enabled for multiple origins")
 	log.Fatal(http.ListenAndServe(":8080", corsRouter))
 }

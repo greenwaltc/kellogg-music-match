@@ -88,6 +88,7 @@ interface LoginFormShape {
                 <option value="JD-MBA">JD-MBA</option>
                 <option value="MD-MBA">MD-MBA</option>
                 <option value="EWMBA">EWMBA</option>
+                <option value="JV">JV</option>
               </select>
               <div class="error" *ngIf="form.get('program')?.touched && form.get('program')?.invalid">Program selection required</div>
             </div>

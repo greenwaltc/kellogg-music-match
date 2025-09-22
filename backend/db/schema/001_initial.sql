@@ -32,7 +32,7 @@ CREATE TABLE users (
     first_name VARCHAR(100) NOT NULL,
     last_name VARCHAR(100) NOT NULL,
     password_hash TEXT NOT NULL,
-    program VARCHAR(10) CHECK (program IN ('2Y', '1Y', 'MMM', 'MBAi', 'JD-MBA', 'MD-MBA', 'EWMBA')),
+    program VARCHAR(10) CHECK (program IN ('2Y', '1Y', 'MMM', 'MBAi', 'JD-MBA', 'MD-MBA', 'EWMBA', 'JV')),
     graduation_year INTEGER CHECK (graduation_year >= 2025 AND graduation_year <= 2030),
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -267,7 +267,7 @@ COMMENT ON FUNCTION spearman_distance_simple(TEXT[], TEXT[]) IS
 'Simple fallback implementation using Jaccard similarity for text arrays. Calculates 1 - (intersection / union) as distance metric. Pure PostgreSQL implementation without external dependencies.';
 
 -- Column comments
-COMMENT ON COLUMN users.program IS 'MBA program type: 2Y, 1Y, MBAi, MMM, or EWMBA';
+COMMENT ON COLUMN users.program IS 'MBA program type: 2Y, 1Y, MBAi, MMM, EWMBA, JV';
 COMMENT ON COLUMN users.graduation_year IS 'Expected graduation year (current year to 2030)';
 
 

@@ -31,7 +31,7 @@ type User struct {
 	FirstName    string    `json:"first_name"`
 	LastName     string    `json:"last_name"`
 	PasswordHash string    `json:"password_hash"`
-	// MBA program type: 2Y, 1Y, MBAi, MMM, or EWMBA
+	// MBA program type: 2Y, 1Y, MBAi, MMM, EWMBA, JV
 	Program sql.NullString `json:"program"`
 	// Expected graduation year (current year to 2030)
 	GraduationYear sql.NullInt32 `json:"graduation_year"`

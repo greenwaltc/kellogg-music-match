@@ -14,5 +14,5 @@ CREATE INDEX idx_users_program ON users(program);
 CREATE INDEX idx_users_graduation_year ON users(graduation_year);
 
 -- Add comments for documentation
-COMMENT ON COLUMN users.program IS 'MBA program type: 2Y, 1Y, MBAi, MMM, or EWMBA';
+COMMENT ON COLUMN users.program IS 'MBA program type: 2Y, 1Y, MBAi, MMM, EWMBA, JV';
 COMMENT ON COLUMN users.graduation_year IS 'Expected graduation year (current year to 2030)';

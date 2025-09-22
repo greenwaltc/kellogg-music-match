@@ -76,7 +76,7 @@ SELECT a.id, a.name, a.created_at
 FROM artists a
 JOIN user_artists ua ON a.id = ua.artist_id
 WHERE ua.user_id = $1
-ORDER BY a.name;
+ORDER BY ua.rank;
 
 -- name: GetArtistUsers :many
 SELECT u.id, u.username, u.email, u.first_name, u.last_name, u.created_at, u.updated_at

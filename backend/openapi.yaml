@@ -448,7 +448,7 @@ components:
         program:
           type: string
           description: MBA program type
-          enum: ["2Y", "1Y", "MMM", "MBAi", "JD-MBA", "MD-MBA", "EWMBA"]
+          enum: ["2Y", "1Y", "MMM", "MBAi", "JD-MBA", "MD-MBA", "EWMBA", "JV"]
           example: "2Y"
         graduationYear:
           type: integer
@@ -528,7 +528,7 @@ components:
         program:
           type: string
           description: MBA program type
-          enum: ["2Y", "1Y", "MMM", "MBAi", "JD-MBA", "MD-MBA", "EWMBA"]
+          enum: ["2Y", "1Y", "MMM", "MBAi", "JD-MBA", "MD-MBA", "EWMBA", "JV"]
           example: "2Y"
         graduationYear:
           type: integer
@@ -607,7 +607,7 @@ components:
         program:
           type: string
           description: MBA program type
-          enum: ["2Y", "1Y", "MMM", "MBAi", "JD-MBA", "MD-MBA", "EWMBA"]
+          enum: ["2Y", "1Y", "MMM", "MBAi", "JD-MBA", "MD-MBA", "EWMBA", "JV"]
           example: "2Y"
         graduationYear:
           type: integer

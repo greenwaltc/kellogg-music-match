@@ -9,7 +9,7 @@ Angular standalone (v17+) application for Kellogg student registration, authenti
   - Personal Details: Username, email, first name, last name
   - Kellogg Profile: Program selection and graduation year
   - Password Security: Strong password requirements with real-time validation
-- **Program Selection**: Dropdown for Kellogg programs (2Y, 1Y, MMM, MBAi, JD-MBA, MD-MBA, EWMBA)
+- **Program Selection**: Dropdown for Kellogg programs (2Y, 1Y, MMM, MBAi, JD-MBA, MD-MBA, EWMBA, JV)
 - **Graduation Year**: Validation for years 2025-2030
 - **Strong Password Requirements**: 
   - Minimum 8 characters
