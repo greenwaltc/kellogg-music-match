@@ -270,17 +270,17 @@ var _ = Describe("Music Matching Engine Behavior", func() {
 	})
 })
 
-// Test to validate the algorithm behavior that matches database function expectations
-var _ = Describe("Algorithm Validation Against Database Distance Function", func() {
+// Test to validate the algorithm behavior that matches database PWO function expectations
+var _ = Describe("Algorithm Validation Against Database PWO Function", func() {
 	var matchingEngine *business.MatchingEngine
 
 	BeforeEach(func() {
 		matchingEngine = business.NewMatchingEngine()
 	})
 
-	Context("comparing with expected spearman_distance outcomes", func() {
+	Context("comparing with expected PWO distance outcomes", func() {
 		It("should produce high scores for cases that would give distance=0 in database", func() {
-			// Identical preferences should produce maximum Jaccard similarity
+			// Identical preferences should produce maximum Jaccard similarity (in-memory fallback)
 			targetArtists := []string{"Tool", "Radiohead", "Pink Floyd"}
 			identicalUser := &generated.User{
 				Username: "identical",
@@ -294,7 +294,7 @@ var _ = Describe("Algorithm Validation Against Database Distance Function", func
 		})
 
 		It("should produce moderate scores for cases that would give distance=0.7 in database", func() {
-			// Subset relationships should produce moderate Jaccard similarity
+			// Subset relationships should produce moderate Jaccard similarity (in-memory fallback)
 			targetArtists := []string{"Tool"}
 			supersetUser := &generated.User{
 				Username: "superset",
@@ -309,7 +309,7 @@ var _ = Describe("Algorithm Validation Against Database Distance Function", func
 		})
 
 		It("should produce no matches for cases that would give distance=2.0 in database", func() {
-			// No overlap should produce no matches in the engine
+			// No overlap should produce no matches in the engine (in-memory fallback)
 			targetArtists := []string{"Tool", "Radiohead"}
 			differentUser := &generated.User{
 				Username: "different",

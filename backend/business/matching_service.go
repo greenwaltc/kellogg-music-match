@@ -278,17 +278,15 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 		}
 		fmt.Printf("DEBUG: User %s - overlap: %d, distance: %.3f, artists: %v\n", row.Username, overlapCount, row.Distance, artistNames)
 
-		// Use the enhanced hybrid similarity score directly from PostgreSQL
-		// The spearman_distance function now includes:
-		// - Jaccard similarity (intersection/union)
-		// - Positional correlation for shared items
-		// - Size penalty for variable-length lists
-		// Distance ranges from 0 (identical) to 2 (completely different)
+		// Use the PWO distance metric directly from PostgreSQL
+		// The pwo_distance function provides position-weighted overlap scoring
+		// Distance ranges from 0 (identical) to 1 (completely different)
 
 		// Convert distance to similarity score (0-1 range, higher is better)
-		score := float32(1.0 - row.Distance)
+		distance := row.Distance
+		score := float32(1.0 - distance)
 
-		fmt.Printf("DEBUG: User %s - hybrid distance: %.3f, similarity score: %.3f\n", row.Username, row.Distance, score)
+		fmt.Printf("DEBUG: User %s - PWO distance: %.3f, similarity score: %.3f\n", row.Username, distance, score)
 
 		match := &generated.MatchUser{
 			Name:           fmt.Sprintf("%s %s", row.FirstName, row.LastName),

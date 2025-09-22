@@ -1,5 +1,5 @@
 # Custom PostgreSQL image with Python scientific libraries
-FROM postgres:15
+FROM postgres:16
 
 # Install Python dependencies as root
 USER root
@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y \
     python3-dev \
     python3-numpy \
     python3-scipy \
-    postgresql-plpython3-15 \
+    postgresql-plpython3-16 \
     && rm -rf /var/lib/apt/lists/*
 
 # Verify installation

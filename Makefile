@@ -1,7 +1,16 @@
 # Kellogg Music Match - Top-Level Makefile
 # Orchestrates backend, UI, and infrastructure deployment
 
-.PHONY: help backend-% ui-% infra-% docker-% dev-% clean-% check status logs
+.PHONY: help backend-% ui-% infra-% docker-% dev-db-re	@ec	@echo "🔄 Resetting database with fresh schema..."
+	@echo "🔽 Step 1: Stopping containers...""🔽 Step 1: Stopping containers..."
+	@docker-compose down
+	@echo "🗑️  Step 2: Removing postgres volume to force reinitialization..."
+	@docker volume rm kellogg-music-match_postgres_data 2>/dev/null || true
+	@echo "🚀 Step 3: Starting postgres with fresh schema..."
+	@docker-compose up -d postgres
+	@echo "⏳ Step 4: Waiting for database to be ready..." Reset database with fresh schema from migrations
+	@echo "🔄 Resetting database with fresh schema..."
+	@echo "🔽 Step 1: Stopping containers..."ean-% check status logs
 
 # Default target
 help: ## Show this help message
@@ -20,13 +29,9 @@ help: ## Show this help message
 	@echo "  test-behavioral       Run Ginkgo behavioral tests"
 	@echo "  test-quick           Run quick unit tests only"
 	@echo ""
-	@echo "Schema management:"
-	@echo "  sync-schema           Sync DATABASE_SCHEMA.sql from backend/db/schema/*.sql"
-	@echo "  check-schema-sync     Verify schema files are synchronized"
-	@echo "  create-migration      Create new migration file (make create-migration name=add_feature)"
+	@echo "Database migrations:"
+	@echo "  create-migration      Create new Flyway migration file (make create-migration name=add_feature)"
 	@echo "  db-reset              Reset database with guaranteed fresh schema"
-	@echo "  db-schema-verify      Verify database schema matches expected structure"
-	@echo "  db-force-schema-sync  Nuclear option: force complete reset with schema sync"
 	@echo ""
 	@echo "Quick development workflow:"
 	@echo "  ./dev.sh start        Start full application"
@@ -38,10 +43,10 @@ help: ## Show this help message
 ## 🏗️  BUILD & DEVELOPMENT
 ## =============================================================================
 
-build: sync-schema backend-build ui-build ## Build both backend and UI (includes schema sync)
+build: backend-build ui-build ## Build both backend and UI
 	@echo "✅ Full application build complete!"
 
-dev: sync-schema ## Start full development environment (includes schema sync)
+dev: ## Start full development environment  
 	@echo "🚀 Starting full development environment..."
 	@echo "📋 Using docker-compose for reliable service management"
 	@docker-compose up -d
@@ -71,12 +76,12 @@ clean: backend-clean ui-clean docker-clean ## Clean all build artifacts
 ## 🐳  DOCKER OPERATIONS
 ## =============================================================================
 
-docker-build: sync-schema ## Build all Docker images (includes schema sync)
+docker-build: ## Build all Docker images
 	@echo "🐳 Building all Docker images..."
 	@docker-compose build --parallel
 	@echo "✅ All Docker images built!"
 
-docker-build-backend: sync-schema ## Build backend Docker image only (includes schema sync)
+docker-build-backend: ## Build backend Docker image only
 	@echo "🐳 Building backend Docker image..."
 	@docker-compose build backend
 	@echo "✅ Backend Docker image built!"
@@ -125,77 +130,10 @@ logs: ## Show logs for all services
 	@docker-compose logs
 
 ## =============================================================================
-## 🗄️  DATABASE OPERATIONS
+## �  CONVENIENCE TARGETS
 ## =============================================================================
 
-schema-sync: sync-schema ## Alias for sync-schema
-
-sync-schema: ## Synchronize DATABASE_SCHEMA.sql from all backend schema files
-	@echo "🔄 Synchronizing schema files..."
-	@echo "-- Kellogg Music Match Database Schema" > DATABASE_SCHEMA.sql
-	@echo "-- This file is automatically synchronized from backend/db/schema/*.sql files" >> DATABASE_SCHEMA.sql
-	@echo "-- DO NOT EDIT DIRECTLY - Make changes in backend/db/schema/ and run 'make sync-schema'" >> DATABASE_SCHEMA.sql
-	@echo "-- " >> DATABASE_SCHEMA.sql
-	@echo "-- Schema files are processed in alphabetical order:" >> DATABASE_SCHEMA.sql
-	@for file in backend/db/schema/*.sql; do \
-		if [ -f "$$file" ]; then \
-			echo "-- $$file" >> DATABASE_SCHEMA.sql; \
-		fi; \
-	done
-	@echo "" >> DATABASE_SCHEMA.sql
-	@echo "-- ============================================================================" >> DATABASE_SCHEMA.sql
-	@echo "-- CONSOLIDATED SCHEMA (Auto-generated from backend/db/schema/*.sql)" >> DATABASE_SCHEMA.sql
-	@echo "-- ============================================================================" >> DATABASE_SCHEMA.sql
-	@echo "" >> DATABASE_SCHEMA.sql
-	@for file in backend/db/schema/*.sql; do \
-		if [ -f "$$file" ]; then \
-			echo "-- -------------------------------------------------------------------------" >> DATABASE_SCHEMA.sql; \
-			echo "-- From: $$file" >> DATABASE_SCHEMA.sql; \
-			echo "-- -------------------------------------------------------------------------" >> DATABASE_SCHEMA.sql; \
-			cat "$$file" >> DATABASE_SCHEMA.sql; \
-			echo "" >> DATABASE_SCHEMA.sql; \
-		fi; \
-	done
-	@echo "✅ Schema synchronized from backend/db/schema/*.sql to DATABASE_SCHEMA.sql"
-
-check-schema-sync: ## Check if schema files are synchronized
-	@echo "🔍 Checking schema synchronization..."
-	@temp_file=$$(mktemp) && \
-	echo "-- Kellogg Music Match Database Schema" > $$temp_file && \
-	echo "-- This file is automatically synchronized from backend/db/schema/*.sql files" >> $$temp_file && \
-	echo "-- DO NOT EDIT DIRECTLY - Make changes in backend/db/schema/ and run 'make sync-schema'" >> $$temp_file && \
-	echo "-- " >> $$temp_file && \
-	echo "-- Schema files are processed in alphabetical order:" >> $$temp_file && \
-	for file in backend/db/schema/*.sql; do \
-		if [ -f "$$file" ]; then \
-			echo "-- $$file" >> $$temp_file; \
-		fi; \
-	done && \
-	echo "" >> $$temp_file && \
-	echo "-- ============================================================================" >> $$temp_file && \
-	echo "-- CONSOLIDATED SCHEMA (Auto-generated from backend/db/schema/*.sql)" >> $$temp_file && \
-	echo "-- ============================================================================" >> $$temp_file && \
-	echo "" >> $$temp_file && \
-	for file in backend/db/schema/*.sql; do \
-		if [ -f "$$file" ]; then \
-			echo "-- -------------------------------------------------------------------------" >> $$temp_file; \
-			echo "-- From: $$file" >> $$temp_file; \
-			echo "-- -------------------------------------------------------------------------" >> $$temp_file; \
-			cat "$$file" >> $$temp_file; \
-			echo "" >> $$temp_file; \
-		fi; \
-	done && \
-	if diff -q $$temp_file DATABASE_SCHEMA.sql >/dev/null 2>&1; then \
-		echo "✅ Schema files are synchronized"; \
-		rm $$temp_file; \
-	else \
-		echo "❌ Schema files are out of sync!"; \
-		echo "🔧 Run 'make sync-schema' to synchronize"; \
-		rm $$temp_file; \
-		exit 1; \
-	fi
-
-create-migration: ## Create a new schema migration file (usage: make create-migration name=add_user_roles)
+create-migration: ## Create a new Flyway migration file (usage: make create-migration name=add_user_roles)
 	@if [ -z "$(name)" ]; then \
 		echo "❌ Please provide a migration name: make create-migration name=your_migration_name"; \
 		exit 1; \
@@ -220,7 +158,7 @@ db-test: ## Test database setup
 	@echo "🧪 Testing database..."
 	@./test-docker-compose.sh
 
-db-reset: sync-schema ## Reset database with guaranteed fresh schema (includes schema sync)
+db-reset: ## Reset database with fresh schema from migrations
 	@echo "🔄 Resetting database with fresh schema..."
 	@echo "📋 Step 1: Synchronizing schema files..."
 	@echo "� Step 2: Stopping containers..."
@@ -243,8 +181,8 @@ db-schema-verify: ## Verify database schema matches expected structure
 		(echo "❌ User_artists table missing rank field" && exit 1)
 	@echo "✅ Database schema verification passed!"
 
-db-force-schema-sync: sync-schema db-reset ## Force complete database reset and schema sync (nuclear option)
-	@echo "🚀 Complete database reset with schema sync completed!"
+db-force-reset: db-reset ## Force complete database reset (alias for db-reset)
+	@echo "🚀 Complete database reset completed!"
 
 db-backup: ## Create database backup
 	@echo "💾 Creating database backup..."
@@ -261,7 +199,7 @@ db-help: ## Show database commands
 	@echo "  db-test               Test database setup"
 	@echo "  db-reset              Reset database with guaranteed fresh schema"
 	@echo "  db-schema-verify      Verify database schema matches expected structure"
-	@echo "  db-force-schema-sync  Nuclear option: force complete reset with schema sync"
+	@echo "  db-force-reset        Force complete database reset (alias for db-reset)"
 	@echo "  db-backup             Create backup"
 
 ## =============================================================================

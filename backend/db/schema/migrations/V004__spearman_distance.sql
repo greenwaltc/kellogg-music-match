@@ -1,6 +1,9 @@
 -- Enable plpython3u extension for advanced statistical functions
 CREATE EXTENSION IF NOT EXISTS plpython3u;
 
+-- Drop the old function first to allow parameter name changes
+DROP FUNCTION IF EXISTS spearman_distance(TEXT[], TEXT[]);
+
 -- Create Spearman rank correlation distance function for text arrays (artist names)
 -- This function calculates a distance metric based on artist preference similarity
 -- Returns a distance where 0 = identical preferences, higher values = less similar

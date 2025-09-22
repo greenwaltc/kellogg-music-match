@@ -55,8 +55,6 @@ generate-sqlc: ## Generate SQLC code from SQL schema and queries
 		~/go/bin/sqlc generate; \
 		echo "✅ SQLC installed and code generated!"; \
 	fi
-	@echo "🔄 Synchronizing root DATABASE_SCHEMA.sql..."
-	@cd .. && $(MAKE) sync-schema
 
 clean: ## Clean build artifacts and temporary files
 	@echo "🧹 Cleaning build artifacts..."

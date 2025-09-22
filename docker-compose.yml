@@ -1,7 +1,9 @@
 services:
   # PostgreSQL Database - no initialization scripts, Flyway will handle schema
   postgres:
-    image: postgres:16-alpine
+    build:
+      context: .
+      dockerfile: postgres.dockerfile
     container_name: kmm-postgres
     environment:
       POSTGRES_USER: kellogg_user
@@ -27,7 +29,7 @@ services:
     container_name: kmm-flyway
     command: migrate
     volumes:
-      - ./database/migrations:/flyway/sql:ro
+      - ./backend/db/schema/migrations:/flyway/sql:ro
       - ./database/flyway.conf:/flyway/conf/flyway.conf:ro
     environment:
       FLYWAY_URL: jdbc:postgresql://postgres:5432/kellogg_music_match

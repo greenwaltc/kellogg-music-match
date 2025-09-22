@@ -138,10 +138,10 @@ var _ = Describe("Similarity Algorithm Comprehensive Tests", func() {
 			matches, ok := response.Body.([]*generated.MatchUser)
 			Expect(ok).To(BeTrue())
 
-			// Should find high similarities with users who share multiple artists
+			// Should find high similarities with users who share multiple artists using PWO metric
 			highSimilarityFound := false
 			for _, match := range matches {
-				if match.Score >= 0.25 { // 25% or higher (adjusted for hybrid algorithm)
+				if match.Score >= 0.3 { // 30% or higher PWO similarity
 					highSimilarityFound = true
 					Expect(match.Overlap).To(BeNumerically(">=", 1)) // At least 1 shared artist
 				}
@@ -151,17 +151,17 @@ var _ = Describe("Similarity Algorithm Comprehensive Tests", func() {
 
 		It("should return good similarity for pop users with common artists", func() {
 			response, err := matchingService.FindMusicMatches(ctx, generated.ArtistsRequest{
-				Artists: []string{"Taylor Swift", "Ed Sheeran"}, // Subset of pop preferences
+				Artists: []string{"Taylor Swift", "Ed Sheeran", "Ariana Grande", "Billie Eilish", "Dua Lipa"}, // Full pop list to meet minimum requirement
 			}, testUsers["pop_star"].Username)
 
 			Expect(err).NotTo(HaveOccurred())
 			matches, ok := response.Body.([]*generated.MatchUser)
 			Expect(ok).To(BeTrue())
 
-			// Should find good similarity with users who share Taylor Swift and/or Ed Sheeran
+			// Should find good similarity with users who share Taylor Swift and/or Ed Sheeran using PWO
 			for _, match := range matches {
 				if match.Overlap >= 1 {
-					Expect(match.Score).To(BeNumerically(">", 0.01)) // At least 1% similarity (adjusted for hybrid algorithm)
+					Expect(match.Score).To(BeNumerically(">", 0.0)) // Any positive PWO similarity
 				}
 			}
 		})
@@ -225,11 +225,11 @@ var _ = Describe("Similarity Algorithm Comprehensive Tests", func() {
 			}
 
 			// Eclectic should have highest similarity (most diverse overlap)
-			Expect(eclecticSimilarity).To(BeNumerically(">", 0.06)) // Adjusted for hybrid algorithm
+			Expect(eclecticSimilarity).To(BeNumerically(">", 0.15)) // PWO metric with position weighting
 
 			// Rock and Pop should have moderate similarity (some overlap)
-			Expect(rockSimilarity).To(BeNumerically(">", 0.04)) // Adjusted for hybrid algorithm
-			Expect(popSimilarity).To(BeNumerically(">", 0.04))  // Adjusted for hybrid algorithm
+			Expect(rockSimilarity).To(BeNumerically(">", 0.10)) // PWO metric with position weighting
+			Expect(popSimilarity).To(BeNumerically(">", 0.10))  // PWO metric with position weighting
 		})
 	})
 
@@ -280,7 +280,7 @@ var _ = Describe("Similarity Algorithm Comprehensive Tests", func() {
 	Context("Edge Cases", func() {
 		It("should handle single artist preferences correctly", func() {
 			response, err := matchingService.FindMusicMatches(ctx, generated.ArtistsRequest{
-				Artists: []string{"Beyoncé"},
+				Artists: []string{"Beyoncé", "Rihanna", "Lady Gaga", "Adele", "Alicia Keys"}, // Mix of R&B/Pop to meet minimum
 			}, testUsers["single_artist"].Username)
 
 			Expect(err).NotTo(HaveOccurred())
@@ -292,7 +292,7 @@ var _ = Describe("Similarity Algorithm Comprehensive Tests", func() {
 			for _, match := range matches {
 				if match.Overlap >= 1 {
 					beyonceMatches++
-					Expect(match.Score).To(BeNumerically(">", 0.005)) // Adjusted for hybrid algorithm with size penalty
+					Expect(match.Score).To(BeNumerically(">", 0.01)) // PWO metric - lowered threshold
 				}
 			}
 
@@ -389,7 +389,7 @@ var _ = Describe("Similarity Algorithm Comprehensive Tests", func() {
 				// and lower similarity with different genres
 				highSimilarityCount := 0
 				for _, match := range matches {
-					if match.Score > 0.15 { // Adjusted for hybrid algorithm
+					if match.Score > 0.15 { // PWO metric threshold - lowered
 						highSimilarityCount++
 					}
 				}
@@ -405,7 +405,7 @@ var _ = Describe("Similarity Algorithm Comprehensive Tests", func() {
 			// Test this by checking if these artists create expected connections
 
 			response, err := matchingService.FindMusicMatches(ctx, generated.ArtistsRequest{
-				Artists: []string{"The Beatles"},
+				Artists: []string{"The Beatles", "Led Zeppelin", "Pink Floyd", "The Rolling Stones", "Queen"}, // Classic rock list to meet minimum
 			}, testUsers["rock_fan"].Username)
 
 			Expect(err).NotTo(HaveOccurred())
@@ -415,7 +415,7 @@ var _ = Describe("Similarity Algorithm Comprehensive Tests", func() {
 			// Should find connections to both eclectic and any other Beatles fans
 			beatlesConnections := 0
 			for _, match := range matches {
-				if match.Overlap >= 1 && match.Score > 0.02 { // Adjusted for hybrid algorithm
+				if match.Overlap >= 1 && match.Score > 0.02 { // PWO metric threshold - lowered
 					beatlesConnections++
 				}
 			}
@@ -426,7 +426,7 @@ var _ = Describe("Similarity Algorithm Comprehensive Tests", func() {
 
 	Describe("Duplicate Artist Validation", func() {
 		It("should reject duplicate artists (exact duplicates)", func() {
-			artists := []string{"Taylor Swift", "The Beatles", "Taylor Swift", "Radiohead"}
+			artists := []string{"Taylor Swift", "The Beatles", "Taylor Swift", "Radiohead", "Pink Floyd", "Queen", "AC/DC"}
 
 			response, err := matchingService.FindMusicMatches(ctx, generated.ArtistsRequest{
 				Artists: artists,
@@ -441,7 +441,7 @@ var _ = Describe("Similarity Algorithm Comprehensive Tests", func() {
 		})
 
 		It("should reject duplicate artists (case-insensitive)", func() {
-			artists := []string{"Taylor Swift", "the beatles", "The Beatles", "Radiohead"}
+			artists := []string{"Taylor Swift", "the beatles", "The Beatles", "Radiohead", "Pink Floyd", "Queen", "AC/DC"}
 
 			response, err := matchingService.FindMusicMatches(ctx, generated.ArtistsRequest{
 				Artists: artists,
@@ -456,7 +456,7 @@ var _ = Describe("Similarity Algorithm Comprehensive Tests", func() {
 		})
 
 		It("should reject duplicate artists (with extra whitespace)", func() {
-			artists := []string{"Taylor Swift", " The Beatles ", "the beatles", "Radiohead"}
+			artists := []string{"Taylor Swift", " The Beatles ", "the beatles", "Radiohead", "Pink Floyd", "Queen", "AC/DC"}
 
 			response, err := matchingService.FindMusicMatches(ctx, generated.ArtistsRequest{
 				Artists: artists,
@@ -471,7 +471,7 @@ var _ = Describe("Similarity Algorithm Comprehensive Tests", func() {
 		})
 
 		It("should accept unique artists with similar but different names", func() {
-			artists := []string{"Taylor Swift", "The Beatles", "Beatles", "Taylor"}
+			artists := []string{"Taylor Swift", "The Beatles", "Beatles", "Taylor", "Pink Floyd"}
 
 			response, err := matchingService.FindMusicMatches(ctx, generated.ArtistsRequest{
 				Artists: artists,
@@ -482,7 +482,7 @@ var _ = Describe("Similarity Algorithm Comprehensive Tests", func() {
 		})
 
 		It("should handle empty strings and still validate duplicates", func() {
-			artists := []string{"Taylor Swift", "", "taylor swift", "The Beatles"}
+			artists := []string{"Taylor Swift", "", "taylor swift", "The Beatles", "Pink Floyd", "Queen", "AC/DC"}
 
 			response, err := matchingService.FindMusicMatches(ctx, generated.ArtistsRequest{
 				Artists: artists,
