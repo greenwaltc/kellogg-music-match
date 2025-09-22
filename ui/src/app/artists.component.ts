@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormArray, FormBuilder, FormControl, Validators, FormGroup, AbstractControl, ValidationErrors, ValidatorFn } from '@angular/forms';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Router } from '@angular/router';
+import { OnInit } from '@angular/core';
 import { MatchService, MatchUser, Artist } from './match.service';
 import { environment } from '../environments/environment';
 import { AuthService } from './auth.service';
@@ -347,7 +348,7 @@ interface ArtistsFormShape { artists: FormArray<FormControl<string | null>>; }
     }
   `]
 })
-export class ArtistsComponent {
+export class ArtistsComponent implements OnInit {
   maxArtists = 20;
   minArtists = 5;
   loading = signal(false);
@@ -359,13 +360,23 @@ export class ArtistsComponent {
     // Initialize with 5 empty artist controls
     const initialControls = Array.from({ length: this.minArtists }, () => this.artistControl());
     this.form = this.fb.group<ArtistsFormShape>({ artists: this.fb.array(initialControls, { validators: [this.noDuplicatesValidator, this.minArtistsValidator] }) });
+  }
+
+  ngOnInit(): void {
+    // Clear and reset form for new user session
+    this.initializeForm();
+  }
+
+  private initializeForm(): void {
+    // Clear existing form and error states
+    const arr = this.artistsArray;
+    while (arr.length) arr.removeAt(0);
+    this.error.set(null);
+    this.loading.set(false);
     
     // Prefill for returning users
     const user = this.auth.user();
     if (user?.artists?.length) {
-      const arr = this.artistsArray;
-      while (arr.length) arr.removeAt(0);
-      
       // Add user's existing artists
       user.artists.slice(0, this.maxArtists).forEach((a: string) => 
         arr.push(this.fb.control<string | null>(a, [Validators.required, Validators.minLength(2), Validators.maxLength(240)]))
@@ -373,6 +384,11 @@ export class ArtistsComponent {
       
       // Fill remaining slots up to minimum if needed
       while (arr.length < this.minArtists) {
+        arr.push(this.artistControl());
+      }
+    } else {
+      // Initialize with empty controls for new users
+      for (let i = 0; i < this.minArtists; i++) {
         arr.push(this.artistControl());
       }
     }

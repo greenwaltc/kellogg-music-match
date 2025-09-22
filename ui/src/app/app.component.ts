@@ -23,6 +23,7 @@ export class AppComponent {
 
   logout(): void {
     this.auth.logout();
+    this.matchService.clear();
     this.router.navigateByUrl('/');
   }
 
