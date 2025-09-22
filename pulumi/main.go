@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"strings"
 
 	appsv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/apps/v1"
 	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/core/v1"
@@ -12,17 +13,28 @@ import (
 
 func main() {
 	pulumi.Run(func(ctx *pulumi.Context) error {
-		// Read consolidated database schema file
-		// This schema includes Kellogg-specific enhancements and scientific functions
-		schemaContent, err := os.ReadFile("../DATABASE_SCHEMA.sql")
+		// Read Flyway configuration file
+		flywayConfig, err := os.ReadFile("../database/flyway.conf")
 		if err != nil {
 			return err
 		}
 
-		// Read database initialization script
-		initScriptContent, err := os.ReadFile("../init-database.sh")
+		// Read migration files from the migrations directory
+		migrationFiles := make(pulumi.StringMap)
+		migrationDir := "../database/migrations"
+		entries, err := os.ReadDir(migrationDir)
 		if err != nil {
 			return err
+		}
+
+		for _, entry := range entries {
+			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".sql") {
+				content, err := os.ReadFile(migrationDir + "/" + entry.Name())
+				if err != nil {
+					return err
+				}
+				migrationFiles[entry.Name()] = pulumi.String(string(content))
+			}
 		}
 		// Create the namespace
 		namespace, err := corev1.NewNamespace(ctx, "kmm", &corev1.NamespaceArgs{
@@ -459,7 +471,7 @@ func main() {
 			return err
 		}
 
-		// Create PostgreSQL ConfigMap with consolidated schema and init script
+		// Create PostgreSQL ConfigMap for environment variables only
 		pgConfigMap, err := corev1.NewConfigMap(ctx, "postgres-config", &corev1.ConfigMapArgs{
 			Metadata: &metav1.ObjectMetaArgs{
 				Name:      pulumi.String("postgres-config"),
@@ -470,10 +482,33 @@ func main() {
 				},
 			},
 			Data: pulumi.StringMap{
-				"PGDATA":              pulumi.String("/var/lib/postgresql/data/pgdata"),
-				"init-database.sh":    pulumi.String(string(initScriptContent)),
-				"DATABASE_SCHEMA.sql": pulumi.String(string(schemaContent)),
+				"PGDATA": pulumi.String("/var/lib/postgresql/data/pgdata"),
 			},
+		})
+		if err != nil {
+			return err
+		}
+
+		// Create Flyway ConfigMap with configuration and migration files
+		flywayConfigMapData := pulumi.StringMap{
+			"flyway.conf": pulumi.String(string(flywayConfig)),
+		}
+
+		// Add all migration files to the ConfigMap
+		for filename, content := range migrationFiles {
+			flywayConfigMapData[filename] = content
+		}
+
+		flywayConfigMap, err := corev1.NewConfigMap(ctx, "flyway-config", &corev1.ConfigMapArgs{
+			Metadata: &metav1.ObjectMetaArgs{
+				Name:      pulumi.String("flyway-config"),
+				Namespace: namespace.Metadata.Name(),
+				Labels: pulumi.StringMap{
+					"app":       pulumi.String("kmm"),
+					"component": pulumi.String("flyway"),
+				},
+			},
+			Data: flywayConfigMapData,
 		})
 		if err != nil {
 			return err
@@ -507,11 +542,47 @@ func main() {
 					},
 					Spec: &corev1.PodSpecArgs{
 						ServiceAccountName: serviceAccount.Metadata.Name(),
+						InitContainers: corev1.ContainerArray{
+							&corev1.ContainerArgs{
+								Name:  pulumi.String("flyway-migrate"),
+								Image: pulumi.String("flyway/flyway:latest"),
+								Command: pulumi.StringArray{
+									pulumi.String("flyway"),
+									pulumi.String("migrate"),
+								},
+								Env: corev1.EnvVarArray{
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("FLYWAY_URL"),
+										Value: pulumi.String("jdbc:postgresql://localhost:5432/kellogg_music_match"),
+									},
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("FLYWAY_USER"),
+										Value: pulumi.String("kellogg_user"),
+									},
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("FLYWAY_PASSWORD"),
+										Value: pulumi.String("kellogg_secure_pass_2024"),
+									},
+								},
+								VolumeMounts: corev1.VolumeMountArray{
+									&corev1.VolumeMountArgs{
+										Name:      pulumi.String("flyway-config"),
+										MountPath: pulumi.String("/flyway/conf"),
+										ReadOnly:  pulumi.Bool(true),
+									},
+									&corev1.VolumeMountArgs{
+										Name:      pulumi.String("flyway-migrations"),
+										MountPath: pulumi.String("/flyway/sql"),
+										ReadOnly:  pulumi.Bool(true),
+									},
+								},
+							},
+						},
 						Containers: corev1.ContainerArray{
 							&corev1.ContainerArgs{
 								Name:            pulumi.String("postgres"),
-								Image:           pulumi.String("kellogg-music-match-postgres:latest"),
-								ImagePullPolicy: pulumi.String("Never"),
+								Image:           pulumi.String("postgres:16-alpine"),
+								ImagePullPolicy: pulumi.String("IfNotPresent"),
 								Ports: corev1.ContainerPortArray{
 									&corev1.ContainerPortArgs{
 										ContainerPort: pulumi.Int(5432),
@@ -534,11 +605,6 @@ func main() {
 									&corev1.VolumeMountArgs{
 										Name:      pulumi.String("postgres-storage"),
 										MountPath: pulumi.String("/var/lib/postgresql/data"),
-									},
-									&corev1.VolumeMountArgs{
-										Name:      pulumi.String("init-scripts"),
-										MountPath: pulumi.String("/docker-entrypoint-initdb.d"),
-										ReadOnly:  pulumi.Bool(true),
 									},
 								},
 								Resources: &corev1.ResourceRequirementsArgs{
@@ -585,21 +651,23 @@ func main() {
 						},
 						Volumes: corev1.VolumeArray{
 							&corev1.VolumeArgs{
-								Name: pulumi.String("init-scripts"),
+								Name: pulumi.String("flyway-config"),
 								ConfigMap: &corev1.ConfigMapVolumeSourceArgs{
-									Name: pgConfigMap.Metadata.Name(),
+									Name: flywayConfigMap.Metadata.Name(),
 									Items: corev1.KeyToPathArray{
 										&corev1.KeyToPathArgs{
-											Key:  pulumi.String("init-database.sh"),
-											Path: pulumi.String("init-database.sh"),
-											Mode: pulumi.Int(0755),
-										},
-										&corev1.KeyToPathArgs{
-											Key:  pulumi.String("DATABASE_SCHEMA.sql"),
-											Path: pulumi.String("DATABASE_SCHEMA.sql"),
+											Key:  pulumi.String("flyway.conf"),
+											Path: pulumi.String("flyway.conf"),
 											Mode: pulumi.Int(0644),
 										},
 									},
+								},
+							},
+							&corev1.VolumeArgs{
+								Name: pulumi.String("flyway-migrations"),
+								ConfigMap: &corev1.ConfigMapVolumeSourceArgs{
+									Name:        flywayConfigMap.Metadata.Name(),
+									DefaultMode: pulumi.Int(0644),
 								},
 							},
 						},
