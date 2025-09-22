@@ -25,11 +25,11 @@ func main() {
 			return err
 		}
 		// Create the namespace
-		namespace, err := corev1.NewNamespace(ctx, "kellogg-music-match", &corev1.NamespaceArgs{
+		namespace, err := corev1.NewNamespace(ctx, "kmm", &corev1.NamespaceArgs{
 			Metadata: &metav1.ObjectMetaArgs{
-				Name: pulumi.String("kellogg-music-match"),
+				Name: pulumi.String("kmm"),
 				Labels: pulumi.StringMap{
-					"app": pulumi.String("kellogg-music-match"),
+					"app": pulumi.String("kmm"),
 				},
 			},
 		})
@@ -38,12 +38,12 @@ func main() {
 		}
 
 		// Create the service account
-		serviceAccount, err := corev1.NewServiceAccount(ctx, "kellogg-music-match-sa", &corev1.ServiceAccountArgs{
+		serviceAccount, err := corev1.NewServiceAccount(ctx, "kmm-sa", &corev1.ServiceAccountArgs{
 			Metadata: &metav1.ObjectMetaArgs{
-				Name:      pulumi.String("kellogg-music-match"),
+				Name:      pulumi.String("kmm"),
 				Namespace: namespace.Metadata.Name(),
 				Labels: pulumi.StringMap{
-					"app": pulumi.String("kellogg-music-match"),
+					"app": pulumi.String("kmm"),
 				},
 			},
 		})
@@ -54,10 +54,10 @@ func main() {
 		// Create ConfigMap for UI configuration with Kellogg-specific backend URL
 		uiConfigMap, err := corev1.NewConfigMap(ctx, "ui-config", &corev1.ConfigMapArgs{
 			Metadata: &metav1.ObjectMetaArgs{
-				Name:      pulumi.String("kellogg-music-match-ui-config"),
+				Name:      pulumi.String("kmm-ui-config"),
 				Namespace: namespace.Metadata.Name(),
 				Labels: pulumi.StringMap{
-					"app":       pulumi.String("kellogg-music-match"),
+					"app":       pulumi.String("kmm"),
 					"component": pulumi.String("ui"),
 				},
 			},
@@ -72,10 +72,10 @@ func main() {
 		// Create backend deployment with enhanced database integration
 		backendDeployment, err := appsv1.NewDeployment(ctx, "backend-deployment", &appsv1.DeploymentArgs{
 			Metadata: &metav1.ObjectMetaArgs{
-				Name:      pulumi.String("kellogg-music-match-backend"),
+				Name:      pulumi.String("kmm-backend"),
 				Namespace: namespace.Metadata.Name(),
 				Labels: pulumi.StringMap{
-					"app":       pulumi.String("kellogg-music-match"),
+					"app":       pulumi.String("kmm"),
 					"component": pulumi.String("backend"),
 				},
 			},
@@ -83,14 +83,14 @@ func main() {
 				Replicas: pulumi.Int(2),
 				Selector: &metav1.LabelSelectorArgs{
 					MatchLabels: pulumi.StringMap{
-						"app":       pulumi.String("kellogg-music-match"),
+						"app":       pulumi.String("kmm"),
 						"component": pulumi.String("backend"),
 					},
 				},
 				Template: &corev1.PodTemplateSpecArgs{
 					Metadata: &metav1.ObjectMetaArgs{
 						Labels: pulumi.StringMap{
-							"app":       pulumi.String("kellogg-music-match"),
+							"app":       pulumi.String("kmm"),
 							"component": pulumi.String("backend"),
 						},
 					},
@@ -176,10 +176,10 @@ func main() {
 		// Create backend service
 		backendService, err := corev1.NewService(ctx, "backend-service", &corev1.ServiceArgs{
 			Metadata: &metav1.ObjectMetaArgs{
-				Name:      pulumi.String("kellogg-music-match-backend"),
+				Name:      pulumi.String("kmm-backend"),
 				Namespace: namespace.Metadata.Name(),
 				Labels: pulumi.StringMap{
-					"app":       pulumi.String("kellogg-music-match"),
+					"app":       pulumi.String("kmm"),
 					"component": pulumi.String("backend"),
 				},
 			},
@@ -194,7 +194,7 @@ func main() {
 					},
 				},
 				Selector: pulumi.StringMap{
-					"app":       pulumi.String("kellogg-music-match"),
+					"app":       pulumi.String("kmm"),
 					"component": pulumi.String("backend"),
 				},
 			},
@@ -206,10 +206,10 @@ func main() {
 		// Create UI deployment with Kellogg student profile support
 		uiDeployment, err := appsv1.NewDeployment(ctx, "ui-deployment", &appsv1.DeploymentArgs{
 			Metadata: &metav1.ObjectMetaArgs{
-				Name:      pulumi.String("kellogg-music-match-ui"),
+				Name:      pulumi.String("kmm-ui"),
 				Namespace: namespace.Metadata.Name(),
 				Labels: pulumi.StringMap{
-					"app":       pulumi.String("kellogg-music-match"),
+					"app":       pulumi.String("kmm"),
 					"component": pulumi.String("ui"),
 				},
 			},
@@ -217,14 +217,14 @@ func main() {
 				Replicas: pulumi.Int(2),
 				Selector: &metav1.LabelSelectorArgs{
 					MatchLabels: pulumi.StringMap{
-						"app":       pulumi.String("kellogg-music-match"),
+						"app":       pulumi.String("kmm"),
 						"component": pulumi.String("ui"),
 					},
 				},
 				Template: &corev1.PodTemplateSpecArgs{
 					Metadata: &metav1.ObjectMetaArgs{
 						Labels: pulumi.StringMap{
-							"app":       pulumi.String("kellogg-music-match"),
+							"app":       pulumi.String("kmm"),
 							"component": pulumi.String("ui"),
 						},
 					},
@@ -295,10 +295,10 @@ func main() {
 		// Create UI service
 		uiService, err := corev1.NewService(ctx, "ui-service", &corev1.ServiceArgs{
 			Metadata: &metav1.ObjectMetaArgs{
-				Name:      pulumi.String("kellogg-music-match-ui"),
+				Name:      pulumi.String("kmm-ui"),
 				Namespace: namespace.Metadata.Name(),
 				Labels: pulumi.StringMap{
-					"app":       pulumi.String("kellogg-music-match"),
+					"app":       pulumi.String("kmm"),
 					"component": pulumi.String("ui"),
 				},
 			},
@@ -313,7 +313,7 @@ func main() {
 					},
 				},
 				Selector: pulumi.StringMap{
-					"app":       pulumi.String("kellogg-music-match"),
+					"app":       pulumi.String("kmm"),
 					"component": pulumi.String("ui"),
 				},
 			},
@@ -323,12 +323,12 @@ func main() {
 		}
 
 		// Create ingress for both UI and backend
-		ingress, err := networkingv1.NewIngress(ctx, "kellogg-music-match-ingress", &networkingv1.IngressArgs{
+		ingress, err := networkingv1.NewIngress(ctx, "kmm-ingress", &networkingv1.IngressArgs{
 			Metadata: &metav1.ObjectMetaArgs{
-				Name:      pulumi.String("kellogg-music-match"),
+				Name:      pulumi.String("kmm"),
 				Namespace: namespace.Metadata.Name(),
 				Labels: pulumi.StringMap{
-					"app": pulumi.String("kellogg-music-match"),
+					"app": pulumi.String("kmm"),
 				},
 				Annotations: pulumi.StringMap{
 					"nginx.ingress.kubernetes.io/rewrite-target": pulumi.String("/"),
@@ -348,7 +348,7 @@ func main() {
 									PathType: pulumi.String("Prefix"),
 									Backend: &networkingv1.IngressBackendArgs{
 										Service: &networkingv1.IngressServiceBackendArgs{
-											Name: pulumi.String("kellogg-music-match-ui"),
+											Name: pulumi.String("kmm-ui"),
 											Port: &networkingv1.ServiceBackendPortArgs{
 												Number: pulumi.Int(80),
 											},
@@ -368,7 +368,7 @@ func main() {
 									PathType: pulumi.String("Prefix"),
 									Backend: &networkingv1.IngressBackendArgs{
 										Service: &networkingv1.IngressServiceBackendArgs{
-											Name: pulumi.String("kellogg-music-match-backend"),
+											Name: pulumi.String("kmm-backend"),
 											Port: &networkingv1.ServiceBackendPortArgs{
 												Number: pulumi.Int(8080),
 											},
@@ -391,7 +391,7 @@ func main() {
 				Name:      pulumi.String("postgres-secret"),
 				Namespace: namespace.Metadata.Name(),
 				Labels: pulumi.StringMap{
-					"app":       pulumi.String("kellogg-music-match"),
+					"app":       pulumi.String("kmm"),
 					"component": pulumi.String("database"),
 				},
 			},
@@ -411,7 +411,7 @@ func main() {
 				Name:      pulumi.String("postgres-config"),
 				Namespace: namespace.Metadata.Name(),
 				Labels: pulumi.StringMap{
-					"app":       pulumi.String("kellogg-music-match"),
+					"app":       pulumi.String("kmm"),
 					"component": pulumi.String("database"),
 				},
 			},
@@ -431,7 +431,7 @@ func main() {
 				Name:      pulumi.String("postgres"),
 				Namespace: namespace.Metadata.Name(),
 				Labels: pulumi.StringMap{
-					"app":       pulumi.String("kellogg-music-match"),
+					"app":       pulumi.String("kmm"),
 					"component": pulumi.String("database"),
 				},
 			},
@@ -440,14 +440,14 @@ func main() {
 				Replicas:    pulumi.Int(1),
 				Selector: &metav1.LabelSelectorArgs{
 					MatchLabels: pulumi.StringMap{
-						"app":       pulumi.String("kellogg-music-match"),
+						"app":       pulumi.String("kmm"),
 						"component": pulumi.String("database"),
 					},
 				},
 				Template: &corev1.PodTemplateSpecArgs{
 					Metadata: &metav1.ObjectMetaArgs{
 						Labels: pulumi.StringMap{
-							"app":       pulumi.String("kellogg-music-match"),
+							"app":       pulumi.String("kmm"),
 							"component": pulumi.String("database"),
 						},
 					},
@@ -455,8 +455,9 @@ func main() {
 						ServiceAccountName: serviceAccount.Metadata.Name(),
 						Containers: corev1.ContainerArray{
 							&corev1.ContainerArgs{
-								Name:  pulumi.String("postgres"),
-								Image: pulumi.String("kellogg-music-match-postgres:latest"),
+								Name:            pulumi.String("postgres"),
+								Image:           pulumi.String("kellogg-music-match-postgres:latest"),
+								ImagePullPolicy: pulumi.String("Never"),
 								Ports: corev1.ContainerPortArray{
 									&corev1.ContainerPortArgs{
 										ContainerPort: pulumi.Int(5432),
@@ -579,13 +580,13 @@ func main() {
 				Name:      pulumi.String("postgres"),
 				Namespace: namespace.Metadata.Name(),
 				Labels: pulumi.StringMap{
-					"app":       pulumi.String("kellogg-music-match"),
+					"app":       pulumi.String("kmm"),
 					"component": pulumi.String("database"),
 				},
 			},
 			Spec: &corev1.ServiceSpecArgs{
 				Selector: pulumi.StringMap{
-					"app":       pulumi.String("kellogg-music-match"),
+					"app":       pulumi.String("kmm"),
 					"component": pulumi.String("database"),
 				},
 				Ports: corev1.ServicePortArray{
@@ -619,7 +620,7 @@ func main() {
 		ctx.Export("healthCheckUrl", pulumi.String("http://kmm-backend.traefik.me/health"))
 
 		// Export database connection information
-		ctx.Export("databaseHost", pulumi.String("postgres.kellogg-music-match.svc.cluster.local"))
+		ctx.Export("databaseHost", pulumi.String("postgres.kmm.svc.cluster.local"))
 		ctx.Export("databasePort", pulumi.String("5432"))
 		ctx.Export("databaseName", pulumi.String("kellogg_music_match"))
 		ctx.Export("databaseUser", pulumi.String("kellogg_user"))
