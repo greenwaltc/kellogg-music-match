@@ -142,14 +142,14 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 
 	// Validate we have enough valid artists after filtering
 	validArtistCount := len(artistSet)
-	if validArtistCount < 5 {
+	if validArtistCount < s.artistConfig.MinCount {
 		return generated.Response(http.StatusBadRequest, generated.ErrorResponse{
-			Message: "at least 5 valid artists are required",
+			Message: fmt.Sprintf("at least %d valid artists are required", s.artistConfig.MinCount),
 		}), nil
 	}
-	if validArtistCount > 20 {
+	if validArtistCount > s.artistConfig.MaxCount {
 		return generated.Response(http.StatusBadRequest, generated.ErrorResponse{
-			Message: "maximum of 20 artists allowed",
+			Message: fmt.Sprintf("maximum of %d artists allowed", s.artistConfig.MaxCount),
 		}), nil
 	}
 
