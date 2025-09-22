@@ -32,14 +32,14 @@ postgres:
     start_period: 30s
 ```
 
-### 🔬 **Scientific Database Features**
+### 🔬 **Database Features**
 
-The custom PostgreSQL image includes:
+The PostgreSQL database includes:
 
-- **plpython3u Extension**: Python integration for advanced functions
-- **Scientific Libraries**: scipy, numpy for statistical calculations  
-- **Spearman Distance Function**: Hybrid Jaccard + positional similarity algorithm
-- **TEXT Array Support**: Custom handling for artist preference arrays
+- **Flyway Migrations**: Professional database versioning system
+- **PWO Distance Function**: Position-Weighted Overlap similarity algorithm  
+- **TEXT Array Support**: Efficient handling for artist preference arrays
+- **Performance Indexes**: Optimized for similarity calculations
 
 **Custom Dockerfile (`postgres.dockerfile`):**
 ```dockerfile
@@ -87,7 +87,7 @@ backend:
 **Backend Features:**
 - **SQLC Integration**: Type-safe PostgreSQL operations
 - **Custom Array Handling**: pq.StringArray for TEXT[] arrays
-- **Scientific Similarity**: Leverages spearman_distance function
+- **PWO Similarity**: Leverages pwo_distance function for Position-Weighted Overlap
 - **Behavioral Testing**: Ginkgo tests for algorithm validation
 
 ### 🎨 **Frontend Integration**
@@ -145,21 +145,20 @@ curl -X POST http://localhost:8080/findMusicMatches \
   -H "X-User-Username: testuser" \
   -d '{"artists":["Tool","Radiohead"]}'
 
-# Test scientific function directly
+# Test PWO distance function directly
 docker-compose exec postgres psql -U kellogg_user -d kellogg_music_match -c \
-  "SELECT spearman_distance(ARRAY['Tool'], ARRAY['Tool', 'Radiohead']);"
+  "SELECT pwo_distance(ARRAY['Tool'], ARRAY['Tool', 'Radiohead'], 0.5);"
 ```
 
 #### Verification Results
-- ✅ **Custom PostgreSQL**: Built with plpython3u, scipy, numpy extensions
-- ✅ **Scientific Functions**: spearman_distance function operational
-- ✅ **Database Connection**: PostgreSQL with SQLC integration and custom array handling
-- ✅ **Schema Management**: Multi-file schema system with synchronization
-- ✅ **UserRepository Pattern**: Clean database abstraction layer with scientific functions
+- ✅ **PostgreSQL Database**: Running with Flyway migration system
+- ✅ **PWO Functions**: pwo_distance and pwo_similarity operational
+- ✅ **Database Connection**: PostgreSQL with SQLC integration and array handling
+- ✅ **Migration System**: Flyway professional database versioning
+- ✅ **UserRepository Pattern**: Clean database abstraction layer with PWO functions
 - ✅ **Type Safety**: SQLC-generated Go code for all database operations
-- ✅ **Behavioral Testing**: Ginkgo tests validating algorithm accuracy
-- ✅ **Sample Data**: 10 artists and 3 users with relationships loaded
-- ✅ **Backend Service**: Running and connected to database with scientific calculations
+- ✅ **Behavioral Testing**: Ginkgo tests validating PWO algorithm accuracy
+- ✅ **Backend Service**: Running and connected to database with PWO calculations
 - ✅ **UI Service**: Running at http://localhost:4200
 - ✅ **Health Checks**: PostgreSQL health monitoring working
 
@@ -188,36 +187,34 @@ make test
 make docker-clean
 ```
 
-### 🧪 **Scientific Function Testing**
+### 🧪 **PWO Function Testing**
 
 ```bash
-# Test spearman_distance function with various scenarios
+# Test pwo_distance function with various scenarios
 docker-compose exec postgres psql -U kellogg_user -d kellogg_music_match -c \
-  "SELECT 'Identical' as scenario, spearman_distance(ARRAY['Tool', 'Radiohead'], ARRAY['Tool', 'Radiohead']) as distance;"
+  "SELECT 'Identical' as scenario, pwo_distance(ARRAY['Tool', 'Radiohead'], ARRAY['Tool', 'Radiohead'], 0.5) as distance;"
 
 docker-compose exec postgres psql -U kellogg_user -d kellogg_music_match -c \
-  "SELECT 'Subset' as scenario, spearman_distance(ARRAY['Tool'], ARRAY['Tool', 'Radiohead']) as distance;"
+  "SELECT 'Different order' as scenario, pwo_distance(ARRAY['Tool', 'Radiohead'], ARRAY['Radiohead', 'Tool'], 0.5) as distance;"
 
 docker-compose exec postgres psql -U kellogg_user -d kellogg_music_match -c \
-  "SELECT 'No overlap' as scenario, spearman_distance(ARRAY['Tool'], ARRAY['Beatles']) as distance;"
+  "SELECT 'No overlap' as scenario, pwo_distance(ARRAY['Tool'], ARRAY['Beatles'], 0.5) as distance;"
 
-# Verify extensions are loaded
-docker-compose exec postgres psql -U kellogg_user -d kellogg_music_match -c \
-  "SELECT * FROM pg_available_extensions WHERE name='plpython3u';"
+# Check migration status
+make db-info
 ```
 
 ### 🔄 **Local ↔ Kubernetes Consistency**
 
 | Configuration | Docker Compose | Pulumi/Kubernetes |
 |---------------|----------------|-------------------|
-| **Database Image** | `kellogg-music-match-postgres:latest` | `kellogg-music-match-postgres:latest` |
-| **Scientific Extensions** | plpython3u, scipy, numpy | plpython3u, scipy, numpy |
+| **Database Image** | `postgres:15` | `postgres:15` |
+| **Migration System** | Flyway | Flyway |
 | **Database Name** | `kellogg_music_match` | `kellogg_music_match` |
 | **Database User** | `kellogg_user` | `kellogg_user` |
 | **Database Password** | `kellogg_secure_pass_2024` | `kellogg_secure_pass_2024` |
-| **Schema Source** | `DATABASE_SCHEMA.sql` | `DATABASE_SCHEMA.sql` (via ConfigMap) |
-| **Scientific Functions** | `spearman_distance` | `spearman_distance` |
-| **Initialization** | `init-database.sh` | `init-database.sh` (via ConfigMap) |
+| **PWO Functions** | `pwo_distance`, `pwo_similarity` | `pwo_distance`, `pwo_similarity` |
+| **Migration Source** | `database/migrations/` | `database/migrations/` (via ConfigMap) |
 | **Data Persistence** | Named volume | StatefulSet PVC |
 
 ### 📋 **Database Connection Details**

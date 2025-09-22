@@ -20,7 +20,7 @@ This document describes the PostgreSQL database setup for the Kellogg Music Matc
 
 ### Architecture Features
 - **SQLC Integration**: Type-safe Go code generated from SQL queries
-- **Multi-file Schema**: Schema managed in `backend/db/schema/*.sql` files
+- **Flyway Migrations**: Professional database versioning with incremental schema updates
 - **UserRepository Pattern**: Clean database abstraction layer
 - **UUID Support**: Proper UUID format with performance indexes
 - **Normalized Design**: Artists and user relationships properly structured
@@ -33,36 +33,32 @@ This document describes the PostgreSQL database setup for the Kellogg Music Matc
 
 ## 🏗️ Database Schema Management
 
-### Consolidated Schema Architecture
-The database schema has been consolidated into a single initial migration for better maintainability:
+### Flyway Migration Architecture
+The database schema uses Flyway for professional database versioning:
 
 ```
+database/
+├── migrations/                # Flyway migration files
+│   ├── V001__initial_schema.sql       # Initial database structure
+│   ├── V002__add_user_profiles.sql    # User profile enhancements
+│   ├── ...                            # Progressive migrations
+│   └── V010__pwo_metric.sql           # Latest PWO distance function
 backend/db/
-├── schema/                    # Source schema files (single source of truth)
-│   ├── 001_initial.sql       # ✅ Consolidated initial schema (replaces 9 migration files)
-│   └── [future migrations]   # Additional schema changes as needed
-├── queries/                  # SQLC query definitions
-│   └── queries.sql          # Type-safe SQL queries for Go code generation
-└── sqlc/                    # Generated Go code (do not edit directly)
-    ├── db.go               # Database interface and configuration
-    ├── models.go           # Go structs for database tables
-    ├── querier.go          # Query interface
-    └── queries.sql.go      # Generated query methods
+├── queries/                   # SQLC query definitions
+│   └── queries.sql           # Type-safe SQL queries for Go code generation
+└── sqlc/                     # Generated Go code (do not edit directly)
+    ├── db.go                # Database interface and configuration
+    ├── models.go            # Go structs for database tables
+    ├── querier.go           # Query interface
+    └── queries.sql.go       # Generated query methods
 ```
 
-### Schema Synchronization Process
-1. **Source Files**: All schema changes made in `backend/db/schema/*.sql`
-2. **Auto-Generation**: `DATABASE_SCHEMA.sql` is automatically generated from schema files
-3. **Docker Integration**: The generated schema is mounted as `/docker-entrypoint-initdb.d/01-schema.sql`
-4. **Fresh Initialization**: Database containers initialize with the consolidated schema
-
-### Schema Synchronization
-The project uses a multi-file schema system with automatic synchronization:
-
-1. **Source Files**: Make schema changes in `backend/db/schema/*.sql`
-2. **Synchronization**: Run `make schema-sync` to update `DATABASE_SCHEMA.sql`
-3. **Code Generation**: Run `make backend-sqlc` to regenerate Go code
-4. **Version Control**: Commit both schema files and generated code
+### Migration Management Process
+1. **Create Migration**: Use `make create-migration name=description` to create new migration file
+2. **Edit Migration**: Add SQL changes to the generated file in `database/migrations/`
+3. **Apply Migrations**: Run `make db-migrate` to apply pending migrations
+4. **Code Generation**: Run `make backend-sqlc` to regenerate Go code if queries changed
+5. **Version Control**: Commit migration files and generated code
 
 ### SQLC Integration
 - **Type Safety**: All database operations use generated Go structs
@@ -173,17 +169,14 @@ dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 The project includes comprehensive database management commands for reliable development:
 
 ```bash
-# Schema Management
-make sync-schema           # Sync DATABASE_SCHEMA.sql from backend/db/schema/*.sql
-make check-schema-sync     # Verify schema files are synchronized
-make create-migration name=feature  # Create new migration file
+# Migration Management
+make create-migration name=feature  # Create new Flyway migration file
+make db-migrate            # Apply pending Flyway migrations
+make db-info               # Show Flyway migration status
+make db-clean              # Clean database schema
 
-# Database Reset & Verification
-make db-reset              # Complete database reset with guaranteed fresh schema
-make db-schema-verify      # Verify database schema matches expected structure
-make db-force-schema-sync  # Nuclear option: force complete reset with schema sync
-
-# Development Database Operations
+# Database Operations
+make db-reset              # Complete database reset with Flyway migrations
 make db-start              # Start PostgreSQL database only
 make db-status             # Show database status and connection info
 make db-connect            # Connect with psql interactive shell
@@ -224,8 +217,8 @@ docker-compose logs postgres
 # Generate SQLC code after schema changes
 make backend-sqlc
 
-# Synchronize schema files
-make schema-sync
+# Apply migrations to database
+make db-migrate
 ```
 
 ### Production Deployment

@@ -152,10 +152,10 @@ curl -X POST https://music-match.kellogg.northwestern.edu/register \
   -H "Content-Type: application/json" \
   -d '{"username":"test","email":"test@kellogg.northwestern.edu","password":"Test123!","firstName":"Test","lastName":"User","program":"2Y","graduationYear":2026}'
 
-# Test database scientific functions
+# Test database PWO functions
 kubectl exec -it -n kellogg-music-match-prod postgres-0 -- \
   psql -U kellogg_user -d kellogg_music_match \
-  -c "SELECT spearman_distance(ARRAY['Tool', 'Radiohead'], ARRAY['Tool', 'Radiohead']);"
+  -c "SELECT pwo_distance(ARRAY['Tool', 'Radiohead'], ARRAY['Tool', 'Radiohead'], 0.5);"
 ```
 
 ## 📈 Scaling Considerations

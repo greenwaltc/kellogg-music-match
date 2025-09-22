@@ -1,6 +1,6 @@
 # 🎵 Kellogg Music Match
 
-A professional full-stack music taste matching application designed for Kellogg students, featuring Go backend, Angular frontend, PostgreSQL database with scientific extensions, and automated infrastructure deployment.
+A professional full-stack music taste matching application designed for Kellogg students, featuring Go backend, Angular frontend, PostgreSQL database with scientific PWO distance metric, and automated infrastructure deployment.
 
 ## 🏗️ Architecture Overview
 
@@ -9,8 +9,7 @@ kellogg-music-match/
 ├── backend/              # Go backend with OpenAPI generation
 ├── ui/                  # Angular frontend application  
 ├── pulumi/              # Infrastructure as Code (Pulumi)
-├── DATABASE_SCHEMA.sql  # PostgreSQL database schema
-├── init-database.sh     # Database initialization script
+├── database/            # Flyway migrations and configuration
 ├── dev.sh              # Development environment helper
 ├── Makefile            # Top-level orchestration
 └── docker-compose.yml  # Local development environment
@@ -19,29 +18,29 @@ kellogg-music-match/
 ### 🔧 Backend
 - **Go 1.22+** with OpenAPI-generated server
 - **Clean Architecture** - Generated code separated from business logic
-- **Custom PostgreSQL Integration** - Complete database migration with scientific extensions
+- **PostgreSQL Integration** - Flyway migrations with scientific PWO distance function
 - **UserRepository Interface** - Clean abstraction layer for database operations
-- **Scientific Similarity Engine** - Hybrid Jaccard + positional correlation algorithm for music matching
+- **PWO Distance Metric** - Position-Weighted Overlap algorithm for scientifically accurate music matching
 - **REST API** with authentication, user management, and music matching
-- **Comprehensive Testing** - Unit tests + Ginkgo behavioral tests for algorithm validation
+- **Comprehensive Testing** - Unit tests + Ginkgo behavioral tests with PWO algorithm validation
 - **Docker** containerization with multi-stage builds
 
 ### 🗄️ Database
-- **Custom PostgreSQL 15** with **plpython3u extension** and scientific libraries (scipy, numpy)
-- **Scientific Similarity Calculations** - Custom `spearman_distance` function with hybrid Jaccard + positional correlation algorithm
+- **PostgreSQL 15** with **PWO distance function** for position-weighted overlap calculations
+- **Scientific Similarity Calculations** - Custom `pwo_distance` function with position-weighted overlap algorithm
 - **SQLC Integration** - Type-safe Go code generated from SQL queries
-- **Consolidated Schema Management** - Single migration file in `backend/db/schema/001_initial.sql`
-- **Automatic Schema Synchronization** - `DATABASE_SCHEMA.sql` auto-generated from schema files
+- **Flyway Migrations** - Professional database versioning and migration management
 - **Enhanced Database Pipeline** - Reset, verification, and sync guarantees in development workflow
 - **UserRepository Interface** - Clean abstraction layer for database operations
 - **UUID Support** - Proper UUID format with performance indexes
 - **User Management** - Complete profile support including program and graduation year
-- **Music Matching** - Artist relationships with scientifically accurate similarity scoring
+- **Music Matching** - Artist relationships with PWO-based similarity scoring
 - **Performance Optimized** - Comprehensive indexes and foreign key constraints
 
 ### 🎨 Frontend  
 - **Angular 17+** with reactive forms and modern UI
 - **Real-time validation** for password complexity and user input
+- **State Management** - Robust user session handling with automatic match clearing on user change
 - **Responsive design** optimized for music discovery
 - **Docker** containerization with Nginx
 
@@ -137,15 +136,11 @@ docker-compose up -d
 # Start PostgreSQL database only
 docker-compose up -d postgres
 
-# Database management (new enhanced pipeline)
-make db-reset              # Complete database reset with fresh schema
-make db-schema-verify      # Verify database structure matches expected
-make db-force-schema-sync  # Nuclear option: complete reset with schema sync
-make sync-schema           # Sync DATABASE_SCHEMA.sql from backend files
-
-# Schema management
-make create-migration name=add_feature  # Create new migration file
-make check-schema-sync     # Verify schema files are synchronized
+# Database management (Flyway migration system)
+make db-reset              # Complete database reset with Flyway migrations
+make db-migrate            # Apply pending Flyway migrations
+make db-clean              # Clean database schema
+make create-migration name=add_feature  # Create new Flyway migration file
 
 # Direct database access
 docker exec -it kmm-postgres psql -U kellogg_user -d kellogg_music_match
@@ -168,7 +163,6 @@ make build          # Build both backend and UI
 make test           # Run all tests
 make check          # Run all checks (lint, test, format)
 make clean          # Clean all build artifacts
-make schema-sync    # Synchronize database schema files
 ```
 
 ### 🐳 Docker Operations
@@ -224,20 +218,20 @@ The application uses PostgreSQL with a comprehensive schema including:
 
 ### Database Architecture
 - **UserRepository Interface**: Clean abstraction layer separating business logic from database operations
-- **Custom PostgreSQL Implementation**: Full CRUD operations with scientific extensions (plpython3u, scipy, numpy)
-- **Spearman Distance Function**: PostgreSQL function implementing hybrid similarity algorithm:
-  - **Jaccard Similarity** (70% weight): Measures artist overlap between users
-  - **Positional Correlation** (30% weight): Considers ranking/order of shared artists  
-  - **Distance Values**: 0 (identical), 0.7 (subset), 2.0 (no overlap)
+- **Flyway Migration System**: Professional database versioning with incremental schema updates (V001-V010)
+- **PWO Distance Function**: PostgreSQL function implementing Position-Weighted Overlap algorithm:
+  - **Position-Weighted Overlap (PWO)**: Scientific similarity metric considering both artist overlap and positional importance
+  - **Configurable Alpha Parameter**: Controls position sensitivity in overlap calculations
+  - **Distance Values**: 0.0 (identical lists) to 1.0 (completely different)
+  - **Similarity Calculation**: 1.0 - pwo_distance for intuitive scoring (higher = more similar)
 - **Type Safety**: SQLC generates type-safe Go structs and methods from SQL queries
 - **Environment Variables**: Configurable connection parameters (DB_HOST, DB_PORT, DB_NAME, etc.)
 
 ### Sample Data
 The development database includes:
-- **10 Popular Artists**: Taylor Swift, The Beatles, Radiohead, Beyoncé, etc.
-- **3 Test Users**: alice, bob, charlie (password: `password123`)
-- **Sample Relationships**: Pre-configured music preferences for testing similarity algorithms
-- **Spearman Distance Function**: PostgreSQL function for scientific similarity calculations
+- **Test Users**: Configurable through registration with full profile support
+- **Music Preferences**: User-artist relationships for testing PWO similarity calculations
+- **PWO Distance Function**: PostgreSQL function for Position-Weighted Overlap calculations
 
 ### Database Connection
 ```bash
@@ -257,17 +251,13 @@ Password: [from kubernetes secret]
 ```
 
 ### Database Files
-- **`DATABASE_SCHEMA.sql`**: Complete PostgreSQL schema with tables, indexes, functions, and sample data
-- **`backend/db/schema/*.sql`**: Multi-file schema source (single source of truth)
-  - `001_initial.sql`: Base tables and relationships
-  - `002_spearman_func.sql`: Initial similarity function
-  - `003_add_rank.sql`: Ranking support
-  - `004_spearman_distance.sql`: Hybrid Jaccard + positional similarity algorithm
+- **`database/migrations/`**: Flyway migration files (V001 through V010)
+  - `V001__initial_schema.sql`: Base tables and relationships
+  - `V010__pwo_metric.sql`: Latest PWO distance function implementation
 - **`backend/db/queries/queries.sql`**: SQLC query definitions for type-safe Go code generation
 - **`backend/sqlc.yaml`**: SQLC configuration for code generation
-- **`init-database.sh`**: Initialization script for automatic setup
 - **`DATABASE_SCHEMA.md`**: Comprehensive documentation with examples and queries
-- **`postgres.dockerfile`**: Custom PostgreSQL image with scientific libraries
+- **`postgres.dockerfile`**: PostgreSQL image configuration
 
 ## 🔄 Development Workflows
 
@@ -339,16 +329,16 @@ make deploy-prod
 ```bash
 make test-behavioral  # Run Ginkgo behavioral tests
 ```
-- **Identical Preferences**: Validates maximum similarity scores (≥0.9) for identical artist lists
-- **Subset Relationships**: Tests moderate similarity (≈0.5) for subset cases
+- **Identical Preferences**: Validates maximum similarity scores (1.0) for identical artist lists
+- **Position Sensitivity**: Tests position-weighted similarity for different orderings
 - **No Overlap**: Confirms zero matches for completely different preferences
-- **Partial Overlap**: Validates Jaccard similarity calculation for partial artist overlap
+- **Weighted Overlap**: Validates PWO calculation for partial artist overlap
 
 #### 2. **Database Function Validation**
-- **Distance = 0**: High scores for identical arrays (perfect similarity)
-- **Distance = 0.7**: Moderate scores for subset relationships 
-- **Distance = 2.0**: No matches for completely different preferences
-- **Scientific Accuracy**: Validates hybrid Jaccard + positional algorithm
+- **Distance = 0.0**: Maximum scores for identical arrays (perfect similarity)
+- **Distance = 1.0**: No matches for completely different preferences
+- **Position Weighting**: Validates position-sensitive similarity scoring
+- **Scientific Accuracy**: Validates PWO (Position-Weighted Overlap) algorithm
 
 #### 3. **Edge Case Testing**
 - Empty artist lists and single artist preferences

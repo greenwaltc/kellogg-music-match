@@ -1,7 +1,33 @@
 # Kellogg Music Match - Top-Level Makefile
 # Orchestrates backend, UI, and infrastructure deployment
 
-.PHONY: help backend-% ui-% infra-% docker-% dev-db-re	@ec	@echo "🔄 Resetting database with fresh schema..."
+.PHONY: help backend-% ui-% infra-% docker-% dev-db-re	@ecdb-reset: ## Reset database with fresh schema from Flyway migrations
+	@echo "🔄 Resetting database with Flyway migrations..."
+	@echo "🛑 Step 1: Stopping containers..."
+	@docker-compose down
+	@echo "🗑️  Step 2: Removing postgres volume to force reinitialization..."
+	@docker volume rm kellogg-music-match_postgres_data 2>/dev/null || true
+	@echo "🚀 Step 3: Starting postgres..."
+	@docker-compose up -d postgres
+	@echo "⏳ Step 4: Waiting for database to be ready..."
+	@sleep 10
+	@echo "📋 Step 5: Running Flyway migrations..."
+	@./scripts/flyway.sh migrate
+	@echo "✅ Database reset complete with latest migrations!"
+
+db-migrate: ## Apply pending Flyway migrations
+	@echo "📋 Applying Flyway migrations..."
+	@./scripts/flyway.sh migrate
+	@echo "✅ Migrations applied!"
+
+db-info: ## Show Flyway migration information
+	@echo "📊 Flyway migration status..."
+	@./scripts/flyway.sh info
+
+db-clean: ## Clean database schema (Flyway clean)
+	@echo "🧹 Cleaning database schema..."
+	@./scripts/flyway.sh clean
+	@echo "✅ Database schema cleaned!"esetting database with fresh schema..."
 	@echo "🔽 Step 1: Stopping containers...""🔽 Step 1: Stopping containers..."
 	@docker-compose down
 	@echo "🗑️  Step 2: Removing postgres volume to force reinitialization..."
@@ -171,19 +197,6 @@ db-reset: ## Reset database with fresh schema from migrations
 	@sleep 10
 	@echo "✅ Database reset complete with latest schema!"
 
-db-schema-verify: ## Verify database schema matches expected structure
-	@echo "🔍 Verifying database schema..."
-	@docker exec kmm-postgres psql -U kellogg_user -d kellogg_music_match -c "\d users" | grep -q "program\|graduation_year" && \
-		echo "✅ Users table has program and graduation_year fields" || \
-		(echo "❌ Users table missing program/graduation_year fields" && exit 1)
-	@docker exec kmm-postgres psql -U kellogg_user -d kellogg_music_match -c "\d user_artists" | grep -q "rank" && \
-		echo "✅ User_artists table has rank field" || \
-		(echo "❌ User_artists table missing rank field" && exit 1)
-	@echo "✅ Database schema verification passed!"
-
-db-force-reset: db-reset ## Force complete database reset (alias for db-reset)
-	@echo "🚀 Complete database reset completed!"
-
 db-backup: ## Create database backup
 	@echo "💾 Creating database backup..."
 	@mkdir -p backups
@@ -197,7 +210,11 @@ db-help: ## Show database commands
 	@echo "  db-logs               Show database logs"
 	@echo "  db-connect            Connect with psql"
 	@echo "  db-test               Test database setup"
-	@echo "  db-reset              Reset database with guaranteed fresh schema"
+	@echo "  db-reset              Reset database with Flyway migrations"
+	@echo "  db-migrate            Apply pending Flyway migrations"
+	@echo "  db-info               Show Flyway migration status"
+	@echo "  db-clean              Clean database schema"
+	@echo "  create-migration      Create new migration file"
 	@echo "  db-schema-verify      Verify database schema matches expected structure"
 	@echo "  db-force-reset        Force complete database reset (alias for db-reset)"
 	@echo "  db-backup             Create backup"

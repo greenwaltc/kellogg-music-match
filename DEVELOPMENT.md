@@ -30,84 +30,72 @@ make logs
 
 ## 🗄️ Database Development
 
-### Custom PostgreSQL Setup
-The project uses a custom PostgreSQL image with scientific extensions:
+### PostgreSQL with Flyway Migrations
+The project uses PostgreSQL with Flyway for professional database versioning:
 
 ```bash
-# Build custom PostgreSQL image (includes plpython3u, scipy, numpy)
-docker-compose build postgres
-
-# Start database with scientific extensions
+# Start database
 docker-compose up -d postgres
 
-# Verify extensions are available
-docker-compose exec postgres psql -U kellogg_user -d kellogg_music_match -c "SELECT * FROM pg_available_extensions WHERE name='plpython3u';"
+# Apply migrations
+make db-migrate
+
+# Check migration status
+make db-info
 ```
 
-### Schema Management
-The project uses a consolidated schema system with enhanced development pipeline:
+### Migration Management
+The project uses Flyway migration system with versioned SQL files:
 
 ```bash
-# Schema Synchronization
-make sync-schema           # Auto-sync DATABASE_SCHEMA.sql from backend/db/schema/*.sql
-make check-schema-sync     # Verify schema files are synchronized
+# Create new migration
+make create-migration name=add_feature
 
-# Database Reset Pipeline (Enhanced Development Workflow)
-make db-reset              # Complete database reset with guaranteed fresh schema
-make db-schema-verify      # Verify database schema matches expected structure  
-make db-force-schema-sync  # Nuclear option: complete reset with schema sync
+# Apply pending migrations
+make db-migrate
 
-# Traditional Database Operations
-make db-start              # Start PostgreSQL database only
-make db-connect            # Connect with psql interactive shell
-make db-logs               # Show recent database logs
-make db-backup             # Create timestamped backup
-```
-
-### Enhanced Reset Guarantees
-The development pipeline provides reliable database management:
-
-1. **Complete Volume Removal**: Docker volumes removed for truly fresh state
-2. **Schema Synchronization**: Auto-syncs from `backend/db/schema/*.sql` before reset
-3. **Structure Verification**: Validates all tables, indexes, and functions exist
-4. **SQLC Regeneration**: Ensures Go code matches database structure
-
-### Consolidated Schema Benefits
-- **Single Source of Truth**: All schema in `backend/db/schema/001_initial.sql`
-- **Complete Profiles**: Users include `program` and `graduation_year` fields
-- **Kellogg Validation**: Program constraints (2Y, 1Y, MMM, MBAi, JD-MBA, etc.)
-- **Docker Integration**: Schema auto-applied on container initialization
-
-### Schema Development Workflow
-```bash
-# 1. Edit schema files in backend/db/schema/
-vim backend/db/schema/001_initial.sql  # Main consolidated schema
-
-# 2. Synchronize to main schema file (if adding new files)
-make sync-schema
-
-# 3. Generate SQLC code from updated schema
-make backend-sqlc
-
-# 4. Reset database with new schema
+# Reset database (drops and recreates with all migrations)
 make db-reset
 
-# 5. Verify schema was applied correctly
-make db-schema-verify
-
-# 6. Commit changes
-git add backend/db/ DATABASE_SCHEMA.sql
-git commit -m "Update database schema"
+# View migration history
+make db-info
 ```
 
-### Scientific Distance Function
-The database includes a custom `spearman_distance` function for music similarity:
+### Current Migration Status
+- **V001__initial_schema.sql**: Base tables, users, artists, user_artists
+- **V002-V009**: Progressive feature additions and improvements  
+- **V010__pwo_metric.sql**: Position-Weighted Overlap distance function
+
+### Database Development Workflow
+```bash
+# 1. Create new migration file
+make create-migration name=add_user_preferences
+
+# 2. Edit the generated migration file
+vim database/migrations/V011__add_user_preferences.sql
+
+# 3. Apply migration
+make db-migrate
+
+# 4. Generate SQLC code if queries changed
+make backend-sqlc
+
+# 5. Test database changes
+make backend-test
+
+# 6. Commit changes
+git add database/migrations/ backend/db/
+git commit -m "Add user preferences feature"
+```
+
+### PWO Distance Function
+The database includes a PWO (Position-Weighted Overlap) distance function for music similarity:
 
 ```sql
--- Test the hybrid similarity algorithm
-SELECT spearman_distance(ARRAY['Tool', 'Radiohead'], ARRAY['Tool', 'Radiohead']);  -- Returns 0 (identical)
-SELECT spearman_distance(ARRAY['Tool'], ARRAY['Tool', 'Radiohead']);              -- Returns ~0.7 (subset)
-SELECT spearman_distance(ARRAY['Tool'], ARRAY['Beatles']);                        -- Returns 2.0 (no overlap)
+-- Test the PWO similarity algorithm
+SELECT pwo_distance(ARRAY['Tool', 'Radiohead'], ARRAY['Tool', 'Radiohead'], 0.5);  -- Returns 0.0 (identical)
+SELECT pwo_distance(ARRAY['Tool', 'Radiohead'], ARRAY['Radiohead', 'Tool'], 0.5);  -- Returns small value (different order)
+SELECT pwo_distance(ARRAY['Tool'], ARRAY['Beatles'], 0.5);                         -- Returns 1.0 (no overlap)
 ```
 
 ### Database Operations
@@ -257,19 +245,19 @@ make backend-test-ginkgo
 cd backend/business && ~/go/bin/ginkgo run -v .
 ```
 
-**Behavioral Test Coverage (13 test specs):**
-- **Music Matching Algorithm**: Validates Jaccard similarity calculations
-- **Identical Preferences**: Score ≥ 0.9 for identical artist lists
-- **Subset Relationships**: Score ≈ 0.5 for subset cases
+**Behavioral Test Coverage:**
+- **Music Matching Algorithm**: Validates PWO (Position-Weighted Overlap) distance calculations
+- **Identical Preferences**: Similarity = 1.0 for identical artist lists  
+- **Different Preferences**: Lower similarity scores for divergent tastes
 - **Edge Cases**: Empty lists, normalization, caller exclusion
-- **Scientific Accuracy**: Validates hybrid algorithm alignment with PostgreSQL
+- **Scientific Accuracy**: Validates PWO algorithm alignment with PostgreSQL
 
 #### 3. **Database Function Testing**
-Tests for PostgreSQL scientific functions:
+Tests for PostgreSQL PWO distance function:
 ```bash
-# Test spearman_distance function directly
+# Test pwo_distance function directly
 docker-compose exec postgres psql -U kellogg_user -d kellogg_music_match -c \
-  "SELECT spearman_distance(ARRAY['Tool'], ARRAY['Tool', 'Radiohead']);"
+  "SELECT pwo_distance(ARRAY['Tool'], ARRAY['Tool', 'Radiohead'], 0.5);"
 ```
 
 #### 4. **Integration Testing**
@@ -317,13 +305,13 @@ docker-compose exec postgres psql -U kellogg_user -d kellogg_music_match -c \
 - [ ] User registration works with proper UUID format
 - [ ] User login validates credentials correctly
 - [ ] Artist preferences are stored and retrieved
-- [ ] Music matching finds users with shared artists using scientific similarity
-- [ ] **Similarity scores are accurate**: Identical preferences (≥0.9), subsets (≈0.5), no overlap (no matches)
-- [ ] **PostgreSQL spearman_distance function works**: Distance values 0, 0.7, 2.0 for test cases
-- [ ] Database persistence verified with custom array handling
+- [ ] Music matching finds users with shared artists using PWO similarity
+- [ ] **Similarity scores are accurate**: Identical preferences (1.0), different preferences (lower scores)
+- [ ] **PostgreSQL pwo_distance function works**: Distance values 0.0-1.0 for test cases
+- [ ] Database persistence verified with array handling
 - [ ] Frontend connects to backend API
 - [ ] All endpoints return expected HTTP status codes
-- [ ] **Behavioral tests pass**: All 13 Ginkgo test specs validate algorithm behavior
+- [ ] **Behavioral tests pass**: Ginkgo test specs validate PWO algorithm behavior
 
 ## 🔄 Development Cycle
 
@@ -336,13 +324,12 @@ docker-compose exec postgres psql -U kellogg_user -d kellogg_music_match -c \
 6. **Commit**: Git commit with descriptive message
 
 ### Schema Changes Flow
-1. **Edit Schema**: Modify files in backend/db/schema/ (especially 004_spearman_distance.sql for algorithm changes)
-2. **Sync Schema**: `make schema-sync`
-3. **Generate Code**: `make backend-sqlc`
-4. **Update Queries**: Edit backend/db/queries/queries.sql if needed
-5. **Regenerate**: `make backend-sqlc`
-6. **Test**: Verify database operations work with `make test-behavioral`
-7. **Commit**: Include schema files, generated code, and postgres.dockerfile
+1. **Create Migration**: `make create-migration name=description`
+2. **Edit Migration**: Modify the generated file in database/migrations/
+3. **Apply Migration**: `make db-migrate`
+4. **Generate Code**: `make backend-sqlc` (if queries changed)
+5. **Test**: Verify database operations work with `make test`
+6. **Commit**: Include migration files and generated code
 
 ### Code Generation Flow
 1. **Edit OpenAPI**: Modify backend/openapi.yaml
@@ -412,8 +399,8 @@ DB_USER=kellogg_user
 DB_PASSWORD=kellogg_secure_pass_2024
 DB_SSLMODE=disable
 
-# Note: Custom PostgreSQL image includes plpython3u extension
-# and scientific libraries (scipy, numpy) for similarity calculations
+# Note: PostgreSQL image includes PWO distance function
+# for Position-Weighted Overlap similarity calculations
 ```
 
 #### Frontend (Docker Compose)
@@ -426,7 +413,7 @@ API_BASE_URL=http://localhost:8080
 ### Key Files
 - **README.md**: Main project documentation
 - **DATABASE.md**: Database setup and schema information
-- **DATABASE_SCHEMA.md**: Comprehensive schema documentation with spearman_distance function
+- **DATABASE_SCHEMA.md**: Comprehensive schema documentation with PWO distance function
 - **DOCKER-COMPOSE-SETUP.md**: Docker environment setup with custom PostgreSQL
 - **backend/README.md**: Backend-specific documentation with testing framework
 - **backend/business/TESTING.md**: Detailed Ginkgo behavioral testing documentation

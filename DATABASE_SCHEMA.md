@@ -2,90 +2,91 @@
 
 ## Overview
 
-The Kellogg Music Match application uses a **custom PostgreSQL 15 database** with scientific extensions for advanced similarity calculations. The database features a consolidated schema design, plpython3u extension with scipy/numpy libraries, and a hybrid Jaccard + positional similarity algorithm for accurate music taste matching between Kellogg students.
+The Kellogg Music Match application uses **PostgreSQL 15** with Flyway migrations for professional database versioning. The database features a comprehensive migration system with PWO (Position-Weighted Overlap) distance function for scientifically accurate music taste matching between Kellogg students.
 
 ## 🏗️ Schema Architecture
 
-### Consolidated Schema Management
-The database schema has been consolidated from multiple migration files into a single, comprehensive initial schema:
+### Flyway Migration Management
+The database schema uses Flyway for professional database versioning:
 
-- **Source**: `backend/db/schema/001_initial.sql` (consolidated from 9 migration files)
-- **Auto-Generated**: `DATABASE_SCHEMA.sql` (synchronized from source files)
-- **Docker Integration**: Automatically applied during container initialization
-- **Development Pipeline**: Enhanced reset and verification commands
+- **Migrations**: `database/migrations/V001` through `V010` 
+- **Current Version**: V010 includes PWO distance function implementation
+- **Migration Commands**: `make db-migrate`, `make db-reset`, `make create-migration`
+- **Professional Versioning**: Incremental schema changes with rollback support
 
-### Key Improvements
-- ✅ **Single Source of Truth**: All table definitions in one place
-- ✅ **Complete User Profiles**: Added `program` and `graduation_year` fields
+### Key Features
+- ✅ **Professional Migration System**: Flyway versioning with audit trail
+- ✅ **Complete User Profiles**: Program and graduation year fields
 - ✅ **Enhanced Validation**: Program constraints for Kellogg programs (2Y, 1Y, MMM, etc.)
-- ✅ **SQLC Compatibility**: Optimized queries for Go code generation
-- ✅ **Reset Guarantees**: Reliable database reset with schema verification
+- ✅ **SQLC Compatibility**: Type-safe Go code generation
+- ✅ **PWO Distance Function**: Scientific Position-Weighted Overlap algorithm
 
 ## 🧪 Scientific Database Features
 
-### Custom PostgreSQL Image
-- **Base**: PostgreSQL 15 with plpython3u extension
-- **Scientific Libraries**: scipy, numpy for statistical calculations
-- **Hybrid Algorithm**: Combines Jaccard similarity with positional correlation
-- **Performance**: Optimized for real-time similarity calculations
-
-### Spearman Distance Function
-Custom PostgreSQL function implementing scientific similarity algorithm:
+### PWO Distance Function
+PostgreSQL function implementing Position-Weighted Overlap algorithm:
 
 ```sql
-CREATE OR REPLACE FUNCTION spearman_distance(arr1 TEXT[], arr2 TEXT[]) 
+-- V010__pwo_metric.sql
+CREATE OR REPLACE FUNCTION pwo_distance(list1 TEXT[], list2 TEXT[], alpha FLOAT8 DEFAULT 0.5)
 RETURNS FLOAT8 AS $$
-import numpy as np
-from scipy.stats import spearmanr
+DECLARE
+    -- PWO (Position-Weighted Overlap) implementation
+    intersection_count INTEGER := 0;
+    weighted_overlap FLOAT8 := 0.0;
+    union_count INTEGER;
+    item TEXT;
+    pos1 INTEGER;
+    pos2 INTEGER;
+    weight FLOAT8;
+BEGIN
+    -- Handle empty arrays
+    IF array_length(list1, 1) IS NULL OR array_length(list2, 1) IS NULL THEN
+        RETURN 1.0;
+    END IF;
 
-# Handle empty arrays
-if not arr1 or not arr2:
-    return 2.0
+    -- Calculate weighted overlap for shared items
+    FOREACH item IN ARRAY list1 LOOP
+        pos2 := array_position(list2, item);
+        IF pos2 IS NOT NULL THEN
+            pos1 := array_position(list1, item);
+            -- Position-based weight calculation with alpha parameter
+            weight := 1.0 / (1.0 + alpha * ABS(pos1 - pos2));
+            weighted_overlap := weighted_overlap + weight;
+            intersection_count := intersection_count + 1;
+        END IF;
+    END LOOP;
 
-# Convert to sets for Jaccard similarity
-set1 = set(arr1)
-set2 = set(arr2)
+    -- Calculate union size (total unique items)
+    union_count := (
+        SELECT COUNT(DISTINCT item) 
+        FROM unnest(list1 || list2) AS item
+    );
 
-# Calculate Jaccard similarity
-intersection = len(set1.intersection(set2))
-union = len(set1.union(set2))
-jaccard_similarity = intersection / union if union > 0 else 0
+    -- PWO distance calculation
+    IF union_count = 0 THEN
+        RETURN 1.0;
+    END IF;
 
-# If no intersection, return maximum distance
-if intersection == 0:
-    return 2.0
+    RETURN 1.0 - (weighted_overlap / union_count);
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
 
-# If identical sets, return minimum distance
-if set1 == set2:
-    return 0.0
-
-# For subset relationships, apply penalty
-if set1.issubset(set2) or set2.issubset(set1):
-    return 0.7
-
-# Calculate positional correlation for shared items
-shared_items = list(set1.intersection(set2))
-if len(shared_items) > 1:
-    ranks1 = [arr1.index(item) for item in shared_items if item in arr1]
-    ranks2 = [arr2.index(item) for item in shared_items if item in arr2]
-    
-    if len(ranks1) == len(ranks2) and len(ranks1) > 1:
-        correlation, _ = spearmanr(ranks1, ranks2)
-        if not np.isnan(correlation):
-            # Combine Jaccard (70%) and positional correlation (30%)
-            combined_similarity = 0.7 * jaccard_similarity + 0.3 * (correlation + 1) / 2
-            return 1.0 - combined_similarity
-
-# Default to Jaccard-based distance
-return 1.0 - jaccard_similarity
-$$ LANGUAGE plpython3u IMMUTABLE;
+-- Helper function for similarity scoring  
+CREATE OR REPLACE FUNCTION pwo_similarity(list1 TEXT[], list2 TEXT[], alpha FLOAT8 DEFAULT 0.5)
+RETURNS FLOAT8 AS $$
+BEGIN
+    RETURN 1.0 - pwo_distance(list1, list2, alpha);
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
 ```
 
 **Algorithm Details:**
-- **Distance = 0**: Identical arrays (perfect similarity)
-- **Distance = 0.7**: Subset relationships (moderate similarity)  
-- **Distance = 2.0**: No overlap (no similarity)
-- **Hybrid Calculation**: 70% Jaccard + 30% positional correlation for shared items
+- **Distance = 0.0**: Identical arrays (perfect similarity)
+- **Distance = 1.0**: No overlap (no similarity)
+- **Alpha Parameter**: Controls position sensitivity (higher alpha = more position-sensitive)
+- **Weighted Overlap**: Positions closer in rank contribute more to similarity
+- **Similarity Score**: 1.0 - distance for intuitive scoring (higher = more similar)
 
 ## 📊 Database Schema
 
@@ -188,8 +189,8 @@ END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
 -- Scientific similarity calculation (see "Scientific Database Features" section above)
--- The spearman_distance function provides accurate music taste similarity using
--- hybrid Jaccard + positional correlation algorithm with scipy statistical functions
+-- The pwo_distance function provides accurate music taste similarity using
+-- Position-Weighted Overlap algorithm for position-sensitive similarity scoring
 ```
 
 ### 👁️ Views for Common Queries
@@ -265,19 +266,20 @@ GROUP BY u.id, u.username, u.email, u.first_name, u.last_name, u.created_at, u.l
 
 **Database Operations:**
 1. Normalize and find/create artists in `artists` table
-2. Query users with overlapping artists using spearman_distance function
-3. Calculate scientific similarity scores using hybrid Jaccard + positional algorithm
+2. Query users with overlapping artists using PWO distance function
+3. Calculate similarity scores using Position-Weighted Overlap algorithm
 4. Return top matches sorted by score (converted from distance: score = 1.0 - distance)
 
-**Example Query with Scientific Function:**
+**Example Query with PWO Function:**
 ```sql
--- Find similar users using spearman_distance function
+-- Find similar users using pwo_distance function
 SELECT 
     u.first_name || ' ' || u.last_name as name,
     COUNT(ua.artist_id) as overlap,
-    1.0 - spearman_distance(
+    1.0 - pwo_distance(
         target_artists.artists,
-        ARRAY_AGG(a.name ORDER BY ua.added_at)
+        ARRAY_AGG(a.name ORDER BY ua.added_at),
+        0.5  -- alpha parameter for position sensitivity
     ) as score
 FROM users u
 JOIN user_artists ua ON u.id = ua.user_id
@@ -291,24 +293,24 @@ ORDER BY score DESC, overlap DESC;
 
 ## 🚀 Automatic Database Initialization
 
-### Custom PostgreSQL Setup
+### Database Setup
 
-The database schema is **automatically created** using a custom PostgreSQL image with scientific extensions:
+The database schema is managed using **Flyway migrations** for professional versioning:
 
-1. **Custom Image Build**: `postgres.dockerfile` creates image with plpython3u, scipy, numpy
-2. **Initialization Script**: `init-database.sh` creates schema and functions
-3. **Scientific Function**: `spearman_distance` function for similarity calculations
-4. **Sample Data**: Test users and artists for algorithm validation
+1. **Migration System**: Flyway manages incremental schema updates (V001-V010)
+2. **PWO Function**: V010 migration includes Position-Weighted Overlap distance function
+3. **Professional Versioning**: Audit trail and rollback support
+4. **Development Commands**: `make db-migrate`, `make db-reset`, `make create-migration`
 
-### Initialization Components
+### Database Components
 
 - **Tables**: users, artists, user_artists with UUID and foreign key constraints
 - **Indexes**: Performance-optimized for common queries and UUID lookups
-- **Scientific Functions**: spearman_distance with hybrid Jaccard + positional algorithm
+- **PWO Functions**: pwo_distance and pwo_similarity for Position-Weighted Overlap calculations
 - **Standard Functions**: Timestamp updates and name normalization
 - **Triggers**: Automatic field management
 - **Views**: Common query patterns with artist aggregation
-- **Sample Data**: Test artists and users for development and testing
+- **Migration System**: Professional database versioning with Flyway
 
 ## 📝 Common Database Queries
 
@@ -331,25 +333,25 @@ SELECT
 ON CONFLICT DO NOTHING;
 ```
 
-### Find Music Matches (Scientific Algorithm)
+### Test PWO Distance Function
 ```sql
--- Test spearman_distance function with various scenarios
+-- Test pwo_distance function with various scenarios
 SELECT 
     'Identical arrays' as scenario,
-    spearman_distance(ARRAY['Tool', 'Radiohead'], ARRAY['Tool', 'Radiohead']) as distance;
--- Returns: 0 (perfect similarity)
+    pwo_distance(ARRAY['Tool', 'Radiohead'], ARRAY['Tool', 'Radiohead'], 0.5) as distance;
+-- Returns: 0.0 (perfect similarity)
 
 SELECT 
-    'Subset relationship' as scenario,
-    spearman_distance(ARRAY['Tool'], ARRAY['Tool', 'Radiohead']) as distance;
--- Returns: ~0.7 (moderate similarity)
+    'Different order' as scenario,
+    pwo_distance(ARRAY['Tool', 'Radiohead'], ARRAY['Radiohead', 'Tool'], 0.5) as distance;
+-- Returns: small positive value (position-sensitive)
 
 SELECT 
     'No overlap' as scenario,
-    spearman_distance(ARRAY['Tool'], ARRAY['Beatles']) as distance;
--- Returns: 2.0 (no similarity)
+    pwo_distance(ARRAY['Tool'], ARRAY['Beatles'], 0.5) as distance;
+-- Returns: 1.0 (no similarity)
 
--- Find music matches using scientific similarity
+-- Find music matches using PWO similarity
 WITH user_target_artists AS (
     SELECT ARRAY['Tool', 'Radiohead'] as artists
 ),
@@ -358,9 +360,10 @@ similarity_scores AS (
         u.id,
         u.first_name || ' ' || u.last_name as name,
         ARRAY_AGG(a.name ORDER BY ua.added_at) as user_artists,
-        1.0 - spearman_distance(
+        1.0 - pwo_distance(
             (SELECT artists FROM user_target_artists),
-            ARRAY_AGG(a.name ORDER BY ua.added_at)
+            ARRAY_AGG(a.name ORDER BY ua.added_at),
+            0.5  -- alpha parameter for position sensitivity
         ) as score,
         COUNT(a.name) as total_artists
     FROM users u
@@ -399,16 +402,15 @@ LIMIT 5;
 
 ### Development Access
 ```bash
-# Connect to custom PostgreSQL with scientific extensions
+# Connect to PostgreSQL
 docker-compose exec postgres psql -U kellogg_user -d kellogg_music_match
 
-# Test scientific functions
+# Test PWO distance functions
 docker-compose exec postgres psql -U kellogg_user -d kellogg_music_match -c \
-  "SELECT spearman_distance(ARRAY['Tool'], ARRAY['Tool', 'Radiohead']);"
+  "SELECT pwo_distance(ARRAY['Tool'], ARRAY['Tool', 'Radiohead'], 0.5);"
 
-# Verify extensions are loaded
-docker-compose exec postgres psql -U kellogg_user -d kellogg_music_match -c \
-  "SELECT * FROM pg_available_extensions WHERE name='plpython3u';"
+# Check migration status
+make db-info
 
 # For Kubernetes deployment:
 kubectl port-forward -n kellogg-music-match service/postgres 5432:5432
