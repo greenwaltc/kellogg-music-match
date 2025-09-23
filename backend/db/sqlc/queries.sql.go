@@ -44,14 +44,28 @@ const createArtist = `-- name: CreateArtist :one
 INSERT INTO artists (name)
 VALUES ($1)
 ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
-RETURNING id, name, created_at
+RETURNING id, name, created_at, musicbrainz_id, sort_name, artist_type, gender, country, life_span_begin, life_span_end, disambiguation, musicbrainz_score, is_reference
 `
 
 // Artist queries
 func (q *Queries) CreateArtist(ctx context.Context, name string) (Artist, error) {
 	row := q.db.QueryRowContext(ctx, createArtist, name)
 	var i Artist
-	err := row.Scan(&i.ID, &i.Name, &i.CreatedAt)
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.CreatedAt,
+		&i.MusicbrainzID,
+		&i.SortName,
+		&i.ArtistType,
+		&i.Gender,
+		&i.Country,
+		&i.LifeSpanBegin,
+		&i.LifeSpanEnd,
+		&i.Disambiguation,
+		&i.MusicbrainzScore,
+		&i.IsReference,
+	)
 	return i, err
 }
 
@@ -250,7 +264,7 @@ func (q *Queries) FindSimilarUsers(ctx context.Context, arg FindSimilarUsersPara
 }
 
 const getAllArtists = `-- name: GetAllArtists :many
-SELECT id, name, created_at FROM artists ORDER BY name
+SELECT id, name, created_at, musicbrainz_id, sort_name, artist_type, gender, country, life_span_begin, life_span_end, disambiguation, musicbrainz_score, is_reference FROM artists ORDER BY name
 `
 
 func (q *Queries) GetAllArtists(ctx context.Context) ([]Artist, error) {
@@ -262,7 +276,21 @@ func (q *Queries) GetAllArtists(ctx context.Context) ([]Artist, error) {
 	items := []Artist{}
 	for rows.Next() {
 		var i Artist
-		if err := rows.Scan(&i.ID, &i.Name, &i.CreatedAt); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.CreatedAt,
+			&i.MusicbrainzID,
+			&i.SortName,
+			&i.ArtistType,
+			&i.Gender,
+			&i.Country,
+			&i.LifeSpanBegin,
+			&i.LifeSpanEnd,
+			&i.Disambiguation,
+			&i.MusicbrainzScore,
+			&i.IsReference,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -366,24 +394,52 @@ func (q *Queries) GetAllUsers(ctx context.Context) ([]User, error) {
 }
 
 const getArtistByID = `-- name: GetArtistByID :one
-SELECT id, name, created_at FROM artists WHERE id = $1 LIMIT 1
+SELECT id, name, created_at, musicbrainz_id, sort_name, artist_type, gender, country, life_span_begin, life_span_end, disambiguation, musicbrainz_score, is_reference FROM artists WHERE id = $1 LIMIT 1
 `
 
 func (q *Queries) GetArtistByID(ctx context.Context, id int32) (Artist, error) {
 	row := q.db.QueryRowContext(ctx, getArtistByID, id)
 	var i Artist
-	err := row.Scan(&i.ID, &i.Name, &i.CreatedAt)
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.CreatedAt,
+		&i.MusicbrainzID,
+		&i.SortName,
+		&i.ArtistType,
+		&i.Gender,
+		&i.Country,
+		&i.LifeSpanBegin,
+		&i.LifeSpanEnd,
+		&i.Disambiguation,
+		&i.MusicbrainzScore,
+		&i.IsReference,
+	)
 	return i, err
 }
 
 const getArtistByName = `-- name: GetArtistByName :one
-SELECT id, name, created_at FROM artists WHERE name = $1 LIMIT 1
+SELECT id, name, created_at, musicbrainz_id, sort_name, artist_type, gender, country, life_span_begin, life_span_end, disambiguation, musicbrainz_score, is_reference FROM artists WHERE name = $1 LIMIT 1
 `
 
 func (q *Queries) GetArtistByName(ctx context.Context, name string) (Artist, error) {
 	row := q.db.QueryRowContext(ctx, getArtistByName, name)
 	var i Artist
-	err := row.Scan(&i.ID, &i.Name, &i.CreatedAt)
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.CreatedAt,
+		&i.MusicbrainzID,
+		&i.SortName,
+		&i.ArtistType,
+		&i.Gender,
+		&i.Country,
+		&i.LifeSpanBegin,
+		&i.LifeSpanEnd,
+		&i.Disambiguation,
+		&i.MusicbrainzScore,
+		&i.IsReference,
+	)
 	return i, err
 }
 
@@ -479,15 +535,21 @@ WHERE ua.user_id = $1
 ORDER BY ua.rank
 `
 
-func (q *Queries) GetUserArtists(ctx context.Context, userID uuid.UUID) ([]Artist, error) {
+type GetUserArtistsRow struct {
+	ID        int32        `json:"id"`
+	Name      string       `json:"name"`
+	CreatedAt sql.NullTime `json:"created_at"`
+}
+
+func (q *Queries) GetUserArtists(ctx context.Context, userID uuid.UUID) ([]GetUserArtistsRow, error) {
 	rows, err := q.db.QueryContext(ctx, getUserArtists, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Artist{}
+	items := []GetUserArtistsRow{}
 	for rows.Next() {
-		var i Artist
+		var i GetUserArtistsRow
 		if err := rows.Scan(&i.ID, &i.Name, &i.CreatedAt); err != nil {
 			return nil, err
 		}
@@ -656,7 +718,7 @@ func (q *Queries) RemoveUserArtist(ctx context.Context, arg RemoveUserArtistPara
 }
 
 const searchArtists = `-- name: SearchArtists :many
-SELECT id, name, created_at FROM artists 
+SELECT id, name, created_at, musicbrainz_id, sort_name, artist_type, gender, country, life_span_begin, life_span_end, disambiguation, musicbrainz_score, is_reference FROM artists 
 WHERE LOWER(name) LIKE LOWER($1) 
 ORDER BY 
   CASE 
@@ -690,7 +752,21 @@ func (q *Queries) SearchArtists(ctx context.Context, arg SearchArtistsParams) ([
 	items := []Artist{}
 	for rows.Next() {
 		var i Artist
-		if err := rows.Scan(&i.ID, &i.Name, &i.CreatedAt); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.CreatedAt,
+			&i.MusicbrainzID,
+			&i.SortName,
+			&i.ArtistType,
+			&i.Gender,
+			&i.Country,
+			&i.LifeSpanBegin,
+			&i.LifeSpanEnd,
+			&i.Disambiguation,
+			&i.MusicbrainzScore,
+			&i.IsReference,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

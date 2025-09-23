@@ -56,7 +56,7 @@ type Querier interface {
 	GetArtistByName(ctx context.Context, name string) (Artist, error)
 	GetArtistUsers(ctx context.Context, artistID int32) ([]GetArtistUsersRow, error)
 	GetFeedbackByUser(ctx context.Context, userID uuid.UUID) ([]Feedback, error)
-	GetUserArtists(ctx context.Context, userID uuid.UUID) ([]Artist, error)
+	GetUserArtists(ctx context.Context, userID uuid.UUID) ([]GetUserArtistsRow, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)

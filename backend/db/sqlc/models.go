@@ -10,10 +10,21 @@ import (
 	"github.com/google/uuid"
 )
 
+// Artists table containing both user-submitted and MusicBrainz reference artists
 type Artist struct {
-	ID        int32        `json:"id"`
-	Name      string       `json:"name"`
-	CreatedAt sql.NullTime `json:"created_at"`
+	ID               int32          `json:"id"`
+	Name             string         `json:"name"`
+	CreatedAt        sql.NullTime   `json:"created_at"`
+	MusicbrainzID    uuid.NullUUID  `json:"musicbrainz_id"`
+	SortName         sql.NullString `json:"sort_name"`
+	ArtistType       sql.NullString `json:"artist_type"`
+	Gender           sql.NullString `json:"gender"`
+	Country          sql.NullString `json:"country"`
+	LifeSpanBegin    sql.NullTime   `json:"life_span_begin"`
+	LifeSpanEnd      sql.NullTime   `json:"life_span_end"`
+	Disambiguation   sql.NullString `json:"disambiguation"`
+	MusicbrainzScore sql.NullInt32  `json:"musicbrainz_score"`
+	IsReference      sql.NullBool   `json:"is_reference"`
 }
 
 type Feedback struct {
@@ -22,6 +33,20 @@ type Feedback struct {
 	FeedbackText string       `json:"feedback_text"`
 	CreatedAt    sql.NullTime `json:"created_at"`
 	UpdatedAt    sql.NullTime `json:"updated_at"`
+}
+
+type ReferenceArtist struct {
+	ID               int32          `json:"id"`
+	Name             string         `json:"name"`
+	SortName         sql.NullString `json:"sort_name"`
+	ArtistType       sql.NullString `json:"artist_type"`
+	Gender           sql.NullString `json:"gender"`
+	Country          sql.NullString `json:"country"`
+	LifeSpanBegin    sql.NullTime   `json:"life_span_begin"`
+	LifeSpanEnd      sql.NullTime   `json:"life_span_end"`
+	Disambiguation   sql.NullString `json:"disambiguation"`
+	MusicbrainzScore sql.NullInt32  `json:"musicbrainz_score"`
+	MusicbrainzID    uuid.NullUUID  `json:"musicbrainz_id"`
 }
 
 type User struct {
@@ -44,4 +69,10 @@ type UserArtist struct {
 	ArtistID  int32        `json:"artist_id"`
 	CreatedAt sql.NullTime `json:"created_at"`
 	Rank      int16        `json:"rank"`
+}
+
+type UserSubmittedArtist struct {
+	ID        int32        `json:"id"`
+	Name      string       `json:"name"`
+	CreatedAt sql.NullTime `json:"created_at"`
 }
