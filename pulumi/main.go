@@ -63,7 +63,7 @@ func main() {
 			return err
 		}
 
-		// Create ConfigMap for UI configuration with Kellogg-specific backend URL
+		// Create ConfigMap for UI configuration with proxy-based backend URL
 		uiConfigMap, err := corev1.NewConfigMap(ctx, "ui-config", &corev1.ConfigMapArgs{
 			Metadata: &metav1.ObjectMetaArgs{
 				Name:      pulumi.String("kmm-ui-config"),
@@ -74,7 +74,7 @@ func main() {
 				},
 			},
 			Data: pulumi.StringMap{
-				"config.json": pulumi.String("{\"apiBaseUrl\": \"http://kmm-backend.traefik.me\", \"artistMinCount\": 5, \"artistMaxCount\": 20}"),
+				"config.json": pulumi.String("{\"apiBaseUrl\": \"/api\", \"artistMinCount\": 5, \"artistMaxCount\": 20}"),
 			},
 		})
 		if err != nil {
@@ -101,6 +101,146 @@ func main() {
 				},
 			},
 			Data: flywayConfigMapData,
+		})
+		if err != nil {
+			return err
+		}
+
+		// Create ConfigMap for MusicBrainz data loading script only (CSV will be embedded in container)
+		musicbrainzConfigMap, err := corev1.NewConfigMap(ctx, "musicbrainz-scripts", &corev1.ConfigMapArgs{
+			Metadata: &metav1.ObjectMetaArgs{
+				Name:      pulumi.String("musicbrainz-scripts"),
+				Namespace: namespace.Metadata.Name(),
+				Labels: pulumi.StringMap{
+					"app":       pulumi.String("kmm"),
+					"component": pulumi.String("data"),
+				},
+			},
+			Data: pulumi.StringMap{
+				"load_artists.sql": pulumi.String(`-- Load MusicBrainz artists data from embedded CSV
+CREATE TEMP TABLE temp_musicbrainz_load (
+    musicbrainz_id TEXT,
+    name TEXT,
+    sort_name TEXT,
+    artist_type TEXT,
+    gender TEXT,
+    country TEXT,
+    life_span_begin TEXT,
+    life_span_end TEXT,
+    disambiguation TEXT,
+    musicbrainz_score TEXT
+);
+
+-- Load data from CSV file directly from embedded location using \copy (client-side)
+\copy temp_musicbrainz_load FROM '/data/musicbrainz_artists_50k.csv' WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"', ESCAPE '"');
+
+-- Insert into artists table with proper type conversions and conflict handling
+-- Only proceed if we have fewer than 1000 reference artists
+DO $$
+DECLARE
+    existing_count INTEGER;
+    loaded_count INTEGER;
+BEGIN
+    SELECT COUNT(*) INTO existing_count FROM artists WHERE is_reference = TRUE;
+    
+    IF existing_count < 1000 THEN
+        INSERT INTO artists (
+            name, 
+            musicbrainz_id, 
+            sort_name, 
+            artist_type, 
+            gender, 
+            country, 
+            life_span_begin, 
+            life_span_end, 
+            disambiguation, 
+            musicbrainz_score, 
+            is_reference,
+            created_at
+        )
+        SELECT DISTINCT ON (TRIM(name))
+            TRIM(name),
+            CASE WHEN TRIM(musicbrainz_id) = '' THEN NULL ELSE TRIM(musicbrainz_id)::UUID END,
+            TRIM(sort_name),
+            TRIM(artist_type),
+            CASE WHEN TRIM(gender) = '' THEN NULL ELSE TRIM(gender) END,
+            CASE WHEN TRIM(country) = '' THEN NULL ELSE TRIM(country) END,
+            CASE WHEN TRIM(life_span_begin) = '' THEN NULL 
+                 WHEN TRIM(life_span_begin) ~ '^\d{4}$' THEN (TRIM(life_span_begin) || '-01-01')::DATE
+                 WHEN TRIM(life_span_begin) ~ '^\d{4}-\d{2}$' THEN (TRIM(life_span_begin) || '-01')::DATE
+                 ELSE TRIM(life_span_begin)::DATE END,
+            CASE WHEN TRIM(life_span_end) = '' THEN NULL 
+                 WHEN TRIM(life_span_end) ~ '^\d{4}$' THEN (TRIM(life_span_end) || '-01-01')::DATE
+                 WHEN TRIM(life_span_end) ~ '^\d{4}-\d{2}$' THEN (TRIM(life_span_end) || '-01')::DATE
+                 ELSE TRIM(life_span_end)::DATE END,
+            CASE WHEN TRIM(disambiguation) = '' THEN NULL ELSE TRIM(disambiguation) END,
+            CASE WHEN TRIM(musicbrainz_score) = '' THEN NULL ELSE TRIM(musicbrainz_score)::INTEGER END,
+            TRUE,
+            CURRENT_TIMESTAMP
+        FROM temp_musicbrainz_load
+        WHERE TRIM(musicbrainz_id) != '' AND TRIM(name) != ''
+        ORDER BY TRIM(name), musicbrainz_score DESC NULLS LAST
+        ON CONFLICT (name) DO UPDATE SET
+            musicbrainz_id = COALESCE(EXCLUDED.musicbrainz_id, artists.musicbrainz_id),
+            sort_name = COALESCE(EXCLUDED.sort_name, artists.sort_name),
+            artist_type = COALESCE(EXCLUDED.artist_type, artists.artist_type),
+            gender = COALESCE(EXCLUDED.gender, artists.gender),
+            country = COALESCE(EXCLUDED.country, artists.country),
+            life_span_begin = COALESCE(EXCLUDED.life_span_begin, artists.life_span_begin),
+            life_span_end = COALESCE(EXCLUDED.life_span_end, artists.life_span_end),
+            disambiguation = COALESCE(EXCLUDED.disambiguation, artists.disambiguation),
+            musicbrainz_score = COALESCE(EXCLUDED.musicbrainz_score, artists.musicbrainz_score),
+            is_reference = TRUE;
+        
+        SELECT COUNT(*) INTO loaded_count FROM artists WHERE is_reference = TRUE;
+        RAISE NOTICE 'Loaded % MusicBrainz reference artists (total: %)', 
+            loaded_count - existing_count, loaded_count;
+    ELSE
+        RAISE NOTICE 'MusicBrainz data already exists (% reference artists), skipping load', existing_count;
+    END IF;
+END $$;
+
+DROP TABLE temp_musicbrainz_load;`),
+				"load_data.sh": pulumi.String(`#!/bin/bash
+set -e
+
+echo "🎵 Starting MusicBrainz data loading..."
+
+# Wait for database to be ready
+echo "Waiting for PostgreSQL to be ready..."
+until pg_isready -h postgres -p 5432 -U kellogg_user; do
+    echo "Waiting for postgres..."
+    sleep 2
+done
+
+export PGPASSWORD=kellogg_secure_pass_2024
+
+# Check if data already exists
+echo "Checking if MusicBrainz data needs to be loaded..."
+count=$(psql -h postgres -U kellogg_user -d kellogg_music_match -t -c "SELECT COUNT(*) FROM artists WHERE is_reference = TRUE;" | tr -d ' ')
+
+if [ "$count" -lt 1000 ]; then
+    echo "Loading MusicBrainz artists data..."
+    echo "Found $count existing reference artists"
+    
+    # Verify the embedded CSV data exists and load it directly
+    if [ -f "/data/musicbrainz_artists_50k.csv" ]; then
+        echo "✅ Found CSV file at /data/musicbrainz_artists_50k.csv"
+        echo "📊 File size: $(wc -l < /data/musicbrainz_artists_50k.csv) lines"
+        psql -h postgres -U kellogg_user -d kellogg_music_match -f /scripts/load_artists.sql
+        echo "✅ MusicBrainz data loaded successfully"
+    else
+        echo "❌ CSV file not found at /data/musicbrainz_artists_50k.csv"
+        echo "📂 Available files in /data/:"
+        ls -la /data/ || echo "No /data directory found"
+        exit 1
+    fi
+else
+    echo "✅ MusicBrainz data already exists ($count reference artists), skipping load"
+fi
+
+echo "🎉 MusicBrainz data loading completed"`),
+			},
 		})
 		if err != nil {
 			return err
@@ -177,6 +317,28 @@ func main() {
 									},
 								},
 							},
+							&corev1.ContainerArgs{
+								Name:            pulumi.String("load-musicbrainz-data"),
+								Image:           pulumi.String("kellogg-music-match-musicbrainz:latest"),
+								ImagePullPolicy: pulumi.String("Never"),
+								Command: pulumi.StringArray{
+									pulumi.String("bash"),
+									pulumi.String("/scripts/load_data.sh"),
+								},
+								Env: corev1.EnvVarArray{
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("PGPASSWORD"),
+										Value: pulumi.String("kellogg_secure_pass_2024"),
+									},
+								},
+								VolumeMounts: corev1.VolumeMountArray{
+									&corev1.VolumeMountArgs{
+										Name:      pulumi.String("musicbrainz-scripts"),
+										MountPath: pulumi.String("/scripts"),
+										ReadOnly:  pulumi.Bool(true),
+									},
+								},
+							},
 						},
 						Containers: corev1.ContainerArray{
 							&corev1.ContainerArgs{
@@ -223,7 +385,7 @@ func main() {
 									// CORS Configuration
 									&corev1.EnvVarArgs{
 										Name:  pulumi.String("CORS_ALLOWED_ORIGINS"),
-										Value: pulumi.String("http://localhost:4200,http://kmm-ui.traefik.me"),
+										Value: pulumi.String("http://localhost:4200,http://kmm-ui.traefik.me,https://kmm-ui.traefik.me"),
 									},
 									&corev1.EnvVarArgs{
 										Name:  pulumi.String("CORS_ALLOWED_METHODS"),
@@ -313,6 +475,13 @@ func main() {
 								ConfigMap: &corev1.ConfigMapVolumeSourceArgs{
 									Name:        flywayConfigMap.Metadata.Name(),
 									DefaultMode: pulumi.Int(0644),
+								},
+							},
+							&corev1.VolumeArgs{
+								Name: pulumi.String("musicbrainz-scripts"),
+								ConfigMap: &corev1.ConfigMapVolumeSourceArgs{
+									Name:        musicbrainzConfigMap.Metadata.Name(),
+									DefaultMode: pulumi.Int(0755),
 								},
 							},
 						},
@@ -482,8 +651,8 @@ func main() {
 					"app": pulumi.String("kmm"),
 				},
 				Annotations: pulumi.StringMap{
-				"traefik.ingress.kubernetes.io/router.entrypoints": pulumi.String("web,websecure"),
-			},
+					"traefik.ingress.kubernetes.io/router.entrypoints": pulumi.String("web,websecure"),
+				},
 			},
 			Spec: &networkingv1.IngressSpecArgs{
 				IngressClassName: pulumi.String("traefik"),

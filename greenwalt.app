@@ -161,8 +161,34 @@ server {
     # More permissive CSP for the music match application
     add_header Content-Security-Policy "default-src 'self' https: data: blob:; img-src 'self' https: data:; style-src 'self' 'unsafe-inline' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; font-src 'self' https: data:; connect-src 'self' https: ws: wss:";
 
+    # API routes - proxy to backend and strip /api prefix
+    location /api/ {
+        # Proxy Kellogg Music Match API traffic to Kubernetes backend NodePort
+        proxy_pass https://192.168.1.163:31771/;
+        proxy_set_header Host kmm-backend.traefik.me;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Protocol $scheme;
+        proxy_set_header X-Forwarded-Host $http_host;
+
+        # SSL settings for HTTPS backend
+        proxy_ssl_verify off;
+        proxy_ssl_server_name on;
+
+        # Disable buffering for API responses
+        proxy_buffering off;
+        proxy_cache off;
+        
+        # Set timeout for API calls
+        proxy_connect_timeout 10s;
+        proxy_send_timeout 10s;
+        proxy_read_timeout 30s;
+    }
+
+    # All other routes - proxy to UI
     location / {
-        # Proxy Kellogg Music Match traffic to Kubernetes NodePort
+        # Proxy Kellogg Music Match UI traffic to Kubernetes NodePort
         proxy_pass https://192.168.1.163:31771;
         proxy_set_header Host kmm-ui.traefik.me;
         proxy_set_header X-Real-IP $remote_addr;

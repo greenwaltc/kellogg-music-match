@@ -11,6 +11,8 @@ help: ## Show this help message
 docker-build: ## Build all Docker images
 	@echo "🐳 Building all Docker images..."
 	@docker-compose build postgres backend ui
+	@echo "🎵 Building MusicBrainz data loader image..."
+	@docker build -f Dockerfile.musicbrainz -t kellogg-music-match-musicbrainz:latest .
 	@echo "✅ All Docker images built successfully!"
 
 docker-run: ## Start all services with Docker Compose

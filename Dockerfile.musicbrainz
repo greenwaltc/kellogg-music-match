@@ -1,0 +1,14 @@
+# MusicBrainz Data Loader Container
+FROM postgres:16-alpine
+
+# Install bash for better scripting support
+RUN apk add --no-cache bash curl
+
+# Copy the MusicBrainz CSV data
+COPY musicbrainz_artists_50k.csv /data/musicbrainz_artists_50k.csv
+
+# Set proper permissions
+RUN chmod 644 /data/musicbrainz_artists_50k.csv
+
+# Default command
+CMD ["/bin/bash"]

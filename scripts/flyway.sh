@@ -7,7 +7,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 FLYWAY_CONFIG="$PROJECT_ROOT/database/flyway.conf"
-MIGRATIONS_DIR="$PROJECT_ROOT/database/migrations"
+MIGRATIONS_DIR="$PROJECT_ROOT/backend/db/schema/migrations"
 
 # Color codes for output
 RED='\033[0;31m'
@@ -98,7 +98,6 @@ run_flyway_docker() {
     docker-compose run --rm \
         -v "$MIGRATIONS_DIR:/flyway/sql:ro" \
         -v "$FLYWAY_CONFIG:/flyway/conf/flyway.conf:ro" \
-        flyway \
         flyway \
         -url=jdbc:postgresql://postgres:5432/kellogg_music_match \
         -user=kellogg_user \
