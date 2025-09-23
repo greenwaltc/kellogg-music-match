@@ -874,6 +874,7 @@ echo "🎉 MusicBrainz data loading completed"`),
 							AccessModes: pulumi.StringArray{
 								pulumi.String("ReadWriteOnce"),
 							},
+							StorageClassName: pulumi.String("local-path"),
 							Resources: &corev1.VolumeResourceRequirementsArgs{
 								Requests: pulumi.StringMap{
 									"storage": pulumi.String("10Gi"),
