@@ -21,6 +21,7 @@ interface ArtistsFormShape { artists: FormArray<FormControl<string | null>>; }
     <div class="page-header">
       <h2>Your Favorite Artists</h2>
       <p class="subtitle">List from most to least favorite. Add {{ minArtists }} to {{ maxArtists }} artists.</p>
+      <p class="help-note">If you don't know what you listen to, you can use the <a href="https://www.statsforspotify.com/" target="_blank" rel="noopener noreferrer">Stats for Spotify</a> or <a href="https://statsmyapplemusic.com/" target="_blank" rel="noopener noreferrer">Stats for Apple Music</a> services.</p>
     </div>
     
     <form [formGroup]="form" (ngSubmit)="submit()" novalidate class="artists-form">
@@ -140,6 +141,25 @@ interface ArtistsFormShape { artists: FormArray<FormControl<string | null>>; }
       margin: 0;
       color: #6c757d;
       font-size: 1rem;
+    }
+
+    .help-note {
+      margin: 0.75rem 0 0 0;
+      color: #6c757d;
+      font-size: 0.9rem;
+      font-style: italic;
+    }
+
+    .help-note a {
+      color: #667eea;
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.2s ease;
+    }
+
+    .help-note a:hover {
+      color: #764ba2;
+      text-decoration: underline;
     }
 
     .form-card {

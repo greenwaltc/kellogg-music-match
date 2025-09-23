@@ -1,7 +1,12 @@
 # Kellogg Music Match - Top-Level Makefile
 # Orchestrates backend, UI, and infrastructure deployment
 
-.PHONY: help docker-build docker-run docker-stop docker-logs docker-clean status dev setup test clean backend-% ui-% infra-% db-% logs health restart build-all test-integration db-migrate-k8s db-info-k8s
+# Image versioning
+IMAGE_TAG ?= $(shell date +%Y%m%d-%H%M%S)
+GIT_SHA ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+IMAGE_VERSION ?= $(IMAGE_TAG)-$(GIT_SHA)
+
+.PHONY: help docker-build docker-build-tagged docker-run docker-stop docker-logs docker-clean status dev setup test clean backend-% ui-% infra-% db-% logs health restart build-all test-integration db-migrate-k8s db-info-k8s k3s-import k3s-build-import k3s-registry k3s-push k3s-images k3s-deploy k3s-status infra-deploy-force infra-deploy-k3s
 
 help: ## Show this help message
 	@echo "🎵 Kellogg Music Match - Development Commands"
@@ -12,6 +17,16 @@ docker-build: ## Build all Docker images
 	@echo "🐳 Building all Docker images..."
 	@docker-compose build postgres backend ui musicbrainz-loader
 	@echo "✅ All Docker images built successfully!"
+
+docker-build-tagged: ## Build Docker images with version tags
+	@echo "🐳 Building Docker images with tag: $(IMAGE_VERSION)..."
+	@docker-compose build postgres backend ui musicbrainz-loader
+	@echo "🏷️ Tagging images with version $(IMAGE_VERSION)..."
+	@docker tag kellogg-music-match-backend:latest kellogg-music-match-backend:$(IMAGE_VERSION)
+	@docker tag kellogg-music-match-ui:latest kellogg-music-match-ui:$(IMAGE_VERSION) 
+	@docker tag kellogg-music-match_postgres:latest kellogg-music-match-postgres:$(IMAGE_VERSION)
+	@docker tag kellogg-music-match_musicbrainz-loader:latest kellogg-music-match-musicbrainz:$(IMAGE_VERSION)
+	@echo "✅ Tagged images built successfully with version $(IMAGE_VERSION)!"
 
 docker-run: ## Start all services with Docker Compose
 	@echo "🐳 Starting Docker services..."
@@ -119,8 +134,18 @@ infra-preview: ## Preview infrastructure changes
 	@echo "☁️ Previewing infrastructure changes..."
 	@cd pulumi && pulumi preview
 
-infra-deploy: ## Deploy infrastructure
-	@echo "🚀 Deploying infrastructure..."
+infra-deploy: docker-build ## Build latest images and deploy infrastructure
+	@echo "🚀 Deploying infrastructure with latest images..."
+	@cd pulumi && pulumi up
+
+infra-deploy-force: ## Force rebuild and deploy with fresh images  
+	@echo "🔄 Force rebuilding images and deploying infrastructure..."
+	@docker-compose build --no-cache postgres backend ui musicbrainz-loader
+	@echo "🚀 Deploying infrastructure with force-pulled images..."
+	@cd pulumi && pulumi up --refresh
+
+infra-deploy-k3s: k3s-build-import ## Build, import to k3s, and deploy infrastructure
+	@echo "🚀 Deploying to k3s with latest imported images..."
 	@cd pulumi && pulumi up
 
 infra-destroy: ## Destroy infrastructure
@@ -202,6 +227,45 @@ infra-%: ## Forward infrastructure commands (e.g., make infra-refresh)
 
 db-%: ## Forward database commands to scripts
 	@cd database && ../scripts/flyway.sh $*
+
+# K3s Development Commands
+k3s-import: ## Import Docker images to k3s
+	@echo "🚢 Importing Docker images to k3s..."
+	@./scripts/k3s-image-import.sh import
+	@echo "✅ All images imported to k3s!"
+
+k3s-build-import: docker-build k3s-import ## Build and import Docker images to k3s
+
+k3s-registry: ## Setup local Docker registry for k3s
+	@echo "🏗️ Setting up local Docker registry for k3s..."
+	@./scripts/k3s-image-import.sh registry
+	@echo "✅ Local registry configured!"
+
+k3s-push: ## Push images to local registry
+	@echo "📤 Pushing images to local registry..."
+	@./scripts/k3s-image-import.sh push
+	@echo "✅ Images pushed to local registry!"
+
+k3s-images: ## Show current images in k3s
+	@echo "🔍 Current k3s images:"
+	@./scripts/k3s-image-import.sh show
+
+k3s-deploy: k3s-build-import ## Build, import, and deploy to k3s
+	@echo "🚀 Deploying to k3s..."
+	@kubectl apply -f pulumi/k8s/ -n kmm || echo "⚠️ Deploy k8s manifests manually"
+	@echo "✅ Deployment complete!"
+
+k3s-status: ## Show k3s cluster and application status
+	@echo "📊 K3s Cluster Status:"
+	@echo ""
+	@echo "🏗️ Cluster Info:"
+	@sudo k3s kubectl get nodes
+	@echo ""
+	@echo "🚀 Application Pods:"
+	@kubectl get pods -n kmm 2>/dev/null || echo "  No pods found in kmm namespace"
+	@echo ""
+	@echo "🔧 Services:"
+	@kubectl get services -n kmm 2>/dev/null || echo "  No services found in kmm namespace"
 
 # Default target
 .DEFAULT_GOAL := help

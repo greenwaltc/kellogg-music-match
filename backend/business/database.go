@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/greenwaltc/kellogg-music-match/backend/config"
 	sqlc "github.com/greenwaltc/kellogg-music-match/backend/db/sqlc"
+	_ "github.com/lib/pq"
 )
 
 // UserRepository defines the interface for user data operations
@@ -30,7 +31,7 @@ type UserRepository interface {
 
 	// User-Artist relationship operations
 	SetUserArtists(ctx context.Context, userID uuid.UUID, artistNames []string) error
-	GetUserArtists(ctx context.Context, userID uuid.UUID) ([]sqlc.Artist, error)
+	GetUserArtists(ctx context.Context, userID uuid.UUID) ([]sqlc.GetUserArtistsRow, error)
 	ClearUserArtists(ctx context.Context, userID uuid.UUID) error
 
 	// Matching operations
@@ -221,7 +222,7 @@ func (r *PostgreSQLUserRepository) SetUserArtists(ctx context.Context, userID uu
 }
 
 // GetUserArtists retrieves all artists for a user
-func (r *PostgreSQLUserRepository) GetUserArtists(ctx context.Context, userID uuid.UUID) ([]sqlc.Artist, error) {
+func (r *PostgreSQLUserRepository) GetUserArtists(ctx context.Context, userID uuid.UUID) ([]sqlc.GetUserArtistsRow, error) {
 	return r.queries.GetUserArtists(ctx, userID)
 }
 

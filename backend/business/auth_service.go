@@ -144,7 +144,7 @@ func (s *AuthService) LoginUser(ctx context.Context, loginRequest generated.Logi
 	artists, err := s.userRepo.GetUserArtists(ctx, dbUser.ID)
 	if err != nil {
 		// Log error but don't fail authentication
-		artists = []sqlc.Artist{}
+		artists = []sqlc.GetUserArtistsRow{}
 	}
 
 	// Convert to string slice
