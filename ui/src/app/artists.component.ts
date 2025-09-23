@@ -8,13 +8,14 @@ import { MatchService, MatchUser, Artist } from './match.service';
 import { environment } from '../environments/environment';
 import { AuthService } from './auth.service';
 import { ArtistAutocompleteComponent } from './artist-autocomplete.component';
+import { CdkDragDrop, CdkDrag, CdkDropList, moveItemInArray } from '@angular/cdk/drag-drop';
 
 interface ArtistsFormShape { artists: FormArray<FormControl<string | null>>; }
 
 @Component({
   selector: 'app-artists',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, ArtistAutocompleteComponent],
+  imports: [CommonModule, ReactiveFormsModule, ArtistAutocompleteComponent, CdkDrag, CdkDropList],
   template: `
   <section class="artists-section">
     <div class="page-header">
@@ -29,8 +30,9 @@ interface ArtistsFormShape { artists: FormArray<FormControl<string | null>>; }
           <span class="count-badge">{{ artistsArray.length }}/{{ maxArtists }}</span>
         </div>
         
-        <div formArrayName="artists" class="artists-list">
-          <div class="artist-row" *ngFor="let ctrl of artistsArray.controls; let i = index">
+        <div formArrayName="artists" class="artists-list" cdkDropList (cdkDropListDropped)="drop($event)">
+          <div class="artist-row" cdkDrag *ngFor="let ctrl of artistsArray.controls; let i = index">
+            <div class="drag-handle" cdkDragHandle title="Drag to reorder">⋮⋮</div>
             <div class="input-wrapper">
               <span class="rank-number">{{ i + 1 }}</span>
               <app-artist-autocomplete
@@ -178,6 +180,48 @@ interface ArtistsFormShape { artists: FormArray<FormControl<string | null>>; }
       display: flex;
       flex-direction: column;
       gap: 1rem;
+    }
+
+    .artist-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: transform 0.2s ease;
+    }
+
+    .artist-row.cdk-drag-preview {
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+      border-radius: 8px;
+    }
+
+    .artist-row.cdk-drag-animating {
+      transition: transform 250ms cubic-bezier(0, 0, 0.2, 1);
+    }
+
+    .artists-list.cdk-drop-list-dragging .artist-row:not(.cdk-drag-placeholder) {
+      transition: transform 250ms cubic-bezier(0, 0, 0.2, 1);
+    }
+
+    .drag-handle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 2rem;
+      height: 2rem;
+      color: #6c757d;
+      cursor: grab;
+      font-size: 1rem;
+      line-height: 1;
+      user-select: none;
+      transition: color 0.2s ease;
+    }
+
+    .drag-handle:hover {
+      color: #495057;
+    }
+
+    .drag-handle:active {
+      cursor: grabbing;
     }
 
     .input-wrapper {
@@ -443,6 +487,31 @@ export class ArtistsComponent implements OnInit {
       this.artistsArray.removeAt(i);
       this.artistsArray.updateValueAndValidity();
     }
+  }
+
+  drop(event: CdkDragDrop<FormControl<string | null>[]>): void {
+    const artistsArray = this.artistsArray;
+    
+    // Get the current values
+    const currentValues = artistsArray.controls.map((control: FormControl<string | null>) => control.value);
+    
+    // Move the values in the array
+    moveItemInArray(currentValues, event.previousIndex, event.currentIndex);
+    
+    // Clear the form array
+    while (artistsArray.length) {
+      artistsArray.removeAt(0);
+    }
+    
+    // Re-add the controls with the new order
+    currentValues.forEach((value: string | null) => {
+      const control = this.artistControl();
+      control.setValue(value);
+      artistsArray.push(control);
+    });
+    
+    // Trigger validation
+    artistsArray.updateValueAndValidity();
   }
 
   submit(): void {
