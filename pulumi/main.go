@@ -482,14 +482,13 @@ func main() {
 					"app": pulumi.String("kmm"),
 				},
 				Annotations: pulumi.StringMap{
-					"nginx.ingress.kubernetes.io/rewrite-target": pulumi.String("/"),
-					"nginx.ingress.kubernetes.io/ssl-redirect":   pulumi.String("false"),
-				},
+				"traefik.ingress.kubernetes.io/router.entrypoints": pulumi.String("web,websecure"),
+			},
 			},
 			Spec: &networkingv1.IngressSpecArgs{
-				IngressClassName: pulumi.String("nginx"),
+				IngressClassName: pulumi.String("traefik"),
 				Rules: networkingv1.IngressRuleArray{
-					// UI ingress rule
+					// UI ingress rule for traefik.me domain
 					&networkingv1.IngressRuleArgs{
 						Host: pulumi.String("kmm-ui.traefik.me"),
 						Http: &networkingv1.HTTPIngressRuleValueArgs{
