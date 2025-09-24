@@ -898,7 +898,6 @@ echo "🎉 MusicBrainz data loading completed"`),
 						},
 					},
 				},
-
 			},
 		})
 		if err != nil {
