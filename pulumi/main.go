@@ -742,6 +742,33 @@ echo "🎉 MusicBrainz data loading completed"`),
 			return err
 		}
 
+		// Create static PVC to reclaim the existing PV with data
+		postgresPVC, err := corev1.NewPersistentVolumeClaim(ctx, "postgres-pvc", &corev1.PersistentVolumeClaimArgs{
+			Metadata: &metav1.ObjectMetaArgs{
+				Name:      pulumi.String("postgres-storage-postgres-0"),
+				Namespace: namespace.Metadata.Name(),
+				Labels: pulumi.StringMap{
+					"app":       pulumi.String("kmm"),
+					"component": pulumi.String("database"),
+				},
+			},
+			Spec: &corev1.PersistentVolumeClaimSpecArgs{
+				AccessModes: pulumi.StringArray{
+					pulumi.String("ReadWriteOnce"),
+				},
+				StorageClassName: pulumi.String("local-path"),
+				VolumeName:       pulumi.String("pvc-088b2f83-b19d-43b0-bef3-226ea44cd4c0"), // Claim the specific PV with your data
+				Resources: &corev1.VolumeResourceRequirementsArgs{
+					Requests: pulumi.StringMap{
+						"storage": pulumi.String("10Gi"),
+					},
+				},
+			},
+		})
+		if err != nil {
+			return err
+		}
+
 		// Create PostgreSQL StatefulSet with custom image (scientific extensions)
 		pgStatefulSet, err := appsv1.NewStatefulSet(ctx, "postgres-statefulset", &appsv1.StatefulSetArgs{
 			Metadata: &metav1.ObjectMetaArgs{
@@ -843,6 +870,12 @@ echo "🎉 MusicBrainz data loading completed"`),
 						},
 						Volumes: corev1.VolumeArray{
 							&corev1.VolumeArgs{
+								Name: pulumi.String("postgres-storage"),
+								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSourceArgs{
+									ClaimName: pulumi.String("postgres-storage-postgres-0"),
+								},
+							},
+							&corev1.VolumeArgs{
 								Name: pulumi.String("flyway-config"),
 								ConfigMap: &corev1.ConfigMapVolumeSourceArgs{
 									Name: flywayConfigMap.Metadata.Name(),
@@ -865,24 +898,7 @@ echo "🎉 MusicBrainz data loading completed"`),
 						},
 					},
 				},
-				VolumeClaimTemplates: corev1.PersistentVolumeClaimTypeArray{
-					&corev1.PersistentVolumeClaimTypeArgs{
-						Metadata: &metav1.ObjectMetaArgs{
-							Name: pulumi.String("postgres-storage"),
-						},
-						Spec: &corev1.PersistentVolumeClaimSpecArgs{
-							AccessModes: pulumi.StringArray{
-								pulumi.String("ReadWriteOnce"),
-							},
-							StorageClassName: pulumi.String("local-path"),
-							Resources: &corev1.VolumeResourceRequirementsArgs{
-								Requests: pulumi.StringMap{
-									"storage": pulumi.String("10Gi"),
-								},
-							},
-						},
-					},
-				},
+
 			},
 		})
 		if err != nil {
@@ -928,6 +944,7 @@ echo "🎉 MusicBrainz data loading completed"`),
 		ctx.Export("postgresStatefulSetName", pgStatefulSet.Metadata.Name())
 		ctx.Export("postgresServiceName", pgService.Metadata.Name())
 		ctx.Export("postgresSecretName", pgSecret.Metadata.Name())
+		ctx.Export("postgresPVCName", postgresPVC.Metadata.Name())
 
 		// Export application URLs for easy access
 		ctx.Export("uiUrl", pulumi.String("http://kmm-ui.traefik.me"))
