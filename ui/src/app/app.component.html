@@ -1,6 +1,9 @@
 <div class="wrapper">
   <header class="topbar">
-    <h1 class="brand">{{ title }}</h1>
+    <div class="brand">
+      <img src="assets/logo.svg" alt="Kellogg Music Match Logo" class="brand-logo">
+      <h1 class="brand-text">{{ title }}</h1>
+    </div>
     
     <!-- Desktop Navigation -->
     <nav *ngIf="isLoggedIn(); else loggedOut" class="nav desktop-nav">

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- Background circle -->
+  <circle cx="16" cy="16" r="15" fill="#667eea"/>
+  
+  <!-- Music notes -->
+  <g fill="#ffffff">
+    <!-- First note -->
+    <circle cx="11" cy="19" r="1.5"/>
+    <rect x="12.2" y="10" width="0.8" height="9"/>
+    <ellipse cx="13.5" cy="10" rx="1.5" ry="0.8"/>
+    
+    <!-- Second note -->
+    <circle cx="19" cy="21" r="1.5"/>
+    <rect x="20.2" y="12" width="0.8" height="9"/>
+    <ellipse cx="21.5" cy="12" rx="1.5" ry="0.8"/>
+  </g>
+  
+  <!-- Kellogg "K" -->
+  <g fill="#ffffff" opacity="0.9">
+    <path d="M8 8 L9 8 L9 12 L11 10 L12 10 L10 12 L12 14 L11 14 L9 12 L9 14 L8 14 Z"/>
+  </g>
+</svg>
