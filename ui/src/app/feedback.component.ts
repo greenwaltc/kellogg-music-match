@@ -1,6 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { FormsModule, NgForm } from '@angular/forms';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { AuthService } from './auth.service';
 import { environment } from '../environments/environment';
@@ -14,7 +14,7 @@ import { environment } from '../environments/environment';
       <h2>Share Your Feedback</h2>
       <p>We'd love to hear your thoughts and suggestions to improve the Music Match experience!</p>
       
-      <form (ngSubmit)="submitFeedback()" #feedbackForm="ngForm">
+      <form (ngSubmit)="submitFeedback(feedbackForm)" #feedbackForm="ngForm">
         <div class="form-group">
           <label for="feedback">Your Feedback:</label>
           <textarea 
@@ -180,7 +180,7 @@ export class FeedbackComponent {
   successMessage = '';
   errorMessage = '';
 
-  async submitFeedback() {
+  async submitFeedback(form: NgForm) {
     if (this.feedbackText.trim().length === 0) {
       this.errorMessage = 'Please enter your feedback before submitting.';
       return;
@@ -210,6 +210,9 @@ export class FeedbackComponent {
       this.successMessage = 'Thank you for your feedback! We appreciate your input.';
       this.feedbackText = '';
       this.errorMessage = '';
+      
+      // Reset form state to pristine/untouched to clear validation errors
+      form.resetForm({ feedback: '' });
     } catch (error: any) {
       console.error('Error submitting feedback:', error);
       this.errorMessage = error.error?.message || 'Failed to submit feedback. Please try again.';

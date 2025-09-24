@@ -17,23 +17,10 @@ import { of, Subject, from } from 'rxjs';
         [placeholder]="placeholder"
         [maxlength]="240"
         class="autocomplete-input"
-        [class.has-clear-btn]="control.value && control.value.trim().length > 0"
         (focus)="onFocus()"
         (blur)="onBlur()"
         (keydown)="onKeydown($event)"
       />
-      <button 
-        type="button"
-        class="clear-btn"
-        *ngIf="control.value && control.value.trim().length > 0"
-        (click)="clearInput()"
-        title="Clear input"
-        aria-label="Clear input">
-        ×
-      </button>
-      <div class="char-counter" [class.warning]="control.value && control.value.length > 200">
-        {{ control.value?.length || 0 }}/240
-      </div>
       
       <div class="dropdown" *ngIf="showDropdown && (filteredArtists().length > 0 || isLoading() || error())" [class.show]="showDropdown">
         <div class="loading" *ngIf="isLoading()">
@@ -86,54 +73,7 @@ import { of, Subject, from } from 'rxjs';
       box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
     }
 
-    .autocomplete-input.has-clear-btn {
-      padding-right: 3rem;
-    }
 
-    .clear-btn {
-      position: absolute;
-      right: 0.5rem;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 1.5rem;
-      height: 1.5rem;
-      background: #dc3545;
-      color: white;
-      border: none;
-      border-radius: 50%;
-      font-size: 1rem;
-      line-height: 1;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1;
-    }
-
-    .clear-btn:hover {
-      background: #c82333;
-      transform: translateY(-50%) scale(1.1);
-    }
-
-    .char-counter {
-      position: absolute;
-      right: 0.75rem;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 0.75rem;
-      color: #6c757d;
-      pointer-events: none;
-    }
-
-    .autocomplete-input.has-clear-btn + .clear-btn + .char-counter {
-      right: 2.5rem;
-    }
-
-    .char-counter.warning {
-      color: #dc3545;
-      font-weight: 600;
-    }
 
     .dropdown {
       position: absolute;
@@ -321,11 +261,5 @@ export class ArtistAutocompleteComponent implements OnInit, OnDestroy {
     this.highlightedIndex = -1;
   }
 
-  clearInput() {
-    this.control.setValue('');
-    this.showDropdown = false;
-    this.filteredArtists.set([]);
-    this.highlightedIndex = -1;
-    this.searchInput.nativeElement.focus();
-  }
+
 }

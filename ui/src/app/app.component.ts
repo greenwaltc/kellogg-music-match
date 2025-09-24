@@ -16,6 +16,7 @@ export class AppComponent {
   title = 'Kellogg Music Match';
   user = signal<any>(null);
   isLoggedIn = computed(() => !!this.user());
+  mobileMenuOpen = signal(false);
 
   constructor(private auth: AuthService, private router: Router, public theme: ThemeService, private matchService: MatchService) {
     this.user = this.auth.user; // assign after DI
@@ -28,6 +29,14 @@ export class AppComponent {
   }
 
   toggleTheme(): void { this.theme.toggle(); }
+
+  toggleMobileMenu(): void {
+    this.mobileMenuOpen.set(!this.mobileMenuOpen());
+  }
+
+  closeMobileMenu(): void {
+    this.mobileMenuOpen.set(false);
+  }
 
   ngOnInit(): void { this.matchService.fetchIfReady(); }
 }

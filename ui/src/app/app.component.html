@@ -1,7 +1,9 @@
 <div class="wrapper">
   <header class="topbar">
     <h1 class="brand">{{ title }}</h1>
-    <nav *ngIf="isLoggedIn(); else loggedOut" class="nav">
+    
+    <!-- Desktop Navigation -->
+    <nav *ngIf="isLoggedIn(); else loggedOut" class="nav desktop-nav">
       <a routerLink="/artists" routerLinkActive="active">Artists</a>
       <a routerLink="/matches" routerLinkActive="active">Matches</a>
       <a routerLink="/feedback" routerLinkActive="active">Feedback</a>
@@ -10,7 +12,34 @@
       <button type="button" (click)="logout()">Logout</button>
     </nav>
     <ng-template #loggedOut>
-      <nav class="nav">
+      <nav class="nav desktop-nav">
+        <button type="button" class="ghost" (click)="toggleTheme()" aria-label="Toggle theme">{{ theme.mode() === 'dark' ? '🌞' : '🌙' }}</button>
+      </nav>
+    </ng-template>
+
+    <!-- Mobile Hamburger Button -->
+    <button 
+      type="button" 
+      class="mobile-menu-toggle" 
+      (click)="toggleMobileMenu()"
+      [class.active]="mobileMenuOpen()"
+      aria-label="Toggle menu">
+      <span class="hamburger-line"></span>
+      <span class="hamburger-line"></span>
+      <span class="hamburger-line"></span>
+    </button>
+
+    <!-- Mobile Navigation Menu -->
+    <nav *ngIf="isLoggedIn(); else mobileLoggedOut" class="mobile-nav" [class.open]="mobileMenuOpen()">
+      <a routerLink="/artists" routerLinkActive="active" (click)="closeMobileMenu()">Artists</a>
+      <a routerLink="/matches" routerLinkActive="active" (click)="closeMobileMenu()">Matches</a>
+      <a routerLink="/feedback" routerLinkActive="active" (click)="closeMobileMenu()">Feedback</a>
+      <a routerLink="/roadmap" routerLinkActive="active" (click)="closeMobileMenu()">Roadmap</a>
+      <button type="button" class="ghost" (click)="toggleTheme()" aria-label="Toggle theme">{{ theme.mode() === 'dark' ? '🌞' : '🌙' }}</button>
+      <button type="button" (click)="logout(); closeMobileMenu()">Logout</button>
+    </nav>
+    <ng-template #mobileLoggedOut>
+      <nav class="mobile-nav" [class.open]="mobileMenuOpen()">
         <button type="button" class="ghost" (click)="toggleTheme()" aria-label="Toggle theme">{{ theme.mode() === 'dark' ? '🌞' : '🌙' }}</button>
       </nav>
     </ng-template>

@@ -11,6 +11,7 @@ import { SimilarityMeterComponent } from './similarity-meter.component';
   template: `
   <section>
     <h2>Your Top Music Matches</h2>
+    <p class="note">Tip: check back here often! As more Kellogg students register, we build better matches.</p>
     <ng-container *ngIf="matches.matches() as list; else noFetchYet">
       <ng-container *ngIf="list.length; else noMatchesYet">
         <div class="matches-list">
@@ -75,7 +76,6 @@ import { SimilarityMeterComponent } from './similarity-meter.component';
     <ng-template #noFetchYet>
       <p class="empty-msg">No matches retrieved yet. Add or update your favorite artists to get started.</p>
     </ng-template>
-    <p class="note">Tip: check back here often! As more Kellogg students register, we build better matches.</p>
     <div class="actions">
       <button type="button" (click)="back()">Back</button>
     </div>
