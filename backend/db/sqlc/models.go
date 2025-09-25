@@ -5,74 +5,85 @@
 package database
 
 import (
-	"database/sql"
-
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // Artists table containing both user-submitted and MusicBrainz reference artists
 type Artist struct {
-	ID               int32          `json:"id"`
-	Name             string         `json:"name"`
-	CreatedAt        sql.NullTime   `json:"created_at"`
-	MusicbrainzID    uuid.NullUUID  `json:"musicbrainz_id"`
-	SortName         sql.NullString `json:"sort_name"`
-	ArtistType       sql.NullString `json:"artist_type"`
-	Gender           sql.NullString `json:"gender"`
-	Country          sql.NullString `json:"country"`
-	LifeSpanBegin    sql.NullTime   `json:"life_span_begin"`
-	LifeSpanEnd      sql.NullTime   `json:"life_span_end"`
-	Disambiguation   sql.NullString `json:"disambiguation"`
-	MusicbrainzScore sql.NullInt32  `json:"musicbrainz_score"`
-	IsReference      sql.NullBool   `json:"is_reference"`
+	ID               int32              `json:"id"`
+	Name             string             `json:"name"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	MusicbrainzID    pgtype.UUID        `json:"musicbrainz_id"`
+	SortName         pgtype.Text        `json:"sort_name"`
+	ArtistType       pgtype.Text        `json:"artist_type"`
+	Gender           pgtype.Text        `json:"gender"`
+	Country          pgtype.Text        `json:"country"`
+	LifeSpanBegin    pgtype.Date        `json:"life_span_begin"`
+	LifeSpanEnd      pgtype.Date        `json:"life_span_end"`
+	Disambiguation   pgtype.Text        `json:"disambiguation"`
+	MusicbrainzScore pgtype.Int4        `json:"musicbrainz_score"`
+	IsReference      pgtype.Bool        `json:"is_reference"`
+}
+
+type ArtistListenerCount struct {
+	ArtistID   int32 `json:"artist_id"`
+	NListeners int64 `json:"n_listeners"`
+}
+
+type ArtistNeighbor struct {
+	A         int32              `json:"a"`
+	B         int32              `json:"b"`
+	Distance  float64            `json:"distance"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
 type Feedback struct {
-	ID           int32        `json:"id"`
-	UserID       uuid.UUID    `json:"user_id"`
-	FeedbackText string       `json:"feedback_text"`
-	CreatedAt    sql.NullTime `json:"created_at"`
-	UpdatedAt    sql.NullTime `json:"updated_at"`
+	ID           int32              `json:"id"`
+	UserID       uuid.UUID          `json:"user_id"`
+	FeedbackText string             `json:"feedback_text"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 }
 
 type ReferenceArtist struct {
-	ID               int32          `json:"id"`
-	Name             string         `json:"name"`
-	SortName         sql.NullString `json:"sort_name"`
-	ArtistType       sql.NullString `json:"artist_type"`
-	Gender           sql.NullString `json:"gender"`
-	Country          sql.NullString `json:"country"`
-	LifeSpanBegin    sql.NullTime   `json:"life_span_begin"`
-	LifeSpanEnd      sql.NullTime   `json:"life_span_end"`
-	Disambiguation   sql.NullString `json:"disambiguation"`
-	MusicbrainzScore sql.NullInt32  `json:"musicbrainz_score"`
-	MusicbrainzID    uuid.NullUUID  `json:"musicbrainz_id"`
+	ID               int32       `json:"id"`
+	Name             string      `json:"name"`
+	SortName         pgtype.Text `json:"sort_name"`
+	ArtistType       pgtype.Text `json:"artist_type"`
+	Gender           pgtype.Text `json:"gender"`
+	Country          pgtype.Text `json:"country"`
+	LifeSpanBegin    pgtype.Date `json:"life_span_begin"`
+	LifeSpanEnd      pgtype.Date `json:"life_span_end"`
+	Disambiguation   pgtype.Text `json:"disambiguation"`
+	MusicbrainzScore pgtype.Int4 `json:"musicbrainz_score"`
+	MusicbrainzID    pgtype.UUID `json:"musicbrainz_id"`
 }
 
 type User struct {
-	ID           uuid.UUID    `json:"id"`
-	Username     string       `json:"username"`
-	Email        string       `json:"email"`
-	FirstName    string       `json:"first_name"`
-	LastName     string       `json:"last_name"`
-	PasswordHash string       `json:"password_hash"`
-	CreatedAt    sql.NullTime `json:"created_at"`
-	UpdatedAt    sql.NullTime `json:"updated_at"`
-	// MBA program type: 2Y, 1Y, MBAi, MMM, EWMBA, JV
-	Program sql.NullString `json:"program"`
+	ID           uuid.UUID          `json:"id"`
+	Username     string             `json:"username"`
+	Email        string             `json:"email"`
+	FirstName    string             `json:"first_name"`
+	LastName     string             `json:"last_name"`
+	PasswordHash string             `json:"password_hash"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+	// MBA program type: 2Y, 1Y, MMM, MBAi, JD-MBA, MD-MBA, EWMBA, JV
+	Program pgtype.Text `json:"program"`
 	// Expected graduation year (current year to 2030)
-	GraduationYear sql.NullInt32 `json:"graduation_year"`
+	GraduationYear pgtype.Int4 `json:"graduation_year"`
 }
 
 type UserArtist struct {
-	UserID    uuid.UUID    `json:"user_id"`
-	ArtistID  int32        `json:"artist_id"`
-	CreatedAt sql.NullTime `json:"created_at"`
-	Rank      int16        `json:"rank"`
+	UserID    uuid.UUID          `json:"user_id"`
+	ArtistID  int32              `json:"artist_id"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	Rank      int16              `json:"rank"`
 }
 
 type UserSubmittedArtist struct {
-	ID        int32        `json:"id"`
-	Name      string       `json:"name"`
-	CreatedAt sql.NullTime `json:"created_at"`
+	ID        int32              `json:"id"`
+	Name      string             `json:"name"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }

@@ -11,46 +11,35 @@ import (
 )
 
 type Querier interface {
-	// User-Artist relationship queries
+	// =======================
+	// User-Artist relations
+	// =======================
+	// FIX: conflict target must be a unique/PK constraint. Your table has PK (user_id, artist_id)
 	AddUserArtist(ctx context.Context, arg AddUserArtistParams) error
+	ChamferSimilarityByIDs(ctx context.Context, arg ChamferSimilarityByIDsParams) (float64, error)
+	ChamferSimilarityByNames(ctx context.Context, arg ChamferSimilarityByNamesParams) (float64, error)
 	ClearUserArtists(ctx context.Context, userID uuid.UUID) error
-	// Artist queries
+	// =======================
+	// Artists
+	// =======================
 	CreateArtist(ctx context.Context, name string) (Artist, error)
+	// (If you also want the :by-user-id variant, keep your FindSimilarUsersChamferByUserID below unchanged.)
 	// Feedback queries
 	CreateFeedback(ctx context.Context, arg CreateFeedbackParams) (Feedback, error)
+	// =======================
+	// Users
+	// =======================
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteUser(ctx context.Context, id uuid.UUID) error
-	// SELECT
-	//   u1.username,
-	//   u1.first_name,
-	//   u1.last_name,
-	//   u1.program,
-	//   u1.graduation_year,
-	//   COALESCE((SELECT array_agg(a1.name ORDER BY ua1.rank ASC)
-	//    FROM user_artists ua1
-	//    JOIN artists a1 ON ua1.artist_id = a1.id
-	//    WHERE ua1.user_id = u1.id), '{}') AS artists,
-	//   spearman_distance(
-	//     COALESCE((SELECT array_agg(a1.name ORDER BY ua1.rank ASC)
-	//      FROM user_artists ua1
-	//      JOIN artists a1 ON ua1.artist_id = a1.id
-	//      WHERE ua1.user_id = u1.id), '{}'),
-	//     COALESCE((SELECT array_agg(a2.name ORDER BY ua2.rank ASC)
-	//      FROM users u2
-	//      JOIN user_artists ua2 ON u2.id = ua2.user_id
-	//      JOIN artists a2 ON ua2.artist_id = a2.id
-	//      WHERE u2.username = $1), '{}')
-	//   ) AS distance
-	// FROM users u1
-	// WHERE u1.username != $1
-	//   AND EXISTS (SELECT 1 FROM user_artists WHERE user_id = u1.id)
-	// ORDER BY distance ASC
-	// LIMIT 50;
+	// =======================
+	// Nearest neighbors (Chamfer-based)
+	// Replace old PWO query with Chamfer under the same exported name
+	// =======================
 	// :username => the anchor profile
 	// :limit_n  => how many matches to return
 	FindSimilarUsers(ctx context.Context, arg FindSimilarUsersParams) ([]FindSimilarUsersRow, error)
 	GetAllArtists(ctx context.Context) ([]Artist, error)
-	GetAllFeedback(ctx context.Context, limit int32) ([]GetAllFeedbackRow, error)
+	GetAllFeedback(ctx context.Context, lim int32) ([]GetAllFeedbackRow, error)
 	GetAllUsers(ctx context.Context) ([]User, error)
 	GetArtistByID(ctx context.Context, id int32) (Artist, error)
 	GetArtistByName(ctx context.Context, name string) (Artist, error)
@@ -61,12 +50,20 @@ type Querier interface {
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
 	GetUserByUsernameWithPassword(ctx context.Context, username string) (User, error)
-	// Matching queries
+	// =======================
+	// Matching helpers / reports
+	// =======================
 	GetUsersWithArtists(ctx context.Context) ([]GetUsersWithArtistsRow, error)
+	PairwiseArtistSimilarityByIDs(ctx context.Context, artist1ID int32) (int32, error)
+	// =======================
+	// New similarity APIs (artist + set)
+	// =======================
+	PairwiseArtistSimilarityByNames(ctx context.Context, arg PairwiseArtistSimilarityByNamesParams) (PairwiseArtistSimilarityByNamesRow, error)
 	RemoveUserArtist(ctx context.Context, arg RemoveUserArtistParams) error
 	SearchArtists(ctx context.Context, arg SearchArtistsParams) ([]Artist, error)
 	SetUserArtists(ctx context.Context, arg SetUserArtistsParams) error
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
+	UserChamferSimilarity(ctx context.Context, arg UserChamferSimilarityParams) (float64, error)
 	UserExistsByEmail(ctx context.Context, email string) (bool, error)
 	UserExistsByUsername(ctx context.Context, username string) (bool, error)
 }

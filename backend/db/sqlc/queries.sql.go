@@ -7,28 +7,76 @@ package database
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/google/uuid"
-	"github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const addUserArtist = `-- name: AddUserArtist :exec
+
 INSERT INTO user_artists (user_id, artist_id, rank)
-VALUES ($1, $2, $3)
-ON CONFLICT (user_id, artist_id, rank) DO NOTHING
+VALUES ($1::uuid, $2::int, $3::int)
+ON CONFLICT (user_id, artist_id) DO UPDATE SET rank = EXCLUDED.rank
 `
 
 type AddUserArtistParams struct {
 	UserID   uuid.UUID `json:"user_id"`
 	ArtistID int32     `json:"artist_id"`
-	Rank     int16     `json:"rank"`
+	Rank     int32     `json:"rank"`
 }
 
-// User-Artist relationship queries
+// =======================
+// User-Artist relations
+// =======================
+// FIX: conflict target must be a unique/PK constraint. Your table has PK (user_id, artist_id)
 func (q *Queries) AddUserArtist(ctx context.Context, arg AddUserArtistParams) error {
-	_, err := q.db.ExecContext(ctx, addUserArtist, arg.UserID, arg.ArtistID, arg.Rank)
+	_, err := q.db.Exec(ctx, addUserArtist, arg.UserID, arg.ArtistID, arg.Rank)
 	return err
+}
+
+const chamferSimilarityByIDs = `-- name: ChamferSimilarityByIDs :one
+SELECT chamfer_similarity_artists($1::int[], $2::int[]) AS similarity
+`
+
+type ChamferSimilarityByIDsParams struct {
+	ArtistIdsList1 []int32 `json:"artist_ids_list1"`
+	ArtistIdsList2 []int32 `json:"artist_ids_list2"`
+}
+
+func (q *Queries) ChamferSimilarityByIDs(ctx context.Context, arg ChamferSimilarityByIDsParams) (float64, error) {
+	row := q.db.QueryRow(ctx, chamferSimilarityByIDs, arg.ArtistIdsList1, arg.ArtistIdsList2)
+	var similarity float64
+	err := row.Scan(&similarity)
+	return similarity, err
+}
+
+const chamferSimilarityByNames = `-- name: ChamferSimilarityByNames :one
+WITH s1 AS (
+  SELECT COALESCE(array_agg(id), '{}'::int[]) AS ids
+  FROM artists
+  WHERE name = ANY($1::text[])
+),
+s2 AS (
+  SELECT COALESCE(array_agg(id), '{}'::int[]) AS ids
+  FROM artists
+  WHERE name = ANY($2::text[])
+)
+SELECT chamfer_similarity_artists(
+  (SELECT ids FROM s1),
+  (SELECT ids FROM s2)
+) AS similarity
+`
+
+type ChamferSimilarityByNamesParams struct {
+	ArtistNamesList1 []string `json:"artist_names_list1"`
+	ArtistNamesList2 []string `json:"artist_names_list2"`
+}
+
+func (q *Queries) ChamferSimilarityByNames(ctx context.Context, arg ChamferSimilarityByNamesParams) (float64, error) {
+	row := q.db.QueryRow(ctx, chamferSimilarityByNames, arg.ArtistNamesList1, arg.ArtistNamesList2)
+	var similarity float64
+	err := row.Scan(&similarity)
+	return similarity, err
 }
 
 const clearUserArtists = `-- name: ClearUserArtists :exec
@@ -36,20 +84,23 @@ DELETE FROM user_artists WHERE user_id = $1
 `
 
 func (q *Queries) ClearUserArtists(ctx context.Context, userID uuid.UUID) error {
-	_, err := q.db.ExecContext(ctx, clearUserArtists, userID)
+	_, err := q.db.Exec(ctx, clearUserArtists, userID)
 	return err
 }
 
 const createArtist = `-- name: CreateArtist :one
+
 INSERT INTO artists (name)
 VALUES ($1)
 ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
 RETURNING id, name, created_at, musicbrainz_id, sort_name, artist_type, gender, country, life_span_begin, life_span_end, disambiguation, musicbrainz_score, is_reference
 `
 
-// Artist queries
+// =======================
+// Artists
+// =======================
 func (q *Queries) CreateArtist(ctx context.Context, name string) (Artist, error) {
-	row := q.db.QueryRowContext(ctx, createArtist, name)
+	row := q.db.QueryRow(ctx, createArtist, name)
 	var i Artist
 	err := row.Scan(
 		&i.ID,
@@ -70,6 +121,7 @@ func (q *Queries) CreateArtist(ctx context.Context, name string) (Artist, error)
 }
 
 const createFeedback = `-- name: CreateFeedback :one
+
 INSERT INTO feedback (user_id, feedback_text)
 VALUES ($1, $2)
 RETURNING id, user_id, feedback_text, created_at, updated_at
@@ -80,9 +132,10 @@ type CreateFeedbackParams struct {
 	FeedbackText string    `json:"feedback_text"`
 }
 
+// (If you also want the :by-user-id variant, keep your FindSimilarUsersChamferByUserID below unchanged.)
 // Feedback queries
 func (q *Queries) CreateFeedback(ctx context.Context, arg CreateFeedbackParams) (Feedback, error) {
-	row := q.db.QueryRowContext(ctx, createFeedback, arg.UserID, arg.FeedbackText)
+	row := q.db.QueryRow(ctx, createFeedback, arg.UserID, arg.FeedbackText)
 	var i Feedback
 	err := row.Scan(
 		&i.ID,
@@ -95,24 +148,28 @@ func (q *Queries) CreateFeedback(ctx context.Context, arg CreateFeedbackParams) 
 }
 
 const createUser = `-- name: CreateUser :one
+
 INSERT INTO users (id, username, email, first_name, last_name, password_hash, program, graduation_year)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING id, username, email, first_name, last_name, password_hash, created_at, updated_at, program, graduation_year
 `
 
 type CreateUserParams struct {
-	ID             uuid.UUID      `json:"id"`
-	Username       string         `json:"username"`
-	Email          string         `json:"email"`
-	FirstName      string         `json:"first_name"`
-	LastName       string         `json:"last_name"`
-	PasswordHash   string         `json:"password_hash"`
-	Program        sql.NullString `json:"program"`
-	GraduationYear sql.NullInt32  `json:"graduation_year"`
+	ID             uuid.UUID   `json:"id"`
+	Username       string      `json:"username"`
+	Email          string      `json:"email"`
+	FirstName      string      `json:"first_name"`
+	LastName       string      `json:"last_name"`
+	PasswordHash   string      `json:"password_hash"`
+	Program        pgtype.Text `json:"program"`
+	GraduationYear pgtype.Int4 `json:"graduation_year"`
 }
 
+// =======================
+// Users
+// =======================
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRowContext(ctx, createUser,
+	row := q.db.QueryRow(ctx, createUser,
 		arg.ID,
 		arg.Username,
 		arg.Email,
@@ -143,19 +200,18 @@ DELETE FROM users WHERE id = $1
 `
 
 func (q *Queries) DeleteUser(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.ExecContext(ctx, deleteUser, id)
+	_, err := q.db.Exec(ctx, deleteUser, id)
 	return err
 }
 
 const findSimilarUsers = `-- name: FindSimilarUsers :many
 
 WITH target AS (
-  SELECT id AS target_id
+  SELECT id AS target_id, program AS target_program, graduation_year AS target_grad
   FROM users
-  WHERE username = $1
+  WHERE username = $3
 ),
 base_list AS (
-  -- Optional: ensure the target has at least one artist
   SELECT 1
   FROM user_artists ua
   JOIN target t ON ua.user_id = t.target_id
@@ -167,73 +223,65 @@ SELECT
   u.last_name,
   u.program,
   u.graduation_year,
-  -- Optional: return their ordered artist names
   COALESCE((
     SELECT array_agg(a.name ORDER BY ua.rank)
     FROM user_artists ua
     JOIN artists a ON a.id = ua.artist_id
     WHERE ua.user_id = u.id
-  ), '{}') AS artists,
-  pwo_distance($3, u.id, (SELECT target_id FROM target)) AS distance
+  ), '{}'::text[]) AS artists,
+  s.d AS distance,
+  (1.0 - s.d) AS similarity
 FROM users u
-WHERE u.username <> $1
+JOIN target t ON TRUE
+CROSS JOIN LATERAL (
+  SELECT user_chamfer_distance(
+           u.id,
+           t.target_id,
+           $1::int,     -- top_k
+           $2::float8   -- alpha
+         ) AS d
+) AS s
+WHERE u.username <> $3
+  AND EXISTS (SELECT 1 FROM base_list)
   AND EXISTS (SELECT 1 FROM user_artists ua WHERE ua.user_id = u.id)
-ORDER BY distance ASC,
-    u.program = (SELECT program FROM users WHERE username = $1) DESC,
-    u.graduation_year = (SELECT graduation_year FROM users WHERE username = $1) DESC
-LIMIT $2
+ORDER BY
+  s.d ASC,
+  (u.program = t.target_program) DESC,
+  (u.graduation_year = t.target_grad) DESC
+LIMIT $4
 `
 
 type FindSimilarUsersParams struct {
-	Username string  `json:"username"`
-	Limit    int32   `json:"limit"`
+	TopK     int32   `json:"top_k"`
 	Alpha    float64 `json:"alpha"`
+	Username string  `json:"username"`
+	Lim      int32   `json:"lim"`
 }
 
 type FindSimilarUsersRow struct {
-	Username       string         `json:"username"`
-	FirstName      string         `json:"first_name"`
-	LastName       string         `json:"last_name"`
-	Program        sql.NullString `json:"program"`
-	GraduationYear sql.NullInt32  `json:"graduation_year"`
-	Artists        interface{}    `json:"artists"`
-	Distance       float64        `json:"distance"`
+	Username       string      `json:"username"`
+	FirstName      string      `json:"first_name"`
+	LastName       string      `json:"last_name"`
+	Program        pgtype.Text `json:"program"`
+	GraduationYear pgtype.Int4 `json:"graduation_year"`
+	Artists        interface{} `json:"artists"`
+	Distance       float64     `json:"distance"`
+	Similarity     int32       `json:"similarity"`
 }
 
-// SELECT
-//
-//	u1.username,
-//	u1.first_name,
-//	u1.last_name,
-//	u1.program,
-//	u1.graduation_year,
-//	COALESCE((SELECT array_agg(a1.name ORDER BY ua1.rank ASC)
-//	 FROM user_artists ua1
-//	 JOIN artists a1 ON ua1.artist_id = a1.id
-//	 WHERE ua1.user_id = u1.id), '{}') AS artists,
-//	spearman_distance(
-//	  COALESCE((SELECT array_agg(a1.name ORDER BY ua1.rank ASC)
-//	   FROM user_artists ua1
-//	   JOIN artists a1 ON ua1.artist_id = a1.id
-//	   WHERE ua1.user_id = u1.id), '{}'),
-//	  COALESCE((SELECT array_agg(a2.name ORDER BY ua2.rank ASC)
-//	   FROM users u2
-//	   JOIN user_artists ua2 ON u2.id = ua2.user_id
-//	   JOIN artists a2 ON ua2.artist_id = a2.id
-//	   WHERE u2.username = $1), '{}')
-//	) AS distance
-//
-// FROM users u1
-// WHERE u1.username != $1
-//
-//	AND EXISTS (SELECT 1 FROM user_artists WHERE user_id = u1.id)
-//
-// ORDER BY distance ASC
-// LIMIT 50;
+// =======================
+// Nearest neighbors (Chamfer-based)
+// Replace old PWO query with Chamfer under the same exported name
+// =======================
 // :username => the anchor profile
 // :limit_n  => how many matches to return
 func (q *Queries) FindSimilarUsers(ctx context.Context, arg FindSimilarUsersParams) ([]FindSimilarUsersRow, error) {
-	rows, err := q.db.QueryContext(ctx, findSimilarUsers, arg.Username, arg.Limit, arg.Alpha)
+	rows, err := q.db.Query(ctx, findSimilarUsers,
+		arg.TopK,
+		arg.Alpha,
+		arg.Username,
+		arg.Lim,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -249,13 +297,11 @@ func (q *Queries) FindSimilarUsers(ctx context.Context, arg FindSimilarUsersPara
 			&i.GraduationYear,
 			&i.Artists,
 			&i.Distance,
+			&i.Similarity,
 		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -268,7 +314,7 @@ SELECT id, name, created_at, musicbrainz_id, sort_name, artist_type, gender, cou
 `
 
 func (q *Queries) GetAllArtists(ctx context.Context) ([]Artist, error) {
-	rows, err := q.db.QueryContext(ctx, getAllArtists)
+	rows, err := q.db.Query(ctx, getAllArtists)
 	if err != nil {
 		return nil, err
 	}
@@ -295,9 +341,6 @@ func (q *Queries) GetAllArtists(ctx context.Context) ([]Artist, error) {
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -313,18 +356,18 @@ LIMIT $1
 `
 
 type GetAllFeedbackRow struct {
-	ID           int32        `json:"id"`
-	UserID       uuid.UUID    `json:"user_id"`
-	FeedbackText string       `json:"feedback_text"`
-	CreatedAt    sql.NullTime `json:"created_at"`
-	UpdatedAt    sql.NullTime `json:"updated_at"`
-	Username     string       `json:"username"`
-	FirstName    string       `json:"first_name"`
-	LastName     string       `json:"last_name"`
+	ID           int32              `json:"id"`
+	UserID       uuid.UUID          `json:"user_id"`
+	FeedbackText string             `json:"feedback_text"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+	Username     string             `json:"username"`
+	FirstName    string             `json:"first_name"`
+	LastName     string             `json:"last_name"`
 }
 
-func (q *Queries) GetAllFeedback(ctx context.Context, limit int32) ([]GetAllFeedbackRow, error) {
-	rows, err := q.db.QueryContext(ctx, getAllFeedback, limit)
+func (q *Queries) GetAllFeedback(ctx context.Context, lim int32) ([]GetAllFeedbackRow, error) {
+	rows, err := q.db.Query(ctx, getAllFeedback, lim)
 	if err != nil {
 		return nil, err
 	}
@@ -346,9 +389,6 @@ func (q *Queries) GetAllFeedback(ctx context.Context, limit int32) ([]GetAllFeed
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -360,7 +400,7 @@ SELECT id, username, email, first_name, last_name, password_hash, created_at, up
 `
 
 func (q *Queries) GetAllUsers(ctx context.Context) ([]User, error) {
-	rows, err := q.db.QueryContext(ctx, getAllUsers)
+	rows, err := q.db.Query(ctx, getAllUsers)
 	if err != nil {
 		return nil, err
 	}
@@ -384,9 +424,6 @@ func (q *Queries) GetAllUsers(ctx context.Context) ([]User, error) {
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -398,7 +435,7 @@ SELECT id, name, created_at, musicbrainz_id, sort_name, artist_type, gender, cou
 `
 
 func (q *Queries) GetArtistByID(ctx context.Context, id int32) (Artist, error) {
-	row := q.db.QueryRowContext(ctx, getArtistByID, id)
+	row := q.db.QueryRow(ctx, getArtistByID, id)
 	var i Artist
 	err := row.Scan(
 		&i.ID,
@@ -423,7 +460,7 @@ SELECT id, name, created_at, musicbrainz_id, sort_name, artist_type, gender, cou
 `
 
 func (q *Queries) GetArtistByName(ctx context.Context, name string) (Artist, error) {
-	row := q.db.QueryRowContext(ctx, getArtistByName, name)
+	row := q.db.QueryRow(ctx, getArtistByName, name)
 	var i Artist
 	err := row.Scan(
 		&i.ID,
@@ -452,17 +489,17 @@ ORDER BY u.username
 `
 
 type GetArtistUsersRow struct {
-	ID        uuid.UUID    `json:"id"`
-	Username  string       `json:"username"`
-	Email     string       `json:"email"`
-	FirstName string       `json:"first_name"`
-	LastName  string       `json:"last_name"`
-	CreatedAt sql.NullTime `json:"created_at"`
-	UpdatedAt sql.NullTime `json:"updated_at"`
+	ID        uuid.UUID          `json:"id"`
+	Username  string             `json:"username"`
+	Email     string             `json:"email"`
+	FirstName string             `json:"first_name"`
+	LastName  string             `json:"last_name"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
 func (q *Queries) GetArtistUsers(ctx context.Context, artistID int32) ([]GetArtistUsersRow, error) {
-	rows, err := q.db.QueryContext(ctx, getArtistUsers, artistID)
+	rows, err := q.db.Query(ctx, getArtistUsers, artistID)
 	if err != nil {
 		return nil, err
 	}
@@ -483,9 +520,6 @@ func (q *Queries) GetArtistUsers(ctx context.Context, artistID int32) ([]GetArti
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -499,7 +533,7 @@ ORDER BY created_at DESC
 `
 
 func (q *Queries) GetFeedbackByUser(ctx context.Context, userID uuid.UUID) ([]Feedback, error) {
-	rows, err := q.db.QueryContext(ctx, getFeedbackByUser, userID)
+	rows, err := q.db.Query(ctx, getFeedbackByUser, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -518,9 +552,6 @@ func (q *Queries) GetFeedbackByUser(ctx context.Context, userID uuid.UUID) ([]Fe
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -536,13 +567,13 @@ ORDER BY ua.rank
 `
 
 type GetUserArtistsRow struct {
-	ID        int32        `json:"id"`
-	Name      string       `json:"name"`
-	CreatedAt sql.NullTime `json:"created_at"`
+	ID        int32              `json:"id"`
+	Name      string             `json:"name"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
 func (q *Queries) GetUserArtists(ctx context.Context, userID uuid.UUID) ([]GetUserArtistsRow, error) {
-	rows, err := q.db.QueryContext(ctx, getUserArtists, userID)
+	rows, err := q.db.Query(ctx, getUserArtists, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -555,9 +586,6 @@ func (q *Queries) GetUserArtists(ctx context.Context, userID uuid.UUID) ([]GetUs
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -569,7 +597,7 @@ SELECT id, username, email, first_name, last_name, password_hash, created_at, up
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
-	row := q.db.QueryRowContext(ctx, getUserByEmail, email)
+	row := q.db.QueryRow(ctx, getUserByEmail, email)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -591,7 +619,7 @@ SELECT id, username, email, first_name, last_name, password_hash, created_at, up
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
-	row := q.db.QueryRowContext(ctx, getUserByID, id)
+	row := q.db.QueryRow(ctx, getUserByID, id)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -613,7 +641,7 @@ SELECT id, username, email, first_name, last_name, password_hash, created_at, up
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
-	row := q.db.QueryRowContext(ctx, getUserByUsername, username)
+	row := q.db.QueryRow(ctx, getUserByUsername, username)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -635,7 +663,7 @@ SELECT id, username, email, first_name, last_name, password_hash, created_at, up
 `
 
 func (q *Queries) GetUserByUsernameWithPassword(ctx context.Context, username string) (User, error) {
-	row := q.db.QueryRowContext(ctx, getUserByUsernameWithPassword, username)
+	row := q.db.QueryRow(ctx, getUserByUsernameWithPassword, username)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -653,6 +681,7 @@ func (q *Queries) GetUserByUsernameWithPassword(ctx context.Context, username st
 }
 
 const getUsersWithArtists = `-- name: GetUsersWithArtists :many
+
 SELECT 
     u.id, u.username, u.email, u.first_name, u.last_name,
     COALESCE(array_agg(a.name) FILTER (WHERE a.name IS NOT NULL), '{}') as artist_names
@@ -672,9 +701,11 @@ type GetUsersWithArtistsRow struct {
 	ArtistNames interface{} `json:"artist_names"`
 }
 
-// Matching queries
+// =======================
+// Matching helpers / reports
+// =======================
 func (q *Queries) GetUsersWithArtists(ctx context.Context) ([]GetUsersWithArtistsRow, error) {
-	rows, err := q.db.QueryContext(ctx, getUsersWithArtists)
+	rows, err := q.db.Query(ctx, getUsersWithArtists)
 	if err != nil {
 		return nil, err
 	}
@@ -694,13 +725,54 @@ func (q *Queries) GetUsersWithArtists(ctx context.Context) ([]GetUsersWithArtist
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 	return items, nil
+}
+
+const pairwiseArtistSimilarityByIDs = `-- name: PairwiseArtistSimilarityByIDs :one
+SELECT 1.0 - artist_distance($1::int, $1::int) AS similarity
+`
+
+func (q *Queries) PairwiseArtistSimilarityByIDs(ctx context.Context, artist1ID int32) (int32, error) {
+	row := q.db.QueryRow(ctx, pairwiseArtistSimilarityByIDs, artist1ID)
+	var similarity int32
+	err := row.Scan(&similarity)
+	return similarity, err
+}
+
+const pairwiseArtistSimilarityByNames = `-- name: PairwiseArtistSimilarityByNames :one
+
+SELECT
+  a1.name AS name1,
+  a2.name AS name2,
+  1.0 - artist_distance(a1.id, a2.id) AS similarity
+FROM artists a1
+JOIN artists a2 ON TRUE
+WHERE a1.name = $1
+  AND a2.name = $2
+`
+
+type PairwiseArtistSimilarityByNamesParams struct {
+	Name1 string `json:"name1"`
+	Name2 string `json:"name2"`
+}
+
+type PairwiseArtistSimilarityByNamesRow struct {
+	Name1      string `json:"name1"`
+	Name2      string `json:"name2"`
+	Similarity int32  `json:"similarity"`
+}
+
+// =======================
+// New similarity APIs (artist + set)
+// =======================
+func (q *Queries) PairwiseArtistSimilarityByNames(ctx context.Context, arg PairwiseArtistSimilarityByNamesParams) (PairwiseArtistSimilarityByNamesRow, error) {
+	row := q.db.QueryRow(ctx, pairwiseArtistSimilarityByNames, arg.Name1, arg.Name2)
+	var i PairwiseArtistSimilarityByNamesRow
+	err := row.Scan(&i.Name1, &i.Name2, &i.Similarity)
+	return i, err
 }
 
 const removeUserArtist = `-- name: RemoveUserArtist :exec
@@ -713,7 +785,7 @@ type RemoveUserArtistParams struct {
 }
 
 func (q *Queries) RemoveUserArtist(ctx context.Context, arg RemoveUserArtistParams) error {
-	_, err := q.db.ExecContext(ctx, removeUserArtist, arg.UserID, arg.ArtistID)
+	_, err := q.db.Exec(ctx, removeUserArtist, arg.UserID, arg.ArtistID)
 	return err
 }
 
@@ -732,18 +804,18 @@ LIMIT $4
 `
 
 type SearchArtistsParams struct {
-	Lower   string `json:"lower"`
-	Lower_2 string `json:"lower_2"`
-	Lower_3 string `json:"lower_3"`
-	Limit   int32  `json:"limit"`
+	SearchTerm   string `json:"search_term"`
+	ExactMatch   string `json:"exact_match"`
+	PartialMatch string `json:"partial_match"`
+	Lim          int32  `json:"lim"`
 }
 
 func (q *Queries) SearchArtists(ctx context.Context, arg SearchArtistsParams) ([]Artist, error) {
-	rows, err := q.db.QueryContext(ctx, searchArtists,
-		arg.Lower,
-		arg.Lower_2,
-		arg.Lower_3,
-		arg.Limit,
+	rows, err := q.db.Query(ctx, searchArtists,
+		arg.SearchTerm,
+		arg.ExactMatch,
+		arg.PartialMatch,
+		arg.Lim,
 	)
 	if err != nil {
 		return nil, err
@@ -771,9 +843,6 @@ func (q *Queries) SearchArtists(ctx context.Context, arg SearchArtistsParams) ([
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -782,54 +851,54 @@ func (q *Queries) SearchArtists(ctx context.Context, arg SearchArtistsParams) ([
 
 const setUserArtists = `-- name: SetUserArtists :exec
 WITH new_artists AS (
-    INSERT INTO artists (name)
-    SELECT unnest($2::text[])
-    ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
-    RETURNING id, name
+  INSERT INTO artists (name)
+  SELECT unnest($2::text[])
+  ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+  RETURNING id, name
 ),
 ranked_artists AS (
-    SELECT 
-        a.id,
-        a.name,
-        ($3::int[])[array_position($2::text[], a.name)] as rank
-    FROM new_artists a
+  SELECT 
+    a.id,
+    a.name,
+    ($3::int[])[array_position($2::text[], a.name)] as rank
+  FROM new_artists a
 )
 INSERT INTO user_artists (user_id, artist_id, rank)
-SELECT $1, id, rank FROM ranked_artists
+SELECT $1::uuid, id, rank FROM ranked_artists
 ON CONFLICT (user_id, artist_id) DO UPDATE SET rank = EXCLUDED.rank
 `
 
 type SetUserArtistsParams struct {
-	UserID  uuid.UUID `json:"user_id"`
-	Column2 []string  `json:"column_2"`
-	Column3 []int32   `json:"column_3"`
+	UserID      uuid.UUID `json:"user_id"`
+	ArtistNames []string  `json:"artist_names"`
+	Ranks       []int32   `json:"ranks"`
 }
 
 func (q *Queries) SetUserArtists(ctx context.Context, arg SetUserArtistsParams) error {
-	_, err := q.db.ExecContext(ctx, setUserArtists, arg.UserID, pq.Array(arg.Column2), pq.Array(arg.Column3))
+	_, err := q.db.Exec(ctx, setUserArtists, arg.UserID, arg.ArtistNames, arg.Ranks)
 	return err
 }
 
 const updateUser = `-- name: UpdateUser :one
 UPDATE users 
-SET first_name = $2, last_name = $3, email = $4
-WHERE id = $1
+SET first_name = $1, last_name = $2, email = $3
+WHERE id = $4
 RETURNING id, username, email, first_name, last_name, password_hash, created_at, updated_at, program, graduation_year
 `
 
 type UpdateUserParams struct {
-	ID        uuid.UUID `json:"id"`
 	FirstName string    `json:"first_name"`
 	LastName  string    `json:"last_name"`
 	Email     string    `json:"email"`
+	ID        uuid.UUID `json:"id"`
 }
 
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {
-	row := q.db.QueryRowContext(ctx, updateUser,
-		arg.ID,
+	row := q.db.QueryRow(ctx, updateUser,
 		arg.FirstName,
 		arg.LastName,
 		arg.Email,
+		arg.ID,
 	)
 	var i User
 	err := row.Scan(
@@ -847,12 +916,40 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 	return i, err
 }
 
+const userChamferSimilarity = `-- name: UserChamferSimilarity :one
+SELECT user_chamfer_similarity(
+  $1::uuid,
+  $2::uuid,
+  $3::int,
+  $4::float8
+) AS similarity
+`
+
+type UserChamferSimilarityParams struct {
+	User1ID uuid.UUID `json:"user1_id"`
+	User2ID uuid.UUID `json:"user2_id"`
+	TopK    int32     `json:"top_k"`
+	Alpha   float64   `json:"alpha"`
+}
+
+func (q *Queries) UserChamferSimilarity(ctx context.Context, arg UserChamferSimilarityParams) (float64, error) {
+	row := q.db.QueryRow(ctx, userChamferSimilarity,
+		arg.User1ID,
+		arg.User2ID,
+		arg.TopK,
+		arg.Alpha,
+	)
+	var similarity float64
+	err := row.Scan(&similarity)
+	return similarity, err
+}
+
 const userExistsByEmail = `-- name: UserExistsByEmail :one
 SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)
 `
 
 func (q *Queries) UserExistsByEmail(ctx context.Context, email string) (bool, error) {
-	row := q.db.QueryRowContext(ctx, userExistsByEmail, email)
+	row := q.db.QueryRow(ctx, userExistsByEmail, email)
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
@@ -863,7 +960,7 @@ SELECT EXISTS(SELECT 1 FROM users WHERE username = $1)
 `
 
 func (q *Queries) UserExistsByUsername(ctx context.Context, username string) (bool, error) {
-	row := q.db.QueryRowContext(ctx, userExistsByUsername, username)
+	row := q.db.QueryRow(ctx, userExistsByUsername, username)
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err

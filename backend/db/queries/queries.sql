@@ -1,112 +1,126 @@
+-- =======================
+-- Users
+-- =======================
+
 -- name: CreateUser :one
 INSERT INTO users (id, username, email, first_name, last_name, password_hash, program, graduation_year)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+VALUES (sqlc.arg(id), sqlc.arg(username), sqlc.arg(email), sqlc.arg(first_name), sqlc.arg(last_name), sqlc.arg(password_hash), sqlc.arg(program), sqlc.arg(graduation_year))
 RETURNING *;
 
 -- name: GetUserByUsername :one
-SELECT * FROM users WHERE username = $1 LIMIT 1;
+SELECT * FROM users WHERE username = sqlc.arg(username) LIMIT 1;
 
 -- name: GetUserByUsernameWithPassword :one
-SELECT * FROM users WHERE username = $1 LIMIT 1;
+SELECT * FROM users WHERE username = sqlc.arg(username) LIMIT 1;
 
 -- name: GetUserByEmail :one
-SELECT * FROM users WHERE email = $1 LIMIT 1;
+SELECT * FROM users WHERE email = sqlc.arg(email) LIMIT 1;
 
 -- name: GetUserByID :one
-SELECT * FROM users WHERE id = $1 LIMIT 1;
+SELECT * FROM users WHERE id = sqlc.arg(id) LIMIT 1;
 
 -- name: UserExistsByUsername :one
-SELECT EXISTS(SELECT 1 FROM users WHERE username = $1);
+SELECT EXISTS(SELECT 1 FROM users WHERE username = sqlc.arg(username));
 
 -- name: UserExistsByEmail :one
-SELECT EXISTS(SELECT 1 FROM users WHERE email = $1);
+SELECT EXISTS(SELECT 1 FROM users WHERE email = sqlc.arg(email));
 
 -- name: UpdateUser :one
 UPDATE users 
-SET first_name = $2, last_name = $3, email = $4
-WHERE id = $1
+SET first_name = sqlc.arg(first_name), last_name = sqlc.arg(last_name), email = sqlc.arg(email)
+WHERE id = sqlc.arg(id)
 RETURNING *;
 
 -- name: DeleteUser :exec
-DELETE FROM users WHERE id = $1;
+DELETE FROM users WHERE id = sqlc.arg(id);
 
 -- name: GetAllUsers :many
 SELECT * FROM users ORDER BY created_at;
 
--- Artist queries
+-- =======================
+-- Artists
+-- =======================
+
 -- name: CreateArtist :one
 INSERT INTO artists (name)
-VALUES ($1)
+VALUES (sqlc.arg(name))
 ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
 RETURNING *;
 
 -- name: GetArtistByName :one
-SELECT * FROM artists WHERE name = $1 LIMIT 1;
+SELECT * FROM artists WHERE name = sqlc.arg(name) LIMIT 1;
 
 -- name: GetArtistByID :one
-SELECT * FROM artists WHERE id = $1 LIMIT 1;
+SELECT * FROM artists WHERE id = sqlc.arg(id) LIMIT 1;
 
 -- name: GetAllArtists :many
 SELECT * FROM artists ORDER BY name;
 
 -- name: SearchArtists :many
 SELECT * FROM artists 
-WHERE LOWER(name) LIKE LOWER($1) 
+WHERE LOWER(name) LIKE LOWER(sqlc.arg(search_term)) 
 ORDER BY 
   CASE 
-    WHEN LOWER(name) = LOWER($2) THEN 1
-    WHEN LOWER(name) LIKE LOWER($3) THEN 2
+    WHEN LOWER(name) = LOWER(sqlc.arg(exact_match)) THEN 1
+    WHEN LOWER(name) LIKE LOWER(sqlc.arg(partial_match)) THEN 2
     ELSE 3
   END,
   LENGTH(name),
   name
-LIMIT $4;
+LIMIT sqlc.arg(lim);
 
--- User-Artist relationship queries
+-- =======================
+-- User-Artist relations
+-- =======================
+
+-- FIX: conflict target must be a unique/PK constraint. Your table has PK (user_id, artist_id)
 -- name: AddUserArtist :exec
 INSERT INTO user_artists (user_id, artist_id, rank)
-VALUES ($1, $2, $3)
-ON CONFLICT (user_id, artist_id, rank) DO NOTHING;
+VALUES (sqlc.arg(user_id)::uuid, sqlc.arg(artist_id)::int, sqlc.arg(rank)::int)
+ON CONFLICT (user_id, artist_id) DO UPDATE SET rank = EXCLUDED.rank;
 
 -- name: RemoveUserArtist :exec
-DELETE FROM user_artists WHERE user_id = $1 AND artist_id = $2;
+DELETE FROM user_artists WHERE user_id = sqlc.arg(user_id) AND artist_id = sqlc.arg(artist_id);
 
 -- name: GetUserArtists :many
 SELECT a.id, a.name, a.created_at
 FROM artists a
 JOIN user_artists ua ON a.id = ua.artist_id
-WHERE ua.user_id = $1
+WHERE ua.user_id = sqlc.arg(user_id)
 ORDER BY ua.rank;
 
 -- name: GetArtistUsers :many
 SELECT u.id, u.username, u.email, u.first_name, u.last_name, u.created_at, u.updated_at
 FROM users u
 JOIN user_artists ua ON u.id = ua.user_id
-WHERE ua.artist_id = $1
+WHERE ua.artist_id = sqlc.arg(artist_id)
 ORDER BY u.username;
 
 -- name: ClearUserArtists :exec
-DELETE FROM user_artists WHERE user_id = $1;
+DELETE FROM user_artists WHERE user_id = sqlc.arg(user_id);
 
 -- name: SetUserArtists :exec
 WITH new_artists AS (
-    INSERT INTO artists (name)
-    SELECT unnest($2::text[])
-    ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
-    RETURNING id, name
+  INSERT INTO artists (name)
+  SELECT unnest(sqlc.arg(artist_names)::text[])
+  ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+  RETURNING id, name
 ),
 ranked_artists AS (
-    SELECT 
-        a.id,
-        a.name,
-        ($3::int[])[array_position($2::text[], a.name)] as rank
-    FROM new_artists a
+  SELECT 
+    a.id,
+    a.name,
+    (sqlc.arg(ranks)::int[])[array_position(sqlc.arg(artist_names)::text[], a.name)] as rank
+  FROM new_artists a
 )
 INSERT INTO user_artists (user_id, artist_id, rank)
-SELECT $1, id, rank FROM ranked_artists
+SELECT sqlc.arg(user_id)::uuid, id, rank FROM ranked_artists
 ON CONFLICT (user_id, artist_id) DO UPDATE SET rank = EXCLUDED.rank;
 
--- Matching queries
+-- =======================
+-- Matching helpers / reports
+-- =======================
+
 -- name: GetUsersWithArtists :many
 SELECT 
     u.id, u.username, u.email, u.first_name, u.last_name,
@@ -117,43 +131,64 @@ LEFT JOIN artists a ON ua.artist_id = a.id
 GROUP BY u.id, u.username, u.email, u.first_name, u.last_name
 ORDER BY u.username;
 
--- SELECT
---   u1.username,
---   u1.first_name,
---   u1.last_name,
---   u1.program,
---   u1.graduation_year,
---   COALESCE((SELECT array_agg(a1.name ORDER BY ua1.rank ASC)
---    FROM user_artists ua1
---    JOIN artists a1 ON ua1.artist_id = a1.id
---    WHERE ua1.user_id = u1.id), '{}') AS artists,
---   spearman_distance(
---     COALESCE((SELECT array_agg(a1.name ORDER BY ua1.rank ASC)
---      FROM user_artists ua1
---      JOIN artists a1 ON ua1.artist_id = a1.id
---      WHERE ua1.user_id = u1.id), '{}'),
---     COALESCE((SELECT array_agg(a2.name ORDER BY ua2.rank ASC)
---      FROM users u2
---      JOIN user_artists ua2 ON u2.id = ua2.user_id
---      JOIN artists a2 ON ua2.artist_id = a2.id
---      WHERE u2.username = $1), '{}')
---   ) AS distance
--- FROM users u1
--- WHERE u1.username != $1
---   AND EXISTS (SELECT 1 FROM user_artists WHERE user_id = u1.id)
--- ORDER BY distance ASC
--- LIMIT 50;
+-- =======================
+-- New similarity APIs (artist + set)
+-- =======================
+
+-- name: PairwiseArtistSimilarityByNames :one
+SELECT
+  a1.name AS name1,
+  a2.name AS name2,
+  1.0 - artist_distance(a1.id, a2.id) AS similarity
+FROM artists a1
+JOIN artists a2 ON TRUE
+WHERE a1.name = sqlc.arg(name1)
+  AND a2.name = sqlc.arg(name2);
+
+-- name: PairwiseArtistSimilarityByIDs :one
+SELECT 1.0 - artist_distance(sqlc.arg(artist1_id)::int, sqlc.arg(artist1_id)::int) AS similarity;
+
+-- name: ChamferSimilarityByNames :one
+WITH s1 AS (
+  SELECT COALESCE(array_agg(id), '{}'::int[]) AS ids
+  FROM artists
+  WHERE name = ANY(sqlc.arg(artist_names_list1)::text[])
+),
+s2 AS (
+  SELECT COALESCE(array_agg(id), '{}'::int[]) AS ids
+  FROM artists
+  WHERE name = ANY(sqlc.arg(artist_names_list2)::text[])
+)
+SELECT chamfer_similarity_artists(
+  (SELECT ids FROM s1),
+  (SELECT ids FROM s2)
+) AS similarity;
+
+-- name: ChamferSimilarityByIDs :one
+SELECT chamfer_similarity_artists(sqlc.arg(artist_ids_list1)::int[], sqlc.arg(artist_ids_list2)::int[]) AS similarity;
+
+-- name: UserChamferSimilarity :one
+SELECT user_chamfer_similarity(
+  sqlc.arg(user1_id)::uuid,
+  sqlc.arg(user2_id)::uuid,
+  sqlc.arg(top_k)::int,
+  sqlc.arg(alpha)::float8
+) AS similarity;
+
+-- =======================
+-- Nearest neighbors (Chamfer-based)
+-- Replace old PWO query with Chamfer under the same exported name
+-- =======================
 
 -- :username => the anchor profile
 -- :limit_n  => how many matches to return
 -- name: FindSimilarUsers :many
 WITH target AS (
-  SELECT id AS target_id
+  SELECT id AS target_id, program AS target_program, graduation_year AS target_grad
   FROM users
-  WHERE username = $1
+  WHERE username = sqlc.arg(username)
 ),
 base_list AS (
-  -- Optional: ensure the target has at least one artist
   SELECT 1
   FROM user_artists ua
   JOIN target t ON ua.user_id = t.target_id
@@ -165,32 +200,44 @@ SELECT
   u.last_name,
   u.program,
   u.graduation_year,
-  -- Optional: return their ordered artist names
   COALESCE((
     SELECT array_agg(a.name ORDER BY ua.rank)
     FROM user_artists ua
     JOIN artists a ON a.id = ua.artist_id
     WHERE ua.user_id = u.id
-  ), '{}') AS artists,
-  pwo_distance($3, u.id, (SELECT target_id FROM target)) AS distance
+  ), '{}'::text[]) AS artists,
+  s.d AS distance,
+  (1.0 - s.d) AS similarity
 FROM users u
-WHERE u.username <> $1
+JOIN target t ON TRUE
+CROSS JOIN LATERAL (
+  SELECT user_chamfer_distance(
+           u.id,
+           t.target_id,
+           sqlc.arg(top_k)::int,     -- top_k
+           sqlc.arg(alpha)::float8   -- alpha
+         ) AS d
+) AS s
+WHERE u.username <> sqlc.arg(username)
+  AND EXISTS (SELECT 1 FROM base_list)
   AND EXISTS (SELECT 1 FROM user_artists ua WHERE ua.user_id = u.id)
-ORDER BY distance ASC,
-    u.program = (SELECT program FROM users WHERE username = $1) DESC,
-    u.graduation_year = (SELECT graduation_year FROM users WHERE username = $1) DESC
-LIMIT $2;
+ORDER BY
+  s.d ASC,
+  (u.program = t.target_program) DESC,
+  (u.graduation_year = t.target_grad) DESC
+LIMIT sqlc.arg(lim);
 
+-- (If you also want the :by-user-id variant, keep your FindSimilarUsersChamferByUserID below unchanged.)
 
 -- Feedback queries
 -- name: CreateFeedback :one
 INSERT INTO feedback (user_id, feedback_text)
-VALUES ($1, $2)
+VALUES (sqlc.arg(user_id), sqlc.arg(feedback_text))
 RETURNING *;
 
 -- name: GetFeedbackByUser :many
 SELECT * FROM feedback
-WHERE user_id = $1
+WHERE user_id = sqlc.arg(user_id)
 ORDER BY created_at DESC;
 
 -- name: GetAllFeedback :many
@@ -198,4 +245,4 @@ SELECT f.*, u.username, u.first_name, u.last_name
 FROM feedback f
 JOIN users u ON f.user_id = u.id
 ORDER BY f.created_at DESC
-LIMIT $1;
+LIMIT sqlc.arg(lim);

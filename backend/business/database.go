@@ -2,14 +2,16 @@ package business
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/google/uuid"
 	"github.com/greenwaltc/kellogg-music-match/backend/config"
 	sqlc "github.com/greenwaltc/kellogg-music-match/backend/db/sqlc"
-	_ "github.com/lib/pq"
+
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // UserRepository defines the interface for user data operations
@@ -42,27 +44,31 @@ type UserRepository interface {
 	GetFeedbackByUser(ctx context.Context, userID uuid.UUID) ([]sqlc.Feedback, error)
 }
 
-// PostgreSQLUserRepository implements UserRepository using PostgreSQL
+// PostgreSQLUserRepository implements UserRepository using pgxpool
 type PostgreSQLUserRepository struct {
-	db      *sql.DB
+	pool    *pgxpool.Pool
 	queries *sqlc.Queries
 }
 
-// NewPostgreSQLUserRepository creates a new PostgreSQL user repository
-func NewPostgreSQLUserRepository(config *config.DatabaseConfig) (*PostgreSQLUserRepository, error) {
-	db, err := sql.Open("postgres", config.ConnectionString())
+// NewPostgreSQLUserRepository creates a new repository backed by pgx/v5
+func NewPostgreSQLUserRepository(cfg *config.DatabaseConfig) (*PostgreSQLUserRepository, error) {
+	dsn := cfg.ConnectionString()
+
+	// Using default pgxpool config; customize if you want timeouts/limits
+	pool, err := pgxpool.New(context.Background(), dsn)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open database connection: %w", err)
+		return nil, fmt.Errorf("pgxpool.New: %w", err)
 	}
 
 	// Test the connection
-	if err := db.Ping(); err != nil {
-		return nil, fmt.Errorf("failed to ping database: %w", err)
+	if err := pool.Ping(context.Background()); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("pgx ping: %w", err)
 	}
 
 	return &PostgreSQLUserRepository{
-		db:      db,
-		queries: sqlc.New(db),
+		pool:    pool,
+		queries: sqlc.New(pool),
 	}, nil
 }
 
@@ -88,30 +94,43 @@ func NewUserRepositoryWithConfig(dbConfig *config.DatabaseConfig) (UserRepositor
 	return repo, nil
 }
 
-// Close closes the database connection
+// Close closes the database pool
 func (r *PostgreSQLUserRepository) Close() error {
-	return r.db.Close()
+	if r.pool != nil {
+		r.pool.Close()
+	}
+	return nil
 }
 
 // CreateUser creates a new user in the database
 func (r *PostgreSQLUserRepository) CreateUser(ctx context.Context, id uuid.UUID, username, email, firstName, lastName, passwordHash, program string, graduationYear int32) (*sqlc.User, error) {
-	fmt.Printf("CreateUser called: ID=%s, Username=%s, Email=%s, Program=%s, GradYear=%d\n", id.String(), username, email, program, graduationYear)
+	fmt.Printf("CreateUser called: ID=%s, Username=%s, Email=%s, Program=%s, GradYear=%d\n",
+		id.String(), username, email, program, graduationYear)
 
-	user, err := r.queries.CreateUser(ctx, sqlc.CreateUserParams{
-		ID:             id,
-		Username:       username,
-		Email:          email,
-		FirstName:      firstName,
-		LastName:       lastName,
-		PasswordHash:   passwordHash,
-		Program:        sql.NullString{String: program, Valid: program != ""},
-		GraduationYear: sql.NullInt32{Int32: graduationYear, Valid: graduationYear > 0},
-	})
+	params := sqlc.CreateUserParams{
+		ID:           id,
+		Username:     username,
+		Email:        email,
+		FirstName:    firstName,
+		LastName:     lastName,
+		PasswordHash: passwordHash,
+
+		// For pgx/v5, sqlc usually emits pgtype.* for nullable columns
+		Program: pgtype.Text{
+			String: program,
+			Valid:  program != "",
+		},
+		GraduationYear: pgtype.Int4{
+			Int32: graduationYear,
+			Valid: graduationYear > 0,
+		},
+	}
+
+	user, err := r.queries.CreateUser(ctx, params)
 	if err != nil {
 		fmt.Printf("CreateUser database error: %v\n", err)
 		return nil, err
 	}
-
 	fmt.Printf("CreateUser successful: ID=%s, Username=%s\n", user.ID.String(), user.Username)
 	return &user, nil
 }
@@ -193,10 +212,10 @@ func (r *PostgreSQLUserRepository) SearchArtists(ctx context.Context, query stri
 	startsWithPattern := strings.ToLower(query) + "%"
 
 	return r.queries.SearchArtists(ctx, sqlc.SearchArtistsParams{
-		Lower:   fuzzyPattern,      // LIKE pattern for general fuzzy matching
-		Lower_2: exactQuery,        // Exact match for highest priority
-		Lower_3: startsWithPattern, // Starts with for second priority
-		Limit:   limit,             // Limit results
+		SearchTerm:   fuzzyPattern,      // LIKE pattern for general fuzzy matching
+		ExactMatch:   exactQuery,        // Exact match for highest priority
+		PartialMatch: startsWithPattern, // Starts with for second priority
+		Lim:          limit,             // Limit results
 	})
 }
 
@@ -208,16 +227,16 @@ func (r *PostgreSQLUserRepository) SetUserArtists(ctx context.Context, userID uu
 	}
 
 	// Set new associations
-	// Create a slice of integers from 1 to len(artistNames)
 	orderValues := make([]int32, len(artistNames))
 	for i := range orderValues {
 		orderValues[i] = int32(i + 1)
 	}
 
+	// sqlc generated SetUserArtistsParams currently exposes fields: UserID, Column2 (artist names), Column3 (ranks).
 	return r.queries.SetUserArtists(ctx, sqlc.SetUserArtistsParams{
-		UserID:  userID,
-		Column2: artistNames,
-		Column3: orderValues,
+		UserID:      userID,
+		ArtistNames: artistNames,
+		Ranks:       orderValues,
 	})
 }
 
@@ -232,27 +251,46 @@ func (r *PostgreSQLUserRepository) ClearUserArtists(ctx context.Context, userID 
 }
 
 // FindSimilarUsers finds users similar to the given username based on their artist preferences
-func (repo *PostgreSQLUserRepository) FindSimilarUsers(ctx context.Context, username string) ([]sqlc.FindSimilarUsersRow, error) {
-	return repo.queries.FindSimilarUsers(ctx, sqlc.FindSimilarUsersParams{
+func (r *PostgreSQLUserRepository) FindSimilarUsers(ctx context.Context, username string) ([]sqlc.FindSimilarUsersRow, error) {
+	// Using the Chamfer-based finder we created (ensure your queries.sql has it)
+	return r.queries.FindSimilarUsers(ctx, sqlc.FindSimilarUsersParams{
 		Username: username,
-		Limit:    20,
+		Lim:      20,
+		TopK:     40,
 		Alpha:    0.85,
 	})
 }
 
 // Feedback operations
-func (repo *PostgreSQLUserRepository) CreateFeedback(ctx context.Context, userID uuid.UUID, feedbackText string) (*sqlc.Feedback, error) {
+func (r *PostgreSQLUserRepository) CreateFeedback(ctx context.Context, userID uuid.UUID, feedbackText string) (*sqlc.Feedback, error) {
 	params := sqlc.CreateFeedbackParams{
 		UserID:       userID,
 		FeedbackText: feedbackText,
 	}
-	feedback, err := repo.queries.CreateFeedback(ctx, params)
+	feedback, err := r.queries.CreateFeedback(ctx, params)
 	if err != nil {
 		return nil, err
 	}
 	return &feedback, nil
 }
 
-func (repo *PostgreSQLUserRepository) GetFeedbackByUser(ctx context.Context, userID uuid.UUID) ([]sqlc.Feedback, error) {
-	return repo.queries.GetFeedbackByUser(ctx, userID)
+func (r *PostgreSQLUserRepository) GetFeedbackByUser(ctx context.Context, userID uuid.UUID) ([]sqlc.Feedback, error) {
+	return r.queries.GetFeedbackByUser(ctx, userID)
+}
+
+// Optional helper if you want to build the pool from env directly elsewhere
+func NewPoolFromEnv() (*pgxpool.Pool, error) {
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		return nil, fmt.Errorf("DATABASE_URL not set")
+	}
+	pool, err := pgxpool.New(context.Background(), dsn)
+	if err != nil {
+		return nil, err
+	}
+	if err := pool.Ping(context.Background()); err != nil {
+		pool.Close()
+		return nil, err
+	}
+	return pool, nil
 }
