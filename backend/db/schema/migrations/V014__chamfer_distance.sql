@@ -88,7 +88,10 @@ scores AS (
               ) / NULLIF( (GREATEST(e_a, e_b)::date - LEAST(s_a, s_b)::date), 0)
             ELSE
               -- if no ends, compare starts: closer starts → closer artists
-              1.0 / (1.0 + ABS(EXTRACT(day FROM (s_a - s_b))) )
+              -- NOTE: In Postgres, date - date returns an integer (days), not an interval.
+              -- Using EXTRACT(day FROM (s_a - s_b)) fails because the operand isn't an interval.
+              -- Use the integer day difference directly and rely on 1.0 to upcast to numeric.
+              1.0 / (1.0 + ABS((s_a::date - s_b::date)))
           END)
        ELSE 0.0
      END)::float8 AS time_overlap
@@ -144,6 +147,24 @@ $$;
 -- Convert to similarity on demand as 1 - artist_distance(a,b).
 
 -- 3b. Cached wrapper that callers should use
+-- (Ensure cache table exists before defining functions that use it)
+
+-- 6) Optional: cache hot pairs (moved earlier so functions can reference it)
+
+-- Stores symmetric distances using (min(a,b), max(a,b)) as the key
+CREATE TABLE IF NOT EXISTS artist_neighbors (
+  a int NOT NULL,
+  b int NOT NULL,
+  distance double precision NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (a, b)
+);
+
+-- Helpful if you’ll run TTL checks in WHERE clauses
+CREATE INDEX IF NOT EXISTS idx_artist_neighbors_updated_at
+  ON artist_neighbors(updated_at);
+
+-- Then have artist_distance(a,b) first SELECT distance FROM artist_neighbors and fall back to live compute when missing.
 -- Looks up (LEAST(a,b), GREATEST(a,b)).
 -- If missing or stale (TTL), computes via artist_distance_uncached and upserts.
 -- Marked VOLATILE so it can write.
@@ -171,14 +192,14 @@ BEGIN
   -- Try cache (optionally enforce TTL)
   IF ttl_minutes IS NULL THEN
     SELECT distance INTO d
-    FROM artist_neighbors
-    WHERE a = a AND b = b;
+    FROM artist_neighbors an
+    WHERE an.a = a AND an.b = b;
   ELSE
     SELECT distance,
            (now() - updated_at > make_interval(mins => ttl_minutes)) AS expired
     INTO d, needs_refresh
-    FROM artist_neighbors
-    WHERE a = a AND b = b;
+    FROM artist_neighbors an
+    WHERE an.a = a AND an.b = b;
 
     IF d IS NOT NULL AND NOT needs_refresh THEN
       RETURN d;
@@ -388,19 +409,6 @@ $$;
 
 -- For speed at query time, cache nearest neighbors:
 
--- Stores symmetric distances using (min(a,b), max(a,b)) as the key
-CREATE TABLE IF NOT EXISTS artist_neighbors (
-  a int NOT NULL,
-  b int NOT NULL,
-  distance double precision NOT NULL,
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (a, b)
-);
-
--- Helpful if you’ll run TTL checks in WHERE clauses
-CREATE INDEX IF NOT EXISTS idx_artist_neighbors_updated_at
-  ON artist_neighbors(updated_at);
-
--- Then have artist_distance(a,b) first SELECT distance FROM artist_neighbors and fall back to live compute when missing.
+-- (Moved earlier in this migration to satisfy dependencies.)
 
 

@@ -207,7 +207,7 @@ SELECT
     WHERE ua.user_id = u.id
   ), '{}'::text[]) AS artists,
   s.d AS distance,
-  (1.0 - s.d) AS similarity
+  (1.0 - s.d)::int AS similarity
 FROM users u
 JOIN target t ON TRUE
 CROSS JOIN LATERAL (
