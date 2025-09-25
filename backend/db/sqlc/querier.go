@@ -37,6 +37,10 @@ type Querier interface {
 	// =======================
 	// :username => the anchor profile
 	// :limit_n  => how many matches to return
+	// Performance optimizations:
+	// 1) Restrict candidates to users who share at least 1 artist with the target (uses idx_user_artists_artist_user)
+	// 2) Compute distances first and LIMIT to top-N before fetching per-user artist arrays
+	// 3) Limit returned artist list to top_k via a lateral subquery to reduce memory/CPU
 	FindSimilarUsers(ctx context.Context, arg FindSimilarUsersParams) ([]FindSimilarUsersRow, error)
 	GetAllArtists(ctx context.Context) ([]Artist, error)
 	GetAllFeedback(ctx context.Context, lim int32) ([]GetAllFeedbackRow, error)
@@ -54,7 +58,7 @@ type Querier interface {
 	// Matching helpers / reports
 	// =======================
 	GetUsersWithArtists(ctx context.Context) ([]GetUsersWithArtistsRow, error)
-	PairwiseArtistSimilarityByIDs(ctx context.Context, artist1ID int32) (int32, error)
+	PairwiseArtistSimilarityByIDs(ctx context.Context, arg PairwiseArtistSimilarityByIDsParams) (int32, error)
 	// =======================
 	// New similarity APIs (artist + set)
 	// =======================

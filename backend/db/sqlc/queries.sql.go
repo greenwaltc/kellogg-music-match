@@ -209,52 +209,83 @@ const findSimilarUsers = `-- name: FindSimilarUsers :many
 WITH target AS (
   SELECT id AS target_id, program AS target_program, graduation_year AS target_grad
   FROM users
-  WHERE username = $3
+  WHERE users.username = $2
 ),
 base_list AS (
-  SELECT 1
+  -- ensure target has at least one artist; otherwise return no rows
+  SELECT 1 FROM user_artists ua JOIN target t ON ua.user_id = t.target_id LIMIT 1
+),
+target_artists AS (
+  SELECT ua.artist_id
   FROM user_artists ua
   JOIN target t ON ua.user_id = t.target_id
-  LIMIT 1
+),
+candidates AS (
+  -- users with at least one overlapping artist with the target
+  SELECT ua.user_id AS candidate_id
+  FROM user_artists ua
+  JOIN target_artists ta USING (artist_id)
+  GROUP BY ua.user_id
+),
+scored AS (
+  SELECT
+    u.id,
+    u.username,
+    u.first_name,
+    u.last_name,
+    u.program,
+    u.graduation_year,
+    s.d AS distance
+  FROM users u
+  JOIN candidates c ON c.candidate_id = u.id
+  JOIN target t ON TRUE
+  CROSS JOIN LATERAL (
+    SELECT user_chamfer_distance(
+             u.id,
+             t.target_id,
+             $1::int,     -- top_k
+             $3::float8   -- alpha
+           ) AS d
+  ) AS s
+  WHERE u.username <> $2
+    AND EXISTS (SELECT 1 FROM base_list)
+  ORDER BY
+    s.d ASC,
+    (u.program = t.target_program) DESC,
+    (u.graduation_year = t.target_grad) DESC
+  LIMIT $4
 )
 SELECT
-  u.username,
-  u.first_name,
-  u.last_name,
-  u.program,
-  u.graduation_year,
-  COALESCE((
-    SELECT array_agg(a.name ORDER BY ua.rank)
+  sc.username,
+  sc.first_name,
+  sc.last_name,
+  sc.program,
+  sc.graduation_year,
+  COALESCE(al.artists, '{}'::text[]) AS artists,
+  sc.distance AS distance,
+  (1.0 - sc.distance)::int AS similarity
+FROM scored sc
+LEFT JOIN LATERAL (
+  SELECT array_agg(sub.name) AS artists
+  FROM (
+    SELECT a.name
     FROM user_artists ua
     JOIN artists a ON a.id = ua.artist_id
-    WHERE ua.user_id = u.id
-  ), '{}'::text[]) AS artists,
-  s.d AS distance,
-	(1.0 - s.d)::int AS similarity
-FROM users u
-JOIN target t ON TRUE
-CROSS JOIN LATERAL (
-  SELECT user_chamfer_distance(
-           u.id,
-           t.target_id,
-           $1::int,     -- top_k
-           $2::float8   -- alpha
-         ) AS d
-) AS s
-WHERE u.username <> $3
-  AND EXISTS (SELECT 1 FROM base_list)
-  AND EXISTS (SELECT 1 FROM user_artists ua WHERE ua.user_id = u.id)
+    WHERE ua.user_id = sc.id
+    ORDER BY ua.rank
+    LIMIT $1::int
+  ) sub
+) al ON TRUE
 ORDER BY
-  s.d ASC,
-  (u.program = t.target_program) DESC,
-  (u.graduation_year = t.target_grad) DESC
-LIMIT $4
+  sc.distance ASC,
+  (sc.program = (SELECT target_program FROM target)) DESC,
+  (sc.graduation_year = (SELECT target_grad FROM target)) DESC
 `
 
 type FindSimilarUsersParams struct {
 	TopK     int32   `json:"top_k"`
-	Alpha    float64 `json:"alpha"`
 	Username string  `json:"username"`
+	Alpha    float64 `json:"alpha"`
 	Lim      int32   `json:"lim"`
 }
 
@@ -275,11 +306,15 @@ type FindSimilarUsersRow struct {
 // =======================
 // :username => the anchor profile
 // :limit_n  => how many matches to return
+// Performance optimizations:
+// 1) Restrict candidates to users who share at least 1 artist with the target (uses idx_user_artists_artist_user)
+// 2) Compute distances first and LIMIT to top-N before fetching per-user artist arrays
+// 3) Limit returned artist list to top_k via a lateral subquery to reduce memory/CPU
 func (q *Queries) FindSimilarUsers(ctx context.Context, arg FindSimilarUsersParams) ([]FindSimilarUsersRow, error) {
 	rows, err := q.db.Query(ctx, findSimilarUsers,
 		arg.TopK,
-		arg.Alpha,
 		arg.Username,
+		arg.Alpha,
 		arg.Lim,
 	)
 	if err != nil {
@@ -732,11 +767,16 @@ func (q *Queries) GetUsersWithArtists(ctx context.Context) ([]GetUsersWithArtist
 }
 
 const pairwiseArtistSimilarityByIDs = `-- name: PairwiseArtistSimilarityByIDs :one
-SELECT 1.0 - artist_distance($1::int, $1::int) AS similarity
+SELECT 1.0 - artist_distance($1::int, $2::int) AS similarity
 `
 
-func (q *Queries) PairwiseArtistSimilarityByIDs(ctx context.Context, artist1ID int32) (int32, error) {
-	row := q.db.QueryRow(ctx, pairwiseArtistSimilarityByIDs, artist1ID)
+type PairwiseArtistSimilarityByIDsParams struct {
+	Artist1ID int32 `json:"artist1_id"`
+	Artist2ID int32 `json:"artist2_id"`
+}
+
+func (q *Queries) PairwiseArtistSimilarityByIDs(ctx context.Context, arg PairwiseArtistSimilarityByIDsParams) (int32, error) {
+	row := q.db.QueryRow(ctx, pairwiseArtistSimilarityByIDs, arg.Artist1ID, arg.Artist2ID)
 	var similarity int32
 	err := row.Scan(&similarity)
 	return similarity, err
@@ -856,7 +896,7 @@ WITH new_artists AS (
   ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
   RETURNING id, name
 ),
-ranked_artists AS (
+ ranked_artists AS (
   SELECT 
     a.id,
     a.name,

@@ -74,14 +74,14 @@ build: generate-sqlc ## Build the backend server (includes SQLC generation)
 
 test: ## Run all tests (Go tests + Ginkgo behavioral tests)
 	@echo "🧪 Running Go tests..."
-	@go test ./... -v
+	@go test -p 1 ./... -v
 	@echo "🎭 Running Ginkgo behavioral tests..."
 	@$(MAKE) test-ginkgo
 	@echo "✅ All tests complete!"
 
 test-quick: ## Run quick Go unit tests only
 	@echo "🧪 Running quick Go tests..."
-	@go test ./... -short
+	@go test -p 1 ./... -short
 	@echo "✅ Quick tests complete!"
 
 test-ginkgo: ## Run Ginkgo behavioral tests

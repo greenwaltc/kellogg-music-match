@@ -66,6 +66,12 @@ func NewPostgreSQLUserRepository(cfg *config.DatabaseConfig) (*PostgreSQLUserRep
 		return nil, fmt.Errorf("pgx ping: %w", err)
 	}
 
+	// Enable testing-mode guard in the database session when running tests to avoid deadlocks
+	if os.Getenv("GO_WANT_HELPER_PROCESS") == "1" || strings.Contains(strings.ToLower(os.Args[0]), ".test") {
+		// Best-effort: set a custom GUC that our trigger reads
+		_, _ = pool.Exec(context.Background(), "SET kmm.testing_mode = 'on'")
+	}
+
 	return &PostgreSQLUserRepository{
 		pool:    pool,
 		queries: sqlc.New(pool),

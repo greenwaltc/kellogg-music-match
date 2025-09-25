@@ -11,6 +11,66 @@ import (
 	"github.com/greenwaltc/kellogg-music-match/backend/generated"
 )
 
+// toStringSlice converts various possible PostgreSQL array representations into a []string.
+func toStringSlice(v interface{}) []string {
+	switch t := v.(type) {
+	case nil:
+		return nil
+	case []string:
+		return t
+	case []interface{}:
+		out := make([]string, 0, len(t))
+		for _, e := range t {
+			if s, ok := e.(string); ok {
+				out = append(out, s)
+			}
+		}
+		return out
+	case []uint8:
+		// e.g., "{\"A\",\"B\"}" or "{A,B}" representations
+		s := string(t)
+		if len(s) > 1 && s[0] == '{' && s[len(s)-1] == '}' {
+			s = s[1 : len(s)-1]
+			if s == "" {
+				return nil
+			}
+			parts := strings.Split(s, ",")
+			out := make([]string, 0, len(parts))
+			for _, p := range parts {
+				p = strings.TrimSpace(p)
+				p = strings.Trim(p, `"`)
+				if p != "" {
+					out = append(out, p)
+				}
+			}
+			return out
+		}
+		return nil
+	case string:
+		// e.g., "{A,B}" format
+		s := t
+		if len(s) > 1 && s[0] == '{' && s[len(s)-1] == '}' {
+			s = s[1 : len(s)-1]
+			if s == "" {
+				return nil
+			}
+			parts := strings.Split(s, ",")
+			out := make([]string, 0, len(parts))
+			for _, p := range parts {
+				p = strings.TrimSpace(p)
+				p = strings.Trim(p, `"`)
+				if p != "" {
+					out = append(out, p)
+				}
+			}
+			return out
+		}
+		return []string{s}
+	default:
+		return nil
+	}
+}
+
 // MatchingService implements the business logic for music matching
 type MatchingService struct {
 	userRepo     UserRepository
@@ -191,19 +251,7 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 	// Debug: log similar users found
 	fmt.Printf("FindSimilarUsers returned %d similar users for %s\n", len(similarUsers), xUserUsername)
 	for _, row := range similarUsers {
-		// Convert artists interface{} to []string for logging
-		var artistNames []string
-		if row.Artists != nil {
-			if names, ok := row.Artists.([]interface{}); ok {
-				artistNames = make([]string, 0, len(names))
-				for _, name := range names {
-					if str, ok := name.(string); ok {
-						artistNames = append(artistNames, str)
-					}
-				}
-			}
-		}
-		fmt.Printf("Similar user: %s (distance: %.3f) with artists: %v\n", row.Username, row.Distance, artistNames)
+		fmt.Printf("Similar user: %s (distance: %.3f) with artists: %v\n", row.Username, row.Distance, toStringSlice(row.Artists))
 	}
 
 	// Convert similar users to API response format
@@ -216,56 +264,8 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 	}
 
 	for _, row := range similarUsers {
-		// Convert artists interface{} to []string
-		var artistNames []string
-		if row.Artists != nil {
-			// Handle different possible types for PostgreSQL arrays
-			switch v := row.Artists.(type) {
-			case []interface{}:
-				artistNames = make([]string, 0, len(v))
-				for _, name := range v {
-					if str, ok := name.(string); ok {
-						artistNames = append(artistNames, str)
-					}
-				}
-			case []string:
-				artistNames = v
-			case []uint8:
-				// PostgreSQL array as byte array representing JSON - convert to string first
-				jsonStr := string(v)
-				if len(jsonStr) > 2 && jsonStr[0] == '{' && jsonStr[len(jsonStr)-1] == '}' {
-					jsonStr = jsonStr[1 : len(jsonStr)-1] // Remove { and }
-					if jsonStr != "" {
-						// Split by comma and handle quoted values
-						parts := strings.Split(jsonStr, ",")
-						for _, part := range parts {
-							part = strings.TrimSpace(part)
-							part = strings.Trim(part, `"`) // Remove quotes
-							if part != "" {
-								artistNames = append(artistNames, part)
-							}
-						}
-					}
-				}
-			case string:
-				// Sometimes PostgreSQL returns arrays as strings
-				// Remove curly braces and split by comma
-				if len(v) > 2 && v[0] == '{' && v[len(v)-1] == '}' {
-					v = v[1 : len(v)-1] // Remove { and }
-					if v != "" {
-						artistNames = strings.Split(v, ",")
-						// Trim whitespace and quotes from each artist name
-						for i, artist := range artistNames {
-							artist = strings.Trim(artist, ` "`)
-							artistNames[i] = artist
-						}
-					}
-				}
-			default:
-				// Fallback - try to log for any remaining edge cases but don't fail
-				fmt.Printf("DEBUG: Unhandled artists type: %T\n", v)
-			}
-		}
+		// Convert artists to []string for downstream use
+		artistNames := toStringSlice(row.Artists)
 
 		// Calculate actual overlap count between user's artists and matched user's artists
 		overlapCount := 0

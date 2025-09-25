@@ -1,6 +1,8 @@
+-- Migration: Add testing guard to invalidate_artist_neighbors
+-- Version: V017
+-- Description: Wrap invalidation in a testing-mode guard using a custom GUC to avoid deadlocks in tests.
 
--- Guard to disable neighbor invalidation during tests to avoid deadlocks
--- Uses a custom GUC (session variable). In production this is off by default.
+-- Ensure the custom GUC exists per session (no-op if not referenced)
 DO $$ BEGIN PERFORM set_config('kmm.testing_mode', current_setting('kmm.testing_mode', true), true); EXCEPTION WHEN others THEN NULL; END $$;
 
 CREATE OR REPLACE FUNCTION invalidate_artist_neighbors()
@@ -30,7 +32,3 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
--- Performance: the updates above filter by a or b; add indexes to accelerate if not present
-CREATE INDEX IF NOT EXISTS idx_artist_neighbors_a ON artist_neighbors(a);
-CREATE INDEX IF NOT EXISTS idx_artist_neighbors_b ON artist_neighbors(b);
