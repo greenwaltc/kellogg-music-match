@@ -84,6 +84,15 @@ services:
       DB_USER: kellogg_user
       DB_PASSWORD: kellogg_secure_pass_2024
       DB_SSLMODE: disable
+      # Ticketmaster API configuration
+      TICKETMASTER_CONSUMER_KEY: 3RVuRqbo6iLpQj0iEG6UUAZiWa2Z5Y0O
+      TICKETMASTER_CONSUMER_SECRET: EzfZFlmQwTHXIrsb
+      TICKETMASTER_BASE_URL: https://app.ticketmaster.com/discovery/v2
+      TICKETMASTER_TIMEOUT: 30
+      TICKETMASTER_MAX_RESULTS: 200
+      TICKETMASTER_DEFAULT_CITY: Chicago
+      TICKETMASTER_DEFAULT_STATE: IL
+      TICKETMASTER_DEFAULT_COUNTRY: US
     depends_on:
       flyway:
         condition: service_completed_successfully

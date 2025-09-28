@@ -5,10 +5,11 @@ This guide covers the complete development workflow for the Kellogg Music Match 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- **Go 1.22+**
+- **Go 1.23+**
 - **Node.js 18+**
 - **Docker & Docker Compose**
 - **Make**
+- **Ticketmaster API Key** (optional, for concert integration)
 
 ### Start Development Environment
 ```bash
@@ -65,6 +66,9 @@ make db-info
 - **V001__initial_schema.sql**: Base tables, users, artists, user_artists
 - **V002-V009**: Progressive feature additions and improvements  
 - **V010__pwo_metric.sql**: Position-Weighted Overlap distance function
+- **V011-V012**: MusicBrainz artist database integration (47,452 records)
+- **V014**: Chamfer distance algorithm for enhanced similarity
+- **V019**: Latest migration with MusicBrainz upsert function fixes
 
 ### Database Development Workflow
 ```bash
@@ -139,20 +143,28 @@ make backend-build
 # Run with hot reload
 make backend-dev
 
-### Backend Testing
+### Backend Testing (43 Passing Tests)
+The project uses **Ginkgo BDD framework** with **Gomega matchers** for comprehensive testing:
+
 ```bash
-# Run all backend tests (Go + Ginkgo behavioral)
+# Run all backend tests (43 passing tests)
 make backend-test
 
-# Run quick Go unit tests only
-make backend-test-quick
+# Run tests with coverage
+make backend-test-coverage
 
-# Run Ginkgo behavioral tests
-make backend-test-ginkgo
+# Run specific test suites
+cd backend && ginkgo run ./business/tests/
 
-# Install testing dependencies
+# Install testing dependencies  
 make backend-install-tools
 ```
+
+**Test Architecture:**
+- **Ginkgo BDD**: Behavior-driven development with expressive test descriptions
+- **Gomega Matchers**: Rich assertion library for readable test expectations
+- **MockEventProvider**: Dependency injection for testing Ticketmaster integration
+- **Test Coverage**: Comprehensive coverage of business logic and API endpoints
 ```
 
 ### Code Generation

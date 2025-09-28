@@ -44,6 +44,15 @@ The application uses a centralized configuration system that loads all settings 
 | `ARTIST_SEARCH_MAX_LENGTH` | `240` | Maximum length for artist search queries |
 | `ARTIST_SEARCH_LIMIT` | `10` | Default limit for artist search results |
 
+### Ticketmaster API Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TICKETMASTER_CONSUMER_KEY` | *(empty)* | Ticketmaster Discovery API consumer key |
+| `TICKETMASTER_CONSUMER_SECRET` | *(empty)* | Ticketmaster Discovery API consumer secret |
+| `TICKETMASTER_BASE_URL` | `https://app.ticketmaster.com/discovery/v2` | Ticketmaster API base URL |
+| `TICKETMASTER_TIMEOUT` | `10s` | HTTP timeout for Ticketmaster API requests |
+
 ### Debug Configuration
 
 | Variable | Default | Description |
@@ -70,6 +79,10 @@ export DB_PASSWORD=dev_password
 export DEBUG_ENABLED=true
 export ARTIST_MIN_COUNT=3
 export ARTIST_MAX_COUNT=15
+
+# Ticketmaster API (optional for concert integration)
+export TICKETMASTER_CONSUMER_KEY=your_consumer_key_here
+export TICKETMASTER_CONSUMER_SECRET=your_consumer_secret_here
 ```
 
 ### Production Environment

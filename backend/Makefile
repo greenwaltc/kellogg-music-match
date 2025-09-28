@@ -6,11 +6,12 @@
 # Default target
 help: ## Show this help message
 	@echo "Kellogg Music Match Backend - Available targets:"
+	@echo "Features: OpenAPI generation, Ticketmaster API, PostgreSQL, Ginkgo testing"
 	@echo ""
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "Testing commands:"
-	@echo "  test             Run all tests (Go + Ginkgo behavioral)"
+	@echo "  test             Run all tests (43 Ginkgo/Gomega BDD tests)"
 	@echo "  test-quick       Run quick Go unit tests only"
 	@echo "  test-ginkgo      Run Ginkgo behavioral tests"
 	@echo "  test-behavioral  Alias for test-ginkgo"

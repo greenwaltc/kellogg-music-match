@@ -8,11 +8,12 @@ import (
 
 // Config holds all application configuration
 type Config struct {
-	Server   ServerConfig
-	Database DatabaseConfig
-	CORS     CORSConfig
-	Artist   ArtistConfig
-	Debug    DebugConfig
+	Server       ServerConfig
+	Database     DatabaseConfig
+	CORS         CORSConfig
+	Artist       ArtistConfig
+	Ticketmaster TicketmasterConfig
+	Debug        DebugConfig
 }
 
 // ServerConfig holds server-related configuration
@@ -45,6 +46,18 @@ type ArtistConfig struct {
 	MaxNameLength   int
 	SearchMaxLength int
 	SearchLimit     int
+}
+
+// TicketmasterConfig holds Ticketmaster API configuration
+type TicketmasterConfig struct {
+	ConsumerKey    string
+	ConsumerSecret string
+	BaseURL        string
+	Timeout        int // timeout in seconds
+	MaxResults     int // maximum results per API call
+	DefaultCity    string
+	DefaultState   string
+	DefaultCountry string
 }
 
 // DebugConfig holds debug-related configuration
@@ -81,6 +94,16 @@ func Load() *Config {
 			MaxNameLength:   getEnvIntWithDefault("ARTIST_MAX_NAME_LENGTH", 240),
 			SearchMaxLength: getEnvIntWithDefault("ARTIST_SEARCH_MAX_LENGTH", 240),
 			SearchLimit:     getEnvIntWithDefault("ARTIST_SEARCH_LIMIT", 10),
+		},
+		Ticketmaster: TicketmasterConfig{
+			ConsumerKey:    getEnvWithDefault("TICKETMASTER_CONSUMER_KEY", ""),
+			ConsumerSecret: getEnvWithDefault("TICKETMASTER_CONSUMER_SECRET", ""),
+			BaseURL:        getEnvWithDefault("TICKETMASTER_BASE_URL", "https://app.ticketmaster.com/discovery/v2"),
+			Timeout:        getEnvIntWithDefault("TICKETMASTER_TIMEOUT", 30),
+			MaxResults:     getEnvIntWithDefault("TICKETMASTER_MAX_RESULTS", 200),
+			DefaultCity:    getEnvWithDefault("TICKETMASTER_DEFAULT_CITY", "Chicago"),
+			DefaultState:   getEnvWithDefault("TICKETMASTER_DEFAULT_STATE", "IL"),
+			DefaultCountry: getEnvWithDefault("TICKETMASTER_DEFAULT_COUNTRY", "US"),
 		},
 		Debug: DebugConfig{
 			Enabled: getEnvBoolWithDefault("DEBUG_ENABLED", false),

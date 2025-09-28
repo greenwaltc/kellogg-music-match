@@ -37,12 +37,16 @@ This document describes the PostgreSQL database setup for the Kellogg Music Matc
 The database schema uses Flyway for professional database versioning:
 
 ```
-database/
-├── migrations/                # Flyway migration files
-│   ├── V001__initial_schema.sql       # Initial database structure
-│   ├── V002__add_user_profiles.sql    # User profile enhancements
-│   ├── ...                            # Progressive migrations
-│   └── V010__pwo_metric.sql           # Latest PWO distance function
+backend/db/schema/migrations/   # Flyway migration files (V001-V019)
+├── V001__initial.sql          # Initial database structure
+├── V002__spearman_func.sql    # Spearman rank correlation
+├── V006__feedback_table.sql   # User feedback system
+├── V010__pwo_metric.sql       # PWO distance function
+├── V011__musicbrainz_artists.sql    # MusicBrainz integration
+├── V012__populate_musicbrainz_artists.sql  # 47,452 artist records
+├── V014__chamfer_distance.sql       # Advanced similarity algorithm
+└── V019__fix_musicbrainz_upsert_function.sql  # Latest (current)
+
 backend/db/
 ├── queries/                   # SQLC query definitions
 │   └── queries.sql           # Type-safe SQL queries for Go code generation

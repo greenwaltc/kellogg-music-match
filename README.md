@@ -1,36 +1,37 @@
 # 🎵 Kellogg Music Match
 
-A professional full-stack music taste matching application designed for Kellogg students, featuring Go backend, Angular frontend, PostgreSQL database with scientific PWO distance metric, and automated infrastructure deployment.
+A professional full-stack music taste matching application designed for Kellogg students, featuring Go backend with Ticketmaster integration, Angular frontend, PostgreSQL database with scientific PWO distance metric, and automated infrastructure deployment.
 
 ## 🏗️ Architecture Overview
 
 ```
 kellogg-music-match/
-├── backend/              # Go backend with OpenAPI generation
+├── backend/              # Go backend with OpenAPI generation & Ticketmaster API
 ├── ui/                  # Angular frontend application  
 ├── pulumi/              # Infrastructure as Code (Pulumi)
 ├── database/            # Flyway migrations and configuration
-├── dev.sh              # Development environment helper
+├── scripts/             # Deployment and utility scripts
 ├── Makefile            # Top-level orchestration
 └── docker-compose.yml  # Local development environment
 ```
 
 ### 🔧 Backend
-- **Go 1.22+** with OpenAPI-generated server
+- **Go 1.23+** with OpenAPI-generated server
 - **Clean Architecture** - Generated code separated from business logic
+- **Ticketmaster Integration** - Concert discovery API with dependency inversion
 - **PostgreSQL Integration** - Flyway migrations with scientific PWO distance function
 - **UserRepository Interface** - Clean abstraction layer for database operations
 - **PWO Distance Metric** - Position-Weighted Overlap algorithm for scientifically accurate music matching
-- **REST API** with authentication, user management, and music matching
-- **Comprehensive Testing** - Unit tests + Ginkgo behavioral tests with PWO algorithm validation
+- **REST API** with authentication, user management, music matching, and concert discovery
+- **Comprehensive Testing** - Unit tests + Ginkgo behavioral tests with PWO algorithm validation (43 passing tests)
 - **Docker** containerization with multi-stage builds
 
 ### 🗄️ Database
-- **PostgreSQL 15** with **PWO distance function** for position-weighted overlap calculations
+- **PostgreSQL 16** with **PWO distance function** for position-weighted overlap calculations
 - **Scientific Similarity Calculations** - Custom `pwo_distance` function with position-weighted overlap algorithm
 - **SQLC Integration** - Type-safe Go code generated from SQL queries
-- **Flyway Migrations** - Professional database versioning and migration management
-- **Enhanced Database Pipeline** - Reset, verification, and sync guarantees in development workflow
+- **Flyway Migrations** - Professional database versioning and migration management (V019 current)
+- **MusicBrainz Integration** - 47,452 artist records loaded and deduplicated
 - **UserRepository Interface** - Clean abstraction layer for database operations
 - **UUID Support** - Proper UUID format with performance indexes
 - **User Management** - Complete profile support including program and graduation year
@@ -41,52 +42,27 @@ kellogg-music-match/
 - **Angular 17+** with reactive forms and modern UI
 - **Real-time validation** for password complexity and user input
 - **State Management** - Robust user session handling with automatic match clearing on user change
-- **Responsive design** optimized for music discovery
+- **Responsive design** optimized for music discovery and concert browsing
 - **Docker** containerization with Nginx
+- **Concert Integration** - UI components for browsing Ticketmaster events
+
+### 🎵 Concert Integration
+- **Ticketmaster API** - Live concert and event discovery
+- **Dependency Inversion** - Clean architecture with EventProvider interface
+- **Configuration Management** - Environment-based API credentials
+- **Geographic Targeting** - Configurable location-based event search (default: Chicago)
+- **Comprehensive Testing** - MockEventProvider for testing without API calls
+- **API Abstraction** - Clean separation between business logic and external APIs
 
 ### ☁️ Infrastructure
 - **Pulumi** Infrastructure as Code
 - **Kubernetes deployment** with StatefulSet for PostgreSQL
+- **Docker Compose** - Complete local development environment
 - **Cloud deployment** ready (AWS/Azure/GCP)
+- **K3s Support** - Local Kubernetes development with image import scripts
 - **Automated provisioning** and configuration management
 
-## 🚀 Quick Start
-
-### Prerequisites
-- **Go 1.22+**
-- **Node.js 18+** 
-- **Docker & Docker Compose**
-- **PostgreSQL client tools** (optional, for direct database access)
-- **Make**
-
-### 1. Initial Setup
-```bash
-# Clone and setup the project
-git clone <repository-url>
-cd kellogg-music-match
-make setup
-```
-
-### 2. Development Environment
-
-#### Option A: Full Docker Environment (Recommended)
-```bash
-# Start everything (database, backend, frontend)
-make dev
-
-# Or use docker-compose directly
-docker-compose up -d
-```
-
-#### Option B: Individual Services
-```bash
-# Start only PostgreSQL database
-docker-compose up -d postgres
-
-# In separate terminals:
-make backend-dev  # Backend with live reload
-make ui-dev       # Frontend with live reload
-```
+## 🚀 Quick Start\n\n### Prerequisites\n- **Go 1.23+**\n- **Node.js 18+** \n- **Docker & Docker Compose**\n- **PostgreSQL client tools** (optional, for direct database access)\n- **Make**\n- **Ticketmaster API Key** (see [TICKETMASTER_INTEGRATION.md](TICKETMASTER_INTEGRATION.md))\n\n### 1. Initial Setup\n```bash\n# Clone and setup the project\ngit clone https://github.com/greenwaltc/kellogg-music-match.git\ncd kellogg-music-match\n\n# Build and start full environment\nmake dev\n```\n\n### 2. Configure Ticketmaster API (Optional)\n```bash\n# Set your Ticketmaster API credentials\nexport TICKETMASTER_CONSUMER_KEY=\"your_key_here\"\nexport TICKETMASTER_CONSUMER_SECRET=\"your_secret_here\"\n```\n\n### 3. Access the Application\n- **Frontend**: http://localhost:4200\n- **Backend API**: http://localhost:8080 \n- **Health Check**: http://localhost:8080/health\n- **Database**: localhost:5432 (user: kellogg_user)\n\n### 4. Development Commands\n```bash\n# Run tests (43 passing tests)\nmake test\n\n# Check application health\nmake status\n\n# Stop services\nmake docker-stop\n\n# Clean up everything\nmake clean\n```"
 
 ### 3. Access the Application
 - **Frontend:** http://localhost:4200
@@ -218,7 +194,7 @@ The application uses PostgreSQL with a comprehensive schema including:
 
 ### Database Architecture
 - **UserRepository Interface**: Clean abstraction layer separating business logic from database operations
-- **Flyway Migration System**: Professional database versioning with incremental schema updates (V001-V010)
+- **Flyway Migration System**: Professional database versioning with incremental schema updates (V001-V019)
 - **PWO Distance Function**: PostgreSQL function implementing Position-Weighted Overlap algorithm:
   - **Position-Weighted Overlap (PWO)**: Scientific similarity metric considering both artist overlap and positional importance
   - **Configurable Alpha Parameter**: Controls position sensitivity in overlap calculations
@@ -251,9 +227,11 @@ Password: [from kubernetes secret]
 ```
 
 ### Database Files
-- **`database/migrations/`**: Flyway migration files (V001 through V010)
-  - `V001__initial_schema.sql`: Base tables and relationships
-  - `V010__pwo_metric.sql`: Latest PWO distance function implementation
+- **`backend/db/schema/migrations/`**: Flyway migration files (V001 through V019)
+  - `V001__initial.sql`: Core database structure with users, artists tables
+  - `V010__pwo_metric.sql`: PWO distance function implementation
+  - `V011-V012__musicbrainz_artists.sql`: MusicBrainz integration (47,452 artists)
+  - `V019__fix_musicbrainz_upsert_function.sql`: Latest migration
 - **`backend/db/queries/queries.sql`**: SQLC query definitions for type-safe Go code generation
 - **`backend/sqlc.yaml`**: SQLC configuration for code generation
 - **`DATABASE_SCHEMA.md`**: Comprehensive documentation with examples and queries
@@ -386,17 +364,38 @@ make test-e2e         # Complete user workflow tests
 
 ### Local Development
 ```bash
-make docker-run       # Full local environment
+make dev              # Full Docker Compose environment
+make status           # Check all services health
 ```
 
-### Staging Environment
+### Kubernetes with Pulumi (Recommended)
 ```bash
-make deploy-staging   # Deploy to staging with full checks
+cd pulumi/
+
+# Configure secrets
+pulumi config set postgres:password <secure-password>
+pulumi config set ticketmaster:consumerKey <api-key> --secret
+pulumi config set ticketmaster:consumerSecret <api-secret> --secret
+
+# Deploy infrastructure
+pulumi up
 ```
 
-### Production Environment
+### Local Kubernetes (K3s)
 ```bash
-make deploy-prod      # Production deployment workflow
+# Build and import images for local cluster
+make build-all
+scripts/k3s-image-import.sh
+
+# Deploy to local K3s
+cd pulumi/
+pulumi up --stack local
+```
+
+### Docker Compose Production
+```bash
+make build-all        # Build production images
+docker-compose up -d  # Deploy with production config
 ```
 
 ## 📊 Monitoring & Maintenance

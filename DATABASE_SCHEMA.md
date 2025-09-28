@@ -2,24 +2,29 @@
 
 ## Overview
 
-The Kellogg Music Match application uses **PostgreSQL 15** with Flyway migrations for professional database versioning. The database features a comprehensive migration system with PWO (Position-Weighted Overlap) distance function for scientifically accurate music taste matching between Kellogg students.
+The Kellogg Music Match application uses **PostgreSQL 16** with Flyway migrations for professional database versioning. The database features a comprehensive migration system with PWO (Position-Weighted Overlap) distance function for scientifically accurate music taste matching between Kellogg students, integrated with **47,452 MusicBrainz artist records** for enhanced matching accuracy.
 
 ## 🏗️ Schema Architecture
 
 ### Flyway Migration Management
 The database schema uses Flyway for professional database versioning:
 
-- **Migrations**: `database/migrations/V001` through `V010` 
-- **Current Version**: V010 includes PWO distance function implementation
+- **Migrations**: `backend/db/schema/migrations/V001` through `V019` 
+- **Current Version**: V019 includes MusicBrainz upsert function fixes
 - **Migration Commands**: `make db-migrate`, `make db-reset`, `make create-migration`
 - **Professional Versioning**: Incremental schema changes with rollback support
+- **MusicBrainz Integration**: 47,452 deduplicated artist records (V011-V012)
 
 ### Key Features
-- ✅ **Professional Migration System**: Flyway versioning with audit trail
-- ✅ **Complete User Profiles**: Program and graduation year fields
-- ✅ **Enhanced Validation**: Program constraints for Kellogg programs (2Y, 1Y, MMM, etc.)
-- ✅ **SQLC Compatibility**: Type-safe Go code generation
+- ✅ **Professional Migration System**: Flyway versioning with audit trail (V001-V019)
+- ✅ **Complete User Profiles**: Program and graduation year fields including JV support
+- ✅ **Enhanced Validation**: Program constraints for Kellogg programs (2Y, 1Y, MMM, JV, etc.)
+- ✅ **SQLC Compatibility**: Type-safe Go code generation with latest queries
 - ✅ **PWO Distance Function**: Scientific Position-Weighted Overlap algorithm
+- ✅ **MusicBrainz Integration**: 47,452 deduplicated artist records for enhanced matching
+- ✅ **Chamfer Distance Algorithm**: Advanced similarity measurement (V014)
+- ✅ **Artist Neighbor Optimization**: Performance optimization for distance calculations
+- ✅ **Feedback System**: User feedback collection and processing (V006)
 
 ## 🧪 Scientific Database Features
 
@@ -27,7 +32,7 @@ The database schema uses Flyway for professional database versioning:
 PostgreSQL function implementing Position-Weighted Overlap algorithm:
 
 ```sql
--- V010__pwo_metric.sql
+-- V010__pwo_metric.sql (current system at V019)
 CREATE OR REPLACE FUNCTION pwo_distance(list1 TEXT[], list2 TEXT[], alpha FLOAT8 DEFAULT 0.5)
 RETURNS FLOAT8 AS $$
 DECLARE
@@ -297,8 +302,10 @@ ORDER BY score DESC, overlap DESC;
 
 The database schema is managed using **Flyway migrations** for professional versioning:
 
-1. **Migration System**: Flyway manages incremental schema updates (V001-V010)
+1. **Migration System**: Flyway manages incremental schema updates (V001-V019)
 2. **PWO Function**: V010 migration includes Position-Weighted Overlap distance function
+3. **MusicBrainz Integration**: V011-V012 migrations include 47,452 deduplicated artist records
+4. **Advanced Algorithms**: V014+ includes Chamfer distance and performance optimizations
 3. **Professional Versioning**: Audit trail and rollback support
 4. **Development Commands**: `make db-migrate`, `make db-reset`, `make create-migration`
 

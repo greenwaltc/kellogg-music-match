@@ -10,6 +10,7 @@ IMAGE_VERSION ?= $(IMAGE_TAG)-$(GIT_SHA)
 
 help: ## Show this help message
 	@echo "🎵 Kellogg Music Match - Development Commands"
+	@echo "Features: Go backend, Angular UI, PostgreSQL, Ticketmaster API integration"
 	@echo ""
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-25s\033[0m %s\n", $$1, $$2}'
 
@@ -58,18 +59,16 @@ status: ## Show application status
 	@echo "🔧 Backend:"
 	@curl -s http://localhost:8080/health >/dev/null 2>&1 && echo "  ✅ Backend API is healthy" || echo "  ❌ Backend API not responding"
 
-dev: ## Start development environment (database + local services)
+dev: docker-build ## Start full development environment with Docker
 	@echo "🚀 Starting development environment..."
-	@echo "🗄️ Starting database..."
-	@docker-compose up -d postgres
-	@sleep 3
-	@echo "🔧 Starting backend in development mode..."
-	@cd backend && $(MAKE) dev &
-	@echo "🎨 Starting UI in development mode..."
-	@cd ui && npm start &
-	@echo "✅ Development environment starting!"
+	@echo "� Building and starting all services..."
+	@docker-compose up -d
+	@echo "✅ Development environment started!"
 	@echo "🌐 Frontend: http://localhost:4200"
-	@echo "🔧 Backend: http://localhost:8080"
+	@echo "🔧 Backend: http://localhost:8080 (Health: /health)"
+	@echo "🗄️ Database: localhost:5432"
+	@echo ""
+	@echo "🎵 Ticketmaster integration configured (see TICKETMASTER_INTEGRATION.md)"
 
 setup: ## Initial project setup
 	@echo "🛠️ Setting up Kellogg Music Match project..."
@@ -197,14 +196,15 @@ restart: ## Restart all services
 build-all: ## Build all components (Docker images + dependencies)
 	@echo "🏗️ Building all components..."
 	@echo "📦 Generating backend code..."
-	@cd backend && $(MAKE) generate 2>/dev/null || echo "⚠️ Backend code generation failed"
-	@echo "🐳 Building Docker images..."
+	@cd backend && $(MAKE) generate
+	@echo "🗄️ Generating SQLC code..."
+	@cd backend && $(MAKE) generate-sqlc
+	@echo "� Generating OpenAPI server code..."
 	@$(MAKE) docker-build
-	@echo "🔧 Building backend locally..."
-	@cd backend && $(MAKE) build 2>/dev/null || echo "⚠️ Backend build skipped"
-	@echo "🎨 Building UI..."
-	@cd ui && npm run build 2>/dev/null || echo "⚠️ UI build skipped" 
-	@echo "✅ Build complete!"
+	@echo "✅ OpenAPI code generation complete!"
+	@echo "📦 Generated files are in the 'generated' package"
+	@echo "💼 Business logic remains in the 'business' package"
+	@echo "🚀 Application entry point is in 'cmd/main.go'"
 
 # Cleanup
 clean: ## Clean build artifacts and containers

@@ -1,17 +1,14 @@
-# 🐳 Docker Compose Setup - Custom PostgreSQL with Scientific Extensions
+# 🐳 Docker Compose Setup - PostgreSQL 16 with MusicBrainz Integration
 
 ## ✅ Complete Local Development Environment
 
-This Docker Compose setup provides a complete local development environment with a **custom PostgreSQL image** featuring scientific extensions for advanced music similarity calculations. The setup mirrors production deployment with custom database functions, Go backend, and Angular frontend.
+This Docker Compose setup provides a complete local development environment with **PostgreSQL 16** featuring advanced music similarity calculations, MusicBrainz artist database integration, and Ticketmaster API support. The setup mirrors production deployment with PWO distance functions, Go 1.23+ backend, and Angular 17+ frontend.
 
-### 🧪 **Custom PostgreSQL Database Configuration**
+### 🗄️ **PostgreSQL 16 Database Configuration**
 
 ```yaml
 postgres:
-  build:
-    context: .
-    dockerfile: postgres.dockerfile          # Custom build with scientific libraries
-  image: kellogg-music-match-postgres:latest
+  image: postgres:16                         # PostgreSQL 16 with enhanced performance
   container_name: kmm-postgres
   environment:
     POSTGRES_USER: kellogg_user              # Production-matching credentials
@@ -19,8 +16,7 @@ postgres:
     POSTGRES_DB: kellogg_music_match
     PGDATA: /var/lib/postgresql/data/pgdata
   volumes:
-    - ./DATABASE_SCHEMA.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro  # Auto-initialization
-    - ./init-database.sh:/docker-entrypoint-initdb.d/02-init.sh:ro        # Auto-initialization
+    - ./init-database.sh:/docker-entrypoint-initdb.d/init.sh:ro  # Auto-initialization
     - postgres_data:/var/lib/postgresql/data  # Persistent storage
   ports:
     - "5432:5432"                            # Host access for development
@@ -30,33 +26,28 @@ postgres:
     timeout: 5s
     retries: 5
     start_period: 30s
+  networks:
+    - kellogg-network
 ```
 
 ### 🔬 **Database Features**
 
-The PostgreSQL database includes:
+The PostgreSQL 16 database includes:
 
-- **Flyway Migrations**: Professional database versioning system
+- **Flyway Migrations**: Professional database versioning system (V001-V019)
 - **PWO Distance Function**: Position-Weighted Overlap similarity algorithm  
+- **MusicBrainz Integration**: 47,452 deduplicated artist records for enhanced matching
+- **Chamfer Distance Algorithm**: Advanced similarity measurement
 - **TEXT Array Support**: Efficient handling for artist preference arrays
-- **Performance Indexes**: Optimized for similarity calculations
+- **Performance Optimization**: Artist neighbor caching and distance calculation improvements
+- **Feedback System**: User feedback collection and processing
 
-**Custom Dockerfile (`postgres.dockerfile`):**
-```dockerfile
-FROM postgres:15
-
-# Install Python dependencies as root
-USER root
-RUN apt-get update && apt-get install -y \
-    python3-pip \
-    python3-dev \
-    python3-numpy \
-    python3-scipy \
-    postgresql-plpython3-15 \
-    && rm -rf /var/lib/apt/lists/*
-
-# Verify scientific libraries
-RUN python3 -c "import scipy.stats; import numpy; print('✅ scipy and numpy are available')"
+**Database Initialization:**
+The database automatically initializes with:
+- **Flyway migrations** applied via `init-database.sh`
+- **UUID extension** for proper UUID support
+- **PWO distance functions** for similarity calculations
+- **MusicBrainz artist data** loaded from CSV (47,452 records)
 
 USER postgres
 ```

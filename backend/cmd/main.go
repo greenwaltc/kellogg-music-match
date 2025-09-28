@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 
@@ -66,6 +67,15 @@ func main() {
 	healthService := business.NewHealthService()
 	matchingService := business.NewMatchingServiceWithConfig(userRepo, matchingEngine, &cfg.Artist)
 	feedbackService := business.NewFeedbackService(userRepo)
+	concertAPIService := business.NewConcertAPIService(cfg)
+
+	// Validate concert service configuration
+	if err := concertAPIService.ValidateConfiguration(context.Background()); err != nil {
+		log.Printf("Warning: Concert service configuration invalid: %v", err)
+		log.Printf("Concert features will be disabled")
+	} else {
+		log.Printf("Concert service initialized with Ticketmaster API")
+	}
 
 	// Create service wrappers that implement the OpenAPI service interfaces
 	authAPIService := NewAuthAPIServiceWrapper(authService)
@@ -78,8 +88,9 @@ func main() {
 	HealthAPIController := generated.NewHealthAPIController(healthAPIService)
 	MatchingAPIController := generated.NewMatchingAPIController(matchingAPIService)
 	FeedbackAPIController := generated.NewFeedbackAPIController(feedbackAPIService)
+	ConcertsAPIController := generated.NewConcertsAPIController(concertAPIService)
 
-	router := generated.NewRouter(AuthenticationAPIController, HealthAPIController, MatchingAPIController, FeedbackAPIController)
+	router := generated.NewRouter(AuthenticationAPIController, HealthAPIController, MatchingAPIController, FeedbackAPIController, ConcertsAPIController)
 
 	// Wrap router with CORS middleware
 	corsRouter := corsMiddleware(cfg)(router)

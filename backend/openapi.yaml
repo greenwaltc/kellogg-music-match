@@ -30,6 +30,8 @@ tags:
     description: User registration and login operations
   - name: Matching
     description: Music taste matching and artist management
+  - name: Concerts
+    description: Concert and event discovery operations
   - name: Feedback
     description: User feedback and suggestions
   - name: Health
@@ -418,6 +420,144 @@ paths:
                   value:
                     message: "at least 5 valid artists are required"
 
+  /concerts/search:
+    get:
+      tags:
+        - Concerts
+      summary: Search for upcoming concerts
+      description: Search for upcoming concerts based on criteria like artist, location, or genre
+      operationId: searchConcerts
+      parameters:
+        - name: artist
+          in: query
+          description: Search for concerts by artist name
+          required: false
+          schema:
+            type: string
+            maxLength: 100
+            example: "Taylor Swift"
+        - name: city
+          in: query
+          description: City to search for concerts in
+          required: false
+          schema:
+            type: string
+            maxLength: 50
+            example: "Chicago"
+        - name: state
+          in: query
+          description: State or province code
+          required: false
+          schema:
+            type: string
+            maxLength: 10
+            example: "IL"
+        - name: country
+          in: query
+          description: Country code (default US)
+          required: false
+          schema:
+            type: string
+            maxLength: 5
+            example: "US"
+        - name: genre
+          in: query
+          description: Music genre filter
+          required: false
+          schema:
+            type: string
+            maxLength: 50
+            example: "Rock"
+        - name: start_date
+          in: query
+          description: Start date for concert search (YYYY-MM-DD)
+          required: false
+          schema:
+            type: string
+            format: date
+            example: "2024-01-01"
+        - name: end_date
+          in: query
+          description: End date for concert search (YYYY-MM-DD)
+          required: false
+          schema:
+            type: string
+            format: date
+            example: "2024-12-31"
+        - name: page
+          in: query
+          description: Page number for pagination (0-based)
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+            example: 0
+        - name: size
+          in: query
+          description: Number of results per page
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 20
+            example: 20
+      responses:
+        '200':
+          description: Concert search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConcertSearchResult'
+        '400':
+          description: Invalid search parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /concerts/{eventId}:
+    get:
+      tags:
+        - Concerts
+      summary: Get concert details by ID
+      description: Retrieve detailed information about a specific concert event
+      operationId: getConcertById
+      parameters:
+        - name: eventId
+          in: path
+          description: Unique identifier for the concert event
+          required: true
+          schema:
+            type: string
+            example: "G5vYZ9AJWlhKo"
+      responses:
+        '200':
+          description: Concert details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Concert'
+        '404':
+          description: Concert not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
 components:
   schemas:
     User:
@@ -694,6 +834,160 @@ components:
         - id
         - message
         - created_at
+
+    Concert:
+      type: object
+      description: A concert or music event
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the concert
+          example: "G5vYZ9AJWlhKo"
+        name:
+          type: string
+          description: Name of the concert/event
+          example: "Taylor Swift | The Eras Tour"
+        date:
+          type: string
+          format: date-time
+          description: Date and time of the concert
+          example: "2024-06-15T19:30:00Z"
+        venue:
+          $ref: '#/components/schemas/Venue'
+        artists:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConcertArtist'
+          description: List of performing artists
+        genres:
+          type: array
+          items:
+            type: string
+          description: Music genres associated with this event
+          example: ["Pop", "Country"]
+        priceRange:
+          $ref: '#/components/schemas/PriceRange'
+        ticketUrl:
+          type: string
+          format: uri
+          description: URL to purchase tickets
+          example: "https://www.ticketmaster.com/event/123"
+      required:
+        - id
+        - name
+        - date
+        - venue
+        - artists
+
+    ConcertSearchResult:
+      type: object
+      description: Search result containing concerts and pagination info
+      properties:
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/Concert'
+          description: List of concert events
+        totalCount:
+          type: integer
+          description: Total number of events matching the search
+          example: 150
+        currentPage:
+          type: integer
+          description: Current page number (0-based)
+          example: 0
+        totalPages:
+          type: integer
+          description: Total number of pages
+          example: 8
+        hasMore:
+          type: boolean
+          description: Whether there are more results available
+          example: true
+      required:
+        - events
+        - totalCount
+        - currentPage
+        - totalPages
+        - hasMore
+
+    Venue:
+      type: object
+      description: Concert venue information
+      properties:
+        name:
+          type: string
+          description: Name of the venue
+          example: "United Center"
+        address:
+          $ref: '#/components/schemas/Address'
+      required:
+        - name
+
+    Address:
+      type: object
+      description: Physical address
+      properties:
+        street:
+          type: string
+          description: Street address
+          example: "1901 W Madison St"
+        city:
+          type: string
+          description: City name
+          example: "Chicago"
+        state:
+          type: string
+          description: State or province
+          example: "IL"
+        country:
+          type: string
+          description: Country code
+          example: "US"
+        postalCode:
+          type: string
+          description: Postal/ZIP code
+          example: "60612"
+
+    ConcertArtist:
+      type: object
+      description: Artist performing at a concert
+      properties:
+        name:
+          type: string
+          description: Artist name
+          example: "Taylor Swift"
+        genres:
+          type: array
+          items:
+            type: string
+          description: Artist genres
+          example: ["Pop", "Country"]
+      required:
+        - name
+
+    PriceRange:
+      type: object
+      description: Price range for tickets
+      properties:
+        min:
+          type: number
+          format: float
+          description: Minimum ticket price
+          example: 49.99
+        max:
+          type: number
+          format: float
+          description: Maximum ticket price
+          example: 299.99
+        currency:
+          type: string
+          description: Currency code
+          example: "USD"
+      required:
+        - min
+        - max
+        - currency
 
   securitySchemes:
     # Reserved for future JWT implementation

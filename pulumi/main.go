@@ -425,6 +425,39 @@ echo "🎉 MusicBrainz data loading completed"`),
 										Name:  pulumi.String("DEBUG_ENABLED"),
 										Value: pulumi.String("false"),
 									},
+									// Ticketmaster API Configuration
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("TICKETMASTER_CONSUMER_KEY"),
+										Value: pulumi.String("3RVuRqbo6iLpQj0iEG6UUAZiWa2Z5Y0O"),
+									},
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("TICKETMASTER_CONSUMER_SECRET"),
+										Value: pulumi.String("EzfZFlmQwTHXIrsb"),
+									},
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("TICKETMASTER_BASE_URL"),
+										Value: pulumi.String("https://app.ticketmaster.com/discovery/v2"),
+									},
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("TICKETMASTER_TIMEOUT"),
+										Value: pulumi.String("30"),
+									},
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("TICKETMASTER_MAX_RESULTS"),
+										Value: pulumi.String("200"),
+									},
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("TICKETMASTER_DEFAULT_CITY"),
+										Value: pulumi.String("Chicago"),
+									},
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("TICKETMASTER_DEFAULT_STATE"),
+										Value: pulumi.String("IL"),
+									},
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("TICKETMASTER_DEFAULT_COUNTRY"),
+										Value: pulumi.String("US"),
+									},
 									// Legacy environment variables for backward compatibility
 									&corev1.EnvVarArgs{
 										Name:  pulumi.String("PORT"),
