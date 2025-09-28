@@ -303,11 +303,11 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 	if len(matches) > 0 {
 		crushMatch := &generated.MatchUser{
 			Name:           "Your Kellogg MBA Crush",
-			Program:        "2Y",                                                         // Default program for the joke entry
-			GraduationYear: 2026,                                                         // Default graduation year for the joke entry
-			Overlap:        int32(0),                                                     // No overlap by design
-			Score:          float32(0.0),                                                 // No compatibility
-			Artists:        []string{"Classical Music", "Podcasts", "NPR", "True Crime"}, // Completely different taste
+			Program:        "2Y",                                                                                     // Default program for the joke entry
+			GraduationYear: 2026,                                                                                     // Default graduation year for the joke entry
+			Overlap:        int32(0),                                                                                 // No overlap by design
+			Score:          float32(0.0),                                                                             // No compatibility
+			Artists:        []string{"Obscure artist 1", "Obscure artist 2", "Obscure artist 3", "Obscure artist 4"}, // Completely different taste
 		}
 		matches = append(matches, crushMatch)
 	}

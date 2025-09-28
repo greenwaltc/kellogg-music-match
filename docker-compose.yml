@@ -56,13 +56,13 @@ services:
       PGPASSWORD: kellogg_secure_pass_2024
     volumes:
       - ./scripts:/scripts:ro
-      - ./musicbrainz_artists_50k.csv:/data/musicbrainz_artists_50k.csv:ro
+      - ./musicbrainz_artists_50k_deduplicated.csv:/data/musicbrainz_artists.csv:ro
     command: >
       bash -c "
         echo 'Waiting for database migrations to complete...' &&
         sleep 10 &&
-        echo 'Loading MusicBrainz artists data...' &&
-        python3 /scripts/load_musicbrainz_artists.py /data/musicbrainz_artists_50k.csv --connection-string postgresql://kellogg_user:kellogg_secure_pass_2024@postgres:5432/kellogg_music_match &&
+        echo 'Loading MusicBrainz artists data (deduplicated)...' &&
+        python3 /scripts/load_musicbrainz_artists.py /data/musicbrainz_artists.csv --connection-string postgresql://kellogg_user:kellogg_secure_pass_2024@postgres:5432/kellogg_music_match &&
         echo 'MusicBrainz data loading completed successfully!'
       "
     depends_on:

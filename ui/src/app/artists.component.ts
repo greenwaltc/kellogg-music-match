@@ -8,14 +8,15 @@ import { MatchService, MatchUser, Artist } from './match.service';
 import { environment } from '../environments/environment';
 import { AuthService } from './auth.service';
 import { ArtistAutocompleteComponent } from './artist-autocomplete.component';
-import { CdkDragDrop, CdkDrag, CdkDropList, moveItemInArray } from '@angular/cdk/drag-drop';
+// Temporarily removed CDK drag-drop to fix build issues
+// import { CdkDragDrop, CdkDrag, CdkDropList, moveItemInArray } from '@angular/cdk/drag-drop';
 
 interface ArtistsFormShape { artists: FormArray<FormControl<string | null>>; }
 
 @Component({
   selector: 'app-artists',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, ArtistAutocompleteComponent, CdkDrag, CdkDropList],
+  imports: [CommonModule, ReactiveFormsModule, ArtistAutocompleteComponent],
   template: `
   <section class="artists-section">
     <div class="page-header">
@@ -31,9 +32,9 @@ interface ArtistsFormShape { artists: FormArray<FormControl<string | null>>; }
           <span class="count-badge">{{ artistsArray.length }}/{{ maxArtists }}</span>
         </div>
         
-        <div formArrayName="artists" class="artists-list" cdkDropList (cdkDropListDropped)="drop($event)">
-          <div class="artist-row" cdkDrag *ngFor="let ctrl of artistsArray.controls; let i = index">
-            <div class="drag-handle" cdkDragHandle title="Drag to reorder">⋮⋮</div>
+        <div formArrayName="artists" class="artists-list">
+          <div class="artist-row" *ngFor="let ctrl of artistsArray.controls; let i = index">
+            <!-- <div class="drag-handle" cdkDragHandle title="Drag to reorder">⋮⋮</div> -->
             <div class="input-wrapper">
               <span class="rank-number">{{ i + 1 }}</span>
               <app-artist-autocomplete
@@ -419,7 +420,7 @@ export class ArtistsComponent implements OnInit {
   form!: FormGroup<ArtistsFormShape>;
   private apiBase = environment.apiBaseUrl;
 
-  constructor(private fb: FormBuilder, private http: HttpClient, private matches: MatchService, private router: Router, private auth: AuthService) {
+  constructor(private fb: FormBuilder, private http: HttpClient, public matches: MatchService, private router: Router, private auth: AuthService) {
     // Initialize with 5 empty artist controls
     const initialControls = Array.from({ length: this.minArtists }, () => this.artistControl());
     this.form = this.fb.group<ArtistsFormShape>({ artists: this.fb.array(initialControls, { validators: [this.noDuplicatesValidator, this.minArtistsValidator] }) });
@@ -507,30 +508,31 @@ export class ArtistsComponent implements OnInit {
     }
   }
 
-  drop(event: CdkDragDrop<FormControl<string | null>[]>): void {
-    const artistsArray = this.artistsArray;
-    
-    // Get the current values
-    const currentValues = artistsArray.controls.map((control: FormControl<string | null>) => control.value);
-    
-    // Move the values in the array
-    moveItemInArray(currentValues, event.previousIndex, event.currentIndex);
-    
-    // Clear the form array
-    while (artistsArray.length) {
-      artistsArray.removeAt(0);
-    }
-    
-    // Re-add the controls with the new order
-    currentValues.forEach((value: string | null) => {
-      const control = this.artistControl();
-      control.setValue(value);
-      artistsArray.push(control);
-    });
-    
-    // Trigger validation
-    artistsArray.updateValueAndValidity();
-  }
+  // Temporarily commented out drag-drop functionality to fix build issues
+  // drop(event: CdkDragDrop<FormControl<string | null>[]>): void {
+  //   const artistsArray = this.artistsArray;
+  //   
+  //   // Get the current values
+  //   const currentValues = artistsArray.controls.map((control: FormControl<string | null>) => control.value);
+  //   
+  //   // Move the values in the array
+  //   moveItemInArray(currentValues, event.previousIndex, event.currentIndex);
+  //   
+  //   // Clear the form array
+  //   while (artistsArray.length) {
+  //     artistsArray.removeAt(0);
+  //   }
+  //   
+  //   // Re-add the controls with the new order
+  //   currentValues.forEach((value: string | null) => {
+  //     const control = this.artistControl();
+  //     control.setValue(value);
+  //     artistsArray.push(control);
+  //   });
+  //   
+  //   // Trigger validation
+  //   artistsArray.updateValueAndValidity();
+  // }
 
   submit(): void {
     if (this.form.invalid) { 

@@ -61,7 +61,7 @@ import { SimilarityMeterComponent } from './similarity-meter.component';
                 </div>
                 <div class="stat">
                   <span class="stat-label">Total Artists:</span>
-                  <span class="stat-value">{{ match.artists?.length || 0 }}</span>
+                  <span class="stat-value">{{ match.artists.length || 0 }}</span>
                 </div>
                 <div class="stat" *ngIf="match.program">
                   <span class="stat-label">Program:</span>
