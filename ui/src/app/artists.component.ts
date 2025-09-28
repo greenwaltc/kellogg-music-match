@@ -96,12 +96,12 @@ interface ArtistsFormShape { artists: FormArray<FormControl<string | null>>; }
         <button 
           type="submit" 
           class="submit-btn" 
-          [disabled]="loading() || form.invalid">
-          <span *ngIf="!loading()" class="btn-content">
+          [disabled]="matches.loading() || form.invalid">
+          <span *ngIf="!matches.loading()" class="btn-content">
             <span class="btn-icon">🎵</span>
             Find My Music Matches
           </span>
-          <span *ngIf="loading()" class="btn-content loading">
+          <span *ngIf="matches.loading()" class="btn-content loading">
             <span class="spinner"></span>
             Finding Matches...
           </span>
@@ -415,7 +415,6 @@ interface ArtistsFormShape { artists: FormArray<FormControl<string | null>>; }
 export class ArtistsComponent implements OnInit {
   maxArtists = 20;
   minArtists = 5;
-  loading = signal(false);
   error = signal<string | null>(null);
   form!: FormGroup<ArtistsFormShape>;
   private apiBase = environment.apiBaseUrl;
@@ -436,7 +435,6 @@ export class ArtistsComponent implements OnInit {
     const arr = this.artistsArray;
     while (arr.length) arr.removeAt(0);
     this.error.set(null);
-    this.loading.set(false);
     
     // Prefill for returning users
     const user = this.auth.user();
@@ -561,12 +559,12 @@ export class ArtistsComponent implements OnInit {
       return;
     }
     
-    this.loading.set(true); this.error.set(null); this.matches.clear();
+    this.matches.loading.set(true); this.error.set(null); this.matches.clear();
   const username = this.auth.user()?.username;
   const headers = username ? new HttpHeaders({ 'X-User-Username': username }) : undefined;
   this.http.post<MatchUser[]>(this.url('/findMusicMatches'), { artists }, { headers }).subscribe({
-      next: (res: any) => { this.loading.set(false); this.matches.set(res); this.router.navigateByUrl('/matches'); },
-      error: (err: any) => { this.loading.set(false); this.error.set(this.extractError(err) + ' Please try again later.'); }
+      next: (res: any) => { this.matches.set(res); this.router.navigateByUrl('/matches'); },
+      error: (err: any) => { this.matches.loading.set(false); this.error.set(this.extractError(err) + ' Please try again later.'); }
     });
   this.auth.updateArtists(artists);
   }

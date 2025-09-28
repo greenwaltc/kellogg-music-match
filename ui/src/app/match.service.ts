@@ -28,7 +28,10 @@ export class MatchService {
 
   constructor(private http: HttpClient, private auth: AuthService) {}
 
-  set(matches: MatchUser[]): void { this.matches.set(matches); }
+  set(matches: MatchUser[]): void { 
+    this.matches.set(matches); 
+    this.loading.set(false);
+  }
   clear(): void { 
     this.matches.set(null); 
     this.lastFetchedForUser = null;

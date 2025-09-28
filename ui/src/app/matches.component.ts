@@ -12,7 +12,14 @@ import { SimilarityMeterComponent } from './similarity-meter.component';
   <section>
     <h2>Your Top Music Matches</h2>
     <p class="note">Tip: check back here often! As more Kellogg students register, we build better matches.</p>
-    <ng-container *ngIf="matches.matches() as list; else noFetchYet">
+    
+    <!-- Loading indicator -->
+    <div *ngIf="matches.loading()" class="loading-container">
+      <div class="loading-spinner"></div>
+      <p class="loading-text">Finding your music matches...</p>
+    </div>
+    
+    <ng-container *ngIf="!matches.loading() && matches.matches() as list; else noFetchYet">
       <ng-container *ngIf="list.length; else noMatchesYet">
         <div class="matches-list">
           <div *ngFor="let match of list" class="match-card"
@@ -74,7 +81,7 @@ import { SimilarityMeterComponent } from './similarity-meter.component';
       </ng-template>
     </ng-container>
     <ng-template #noFetchYet>
-      <p class="empty-msg">No matches retrieved yet. Add or update your favorite artists to get started.</p>
+      <p *ngIf="!matches.loading()" class="empty-msg">No matches retrieved yet. Add or update your favorite artists to get started.</p>
     </ng-template>
     <div class="actions">
       <button type="button" (click)="back()">Back</button>
@@ -199,6 +206,38 @@ import { SimilarityMeterComponent } from './similarity-meter.component';
       border-radius: 4px;
     }
 
+    .loading-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 1rem;
+      margin: 2rem 0;
+    }
+
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #667eea;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 1rem;
+    }
+
+    .loading-text {
+      color: #6c757d;
+      font-size: 1rem;
+      font-weight: 500;
+      margin: 0;
+      text-align: center;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
     .actions {
       text-align: center;
       margin-top: 2rem;
@@ -284,6 +323,7 @@ import { SimilarityMeterComponent } from './similarity-meter.component';
 export class MatchesComponent {
   constructor(public matches: MatchService, private router: Router) {
     effect(() => { if (!this.matches.matches()) { /* could redirect */ } });
+    this.matches.fetchIfReady();
   }
   back(): void { this.router.navigateByUrl('/artists'); }
 }
