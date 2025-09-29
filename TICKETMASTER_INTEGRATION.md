@@ -1,6 +1,6 @@
 # Ticketmaster Integration
 
-This document describes how the Ticketmaster API integration works in the Kellogg Music Match application.
+This document describes how the Ticketmaster API integration works in the Kellogg Music Match application, including the Chicago Events feature with automated synchronization and UI components.
 
 ## Configuration
 
@@ -17,6 +17,7 @@ The Ticketmaster integration uses the following environment variables:
 - `TICKETMASTER_DEFAULT_CITY` - Default city for searches (default: `Chicago`)
 - `TICKETMASTER_DEFAULT_STATE` - Default state code (default: `IL`)
 - `TICKETMASTER_DEFAULT_COUNTRY` - Default country code (default: `US`)
+- `TICKETMASTER_DATE_RANGE_MONTHS` - Event date range in months (default: `6`)
 
 ## Current Configuration
 
@@ -160,10 +161,88 @@ environment:
   DEBUG_ENABLED: true
 ```
 
+## Chicago Events Feature
+
+### Overview
+The Chicago Events feature provides a complete concert discovery experience with:
+- **6-month event range** (configurable via `TICKETMASTER_DATE_RANGE_MONTHS`)  
+- **Automated sync** every 24 hours
+- **950+ events** currently loaded (September 2025 - March 2026)
+- **Artist search** with case-insensitive filtering
+- **Infinite scroll** UI with efficient pagination
+
+### API Endpoints
+
+#### Get Chicago Events
+```bash
+# Basic event listing
+GET /chicago/events?limit=20&offset=0
+
+# Search by artist (case-insensitive)
+GET /chicago/events?limit=20&offset=0&artist=taylor
+
+# Response format
+{
+  "events": [...],
+  "hasMore": true,
+  "totalCount": 953
+}
+```
+
+### Frontend Integration
+The Angular Chicago Events component (`chicago-events.component.ts`) provides:
+- **Infinite scroll** for efficient data loading
+- **Real-time search** with debounced input (300ms)
+- **Consistent theming** with application CSS variables
+- **Responsive design** optimized for concert browsing
+- **Ticket integration** with popup blocker handling
+
+### Sync Service
+The backend sync service (`sync_service.go`) handles:
+- **Scheduled sync** every 24 hours
+- **Pagination** through Ticketmaster API (200 events per page)
+- **Configuration-driven** date ranges and location
+- **Error handling** with graceful degradation
+- **Event cleanup** removes past events automatically
+
+### Data Storage
+Events are stored in PostgreSQL with:
+- **Normalized structure** (events, venues, artists tables)
+- **UPSERT operations** prevent duplicates
+- **Indexes** for efficient querying by date and artist
+- **Foreign keys** maintain data integrity
+
+### Current Status
+- **Total Events**: 953 active events
+- **Date Range**: September 29, 2025 - March 28, 2026
+- **Monthly Distribution**:
+  - October 2025: 382 events
+  - November 2025: 312 events  
+  - December 2025: 155 events
+  - January 2026: 20 events
+  - February 2026: 39 events
+  - March 2026: 32 events
+
+### Management Commands
+```bash
+# Check event status
+make events-status
+
+# Trigger manual sync  
+make events-sync
+
+# Search events
+make events-search ARTIST=john
+
+# View sample events
+make events-sample
+```
+
 ## Future Integration Ideas
 
-1. **User Concert Recommendations**: Based on artist preferences
+1. **User Concert Recommendations**: Based on PWO music compatibility scores
 2. **Social Features**: Share concerts with music-compatible matches  
 3. **Calendar Integration**: Add concerts to user calendars
-4. **Price Alerts**: Notify users of price drops
+4. **Price Alerts**: Notify users of ticket price drops
+5. **Geographic Expansion**: Add support for other cities beyond Chicago
 5. **Venue Recommendations**: Suggest venues based on user history

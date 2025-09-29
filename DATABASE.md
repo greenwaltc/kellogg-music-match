@@ -21,9 +21,12 @@ This document describes the PostgreSQL database setup for the Kellogg Music Matc
 ### Architecture Features
 - **SQLC Integration**: Type-safe Go code generated from SQL queries
 - **Flyway Migrations**: Professional database versioning with incremental schema updates
-- **UserRepository Pattern**: Clean database abstraction layer
+- **UserRepository Pattern**: Clean database abstraction layer  
 - **UUID Support**: Proper UUID format with performance indexes
-- **Normalized Design**: Artists and user relationships properly structured
+- **Normalized Design**: Artists, venues, and user relationships properly structured
+- **Chicago Events**: Complete concert data with venues, artists, and event relationships
+- **PWO Distance Function**: Position-Weighted Overlap algorithm for music similarity
+- **MusicBrainz Integration**: 47,452+ deduplicated artist records
 
 ### Storage Configuration
 - **Persistent Volume**: 10Gi storage allocated per StatefulSet replica
@@ -45,6 +48,8 @@ backend/db/schema/migrations/   # Flyway migration files (V001-V019)
 ├── V011__musicbrainz_artists.sql    # MusicBrainz integration
 ├── V012__populate_musicbrainz_artists.sql  # 47,452 artist records
 ├── V014__chamfer_distance.sql       # Advanced similarity algorithm
+├── V015__concert_events.sql         # Chicago Events tables (concerts, venues)
+├── V016__event_artists.sql          # Event-artist relationships
 └── V019__fix_musicbrainz_upsert_function.sql  # Latest (current)
 
 backend/db/

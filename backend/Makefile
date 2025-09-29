@@ -6,15 +6,21 @@
 # Default target
 help: ## Show this help message
 	@echo "Kellogg Music Match Backend - Available targets:"
-	@echo "Features: OpenAPI generation, Ticketmaster API, PostgreSQL, Ginkgo testing"
+	@echo "Features: OpenAPI generation, Ticketmaster API, Chicago Events, PostgreSQL, Ginkgo testing"
 	@echo ""
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "Testing commands:"
-	@echo "  test             Run all tests (43 Ginkgo/Gomega BDD tests)"
+	@echo "  test             Run all tests (Go unit tests + Ginkgo BDD tests)"
 	@echo "  test-quick       Run quick Go unit tests only"
 	@echo "  test-ginkgo      Run Ginkgo behavioral tests"
 	@echo "  test-behavioral  Alias for test-ginkgo"
+	@echo ""
+	@echo "API Features:"
+	@echo "  - Chicago Events API (/chicago/events) with 6-month event range"
+	@echo "  - Artist search with MusicBrainz database (47K+ artists)"
+	@echo "  - Music matching with PWO similarity algorithm"
+	@echo "  - User authentication and profile management"
 	@echo ""
 
 generate: generate-sqlc ## Generate OpenAPI server code and SQLC code from specifications

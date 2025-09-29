@@ -1,271 +1,189 @@
-# Kellogg Music Match - Top-Level Makefile
-# Orchestrates backend, UI, and infrastructure deployment
+# Kellogg Music Match - Development Commands
 
 # Image versioning
 IMAGE_TAG ?= $(shell date +%Y%m%d-%H%M%S)
 GIT_SHA ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 IMAGE_VERSION ?= $(IMAGE_TAG)-$(GIT_SHA)
 
-.PHONY: help docker-build docker-build-tagged docker-run docker-stop docker-logs docker-clean status dev setup test clean backend-% ui-% infra-% db-% logs health restart build-all test-integration db-migrate-k8s db-info-k8s k3s-import k3s-build-import k3s-registry k3s-push k3s-images k3s-deploy k3s-status infra-deploy-force infra-deploy-k3s
+.PHONY: help docs dev status events-status events-sample clean backend-test build docker-build docker-run docker-stop docker-logs docker-clean test infra-preview infra-deploy infra-destroy k3s-import k3s-build-import k3s-deploy k3s-status db-migrate db-connect
 
-help: ## Show this help message
-	@echo "🎵 Kellogg Music Match - Development Commands"
-	@echo "Features: Go backend, Angular UI, PostgreSQL, Ticketmaster API integration"
+help:
+	@echo "🎵 Kellogg Music Match - Available Commands:"
 	@echo ""
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-25s\033[0m %s\n", $$1, $$2}'
+	@echo "📋 General:"
+	@echo "  make help           Show this help"
+	@echo "  make docs           Documentation navigation"
+	@echo "  make dev            Start development environment"
+	@echo "  make status         Application status"
+	@echo ""
+	@echo "🏗️ Building:"
+	@echo "  make build          Build all components"
+	@echo "  make docker-build   Build Docker images"
+	@echo "  make test           Run all tests"
+	@echo ""
+	@echo "🐳 Docker:"
+	@echo "  make docker-run     Start all services"
+	@echo "  make docker-stop    Stop all services"
+	@echo "  make docker-logs    Show container logs"
+	@echo "  make docker-clean   Clean containers and images"
+	@echo ""
+	@echo "🎵 Chicago Events:"
+	@echo "  make events-status  Show event counts"
+	@echo "  make events-sample  Show sample events"
+	@echo ""
+	@echo "🗄️ Database:"
+	@echo "  make db-migrate     Apply migrations"
+	@echo "  make db-connect     Connect to database"
+	@echo ""
+	@echo "☁️ Infrastructure:"
+	@echo "  make infra-preview  Preview infra changes"
+	@echo "  make infra-deploy   Deploy infrastructure"
+	@echo "  make infra-destroy  Destroy infrastructure"
+	@echo ""
+	@echo "🚢 k3s:"
+	@echo "  make k3s-import     Import images to k3s"
+	@echo "  make k3s-deploy     Deploy to k3s"
+	@echo "  make k3s-status     Show k3s status"
+	@echo ""
+	@echo "🧹 Cleanup:"
+	@echo "  make clean          Clean containers"
 
+docs:
+	@echo "📚 Documentation Navigation:"
+	@echo ""
+	@echo "🚀 Quick Start:"
+	@echo "  README.md - Complete setup and API guide"  
+	@echo "  make dev  - Start development environment"
+	@echo ""
+	@echo "📖 Full Documentation:"
+	@echo "  DOCS.md - Complete documentation index"
+	@echo "  TICKETMASTER_INTEGRATION.md - Chicago Events & API"
+	@echo "  DATABASE.md - Database setup and schema"
+
+dev:
+	@echo "🚀 Starting development environment..."
+	docker-compose up -d
+	@echo "✅ Services started!"
+	@echo "🌐 Frontend: http://localhost:4200"
+	@echo "🔧 Backend: http://localhost:8080"
+	@echo "📍 Chicago Events: http://localhost:8080/chicago/events"
+
+status:
+	@echo "�� Application Status:"
+	@docker-compose ps || echo "Docker not running"
+	@curl -s http://localhost:8080/health >/dev/null && echo "✅ Backend healthy" || echo "❌ Backend down"
+
+events-status:
+	@echo "�� Chicago Events Status:"
+	@docker-compose exec postgres psql -U kellogg_user -d kellogg_music_match -c "SELECT COUNT(*) FROM concert_events;" || echo "❌ Database not accessible"
+
+events-sample:
+	@echo "🎵 Sample Chicago Events:"
+	@curl -s "http://localhost:8080/chicago/events?limit=3" | jq -r '.events[].name' || echo "❌ Backend not accessible"
+
+clean:
+	@echo "🧹 Cleaning up..."
+	docker-compose down -v
+	@echo "✅ Cleanup complete!"
+
+backend-test:
+	@cd backend && make test
+
+# Building Commands
+build: ## Build all components
+	@echo "🏗️ Building all components..."
+	@cd backend && make generate
+	@cd backend && make generate-sqlc
+	@echo "✅ Build complete!"
+
+# Docker Commands
 docker-build: ## Build all Docker images
 	@echo "🐳 Building all Docker images..."
-	@docker-compose build postgres backend ui musicbrainz-loader
-	@echo "✅ All Docker images built successfully!"
-
-docker-build-tagged: ## Build Docker images with version tags
-	@echo "🐳 Building Docker images with tag: $(IMAGE_VERSION)..."
-	@docker-compose build postgres backend ui musicbrainz-loader
-	@echo "🏷️ Tagging images with version $(IMAGE_VERSION)..."
-	@docker tag kellogg-music-match-backend:latest kellogg-music-match-backend:$(IMAGE_VERSION)
-	@docker tag kellogg-music-match-ui:latest kellogg-music-match-ui:$(IMAGE_VERSION) 
-	@docker tag kellogg-music-match_postgres:latest kellogg-music-match-postgres:$(IMAGE_VERSION)
-	@docker tag kellogg-music-match_musicbrainz-loader:latest kellogg-music-match-musicbrainz:$(IMAGE_VERSION)
-	@echo "✅ Tagged images built successfully with version $(IMAGE_VERSION)!"
+	docker-compose build postgres backend ui musicbrainz-loader
+	@echo "✅ All Docker images built!"
 
 docker-run: ## Start all services with Docker Compose
 	@echo "🐳 Starting Docker services..."
-	@docker-compose up -d
+	docker-compose up -d
 	@echo "✅ Docker services started!"
 	@echo "🌐 Frontend: http://localhost:4200"
 	@echo "🔧 Backend: http://localhost:8080"
 
 docker-stop: ## Stop Docker services
 	@echo "🛑 Stopping Docker services..."
-	@docker-compose down
+	docker-compose down
 	@echo "✅ Docker services stopped!"
 
 docker-logs: ## Show Docker container logs
-	@docker-compose logs -f --tail=100
+	docker-compose logs -f --tail=100
 
-docker-clean: ## Clean Docker resources (containers, images, volumes)
+docker-clean: ## Clean Docker resources
 	@echo "🧹 Cleaning Docker resources..."
-	@docker-compose down -v --remove-orphans
-	@docker system prune -f
+	docker-compose down -v --remove-orphans
+	docker system prune -f
 	@echo "✅ Docker cleanup complete!"
 
-status: ## Show application status
-	@echo "📊 Application Status:"
-	@echo ""
-	@echo "🐳 Docker Services:"
-	@docker-compose ps 2>/dev/null || echo "  Docker Compose not running"
-	@echo ""
-	@echo "🔧 Backend:"
-	@curl -s http://localhost:8080/health >/dev/null 2>&1 && echo "  ✅ Backend API is healthy" || echo "  ❌ Backend API not responding"
+# Testing Commands
+test: ## Run all tests
+	@echo "🧪 Running all tests..."
+	@make backend-test
+	@echo "✅ All tests complete!"
 
-dev: docker-build ## Start full development environment with Docker
-	@echo "🚀 Starting development environment..."
-	@echo "� Building and starting all services..."
-	@docker-compose up -d
-	@echo "✅ Development environment started!"
-	@echo "🌐 Frontend: http://localhost:4200"
-	@echo "🔧 Backend: http://localhost:8080 (Health: /health)"
-	@echo "🗄️ Database: localhost:5432"
-	@echo ""
-	@echo "🎵 Ticketmaster integration configured (see TICKETMASTER_INTEGRATION.md)"
-
-setup: ## Initial project setup
-	@echo "🛠️ Setting up Kellogg Music Match project..."
-	@echo "📦 Installing UI dependencies..."
-	@cd ui && npm install
-	@echo "🗄️ Starting database..."
-	@docker-compose up -d postgres
-	@sleep 5
-	@echo "🗄️ Running database migrations..."
-	@$(MAKE) db-migrate
-	@echo "✅ Project setup complete!"
-	@echo "🏗️ Run 'make dev' to start development environment"
-
-logs: ## Show logs for all services
-	@echo "📋 Showing logs..."
-	@docker-compose logs -f
-
-# Database Management
+# Database Commands
 db-migrate: ## Apply database migrations
 	@echo "🗄️ Applying database migrations..."
 	@cd database && ../scripts/flyway.sh migrate
 	@echo "✅ Database migrations applied!"
 
-db-migrate-k8s: ## Apply database migrations to Kubernetes (requires port-forward)
-	@echo "🗄️ Applying migrations to Kubernetes database..."
-	@echo "⚠️  Make sure kubectl port-forward is running: kubectl port-forward -n kmm postgres-0 5433:5432"
-	@docker run --rm -v $(PWD)/backend/db/schema/migrations:/flyway/sql flyway/flyway:latest \
-		-url=jdbc:postgresql://host.docker.internal:5433/kellogg_music_match \
-		-user=kellogg_user -password=kellogg_secure_pass_2024 migrate
-	@echo "✅ Kubernetes database migrations applied!"
-
-db-info-k8s: ## Show migration status for Kubernetes database
-	@echo "ℹ️ Kubernetes database migration info..."
-	@docker run --rm -v $(PWD)/backend/db/schema/migrations:/flyway/sql flyway/flyway:latest \
-		-url=jdbc:postgresql://host.docker.internal:5433/kellogg_music_match \
-		-user=kellogg_user -password=kellogg_secure_pass_2024 info
-
-db-info: ## Show migration information
-	@echo "ℹ️ Database migration info..."
-	@cd database && ../scripts/flyway.sh info
-
-db-clean: ## Clean database schema
-	@echo "🧹 Cleaning database schema..."
-	@cd database && ../scripts/flyway.sh clean
-
-db-reset: ## Reset database with fresh migrations
-	@echo "🔄 Resetting database..."
-	@$(MAKE) db-clean
-	@$(MAKE) db-migrate
-	@echo "✅ Database reset complete!"
-
-db-start: ## Start database only
-	@echo "🗄️ Starting PostgreSQL database..."
-	@docker-compose up -d postgres
-	@echo "✅ Database started!"
-
 db-connect: ## Connect to database with psql
-	@docker-compose exec postgres psql -U kellogg_user -d kellogg_music_match
+	docker-compose exec postgres psql -U kellogg_user -d kellogg_music_match
 
-# Infrastructure Management (Pulumi)
+# Infrastructure Commands (Pulumi)
 infra-preview: ## Preview infrastructure changes
 	@echo "☁️ Previewing infrastructure changes..."
 	@cd pulumi && pulumi preview
 
-infra-deploy: docker-build ## Build latest images and deploy infrastructure
-	@echo "🚀 Deploying infrastructure with latest images..."
-	@cd pulumi && pulumi up
-
-infra-deploy-force: ## Force rebuild and deploy with fresh images  
-	@echo "🔄 Force rebuilding images and deploying infrastructure..."
-	@docker-compose build --no-cache postgres backend ui musicbrainz-loader
-	@echo "🚀 Deploying infrastructure with force-pulled images..."
-	@cd pulumi && pulumi up --refresh
-
-infra-deploy-k3s: k3s-build-import ## Build, import to k3s, and deploy infrastructure
-	@echo "🚀 Deploying to k3s with latest imported images..."
+infra-deploy: docker-build ## Build images and deploy infrastructure
+	@echo "🚀 Deploying infrastructure..."
 	@cd pulumi && pulumi up
 
 infra-destroy: ## Destroy infrastructure
 	@echo "💥 Destroying infrastructure..."
 	@cd pulumi && pulumi destroy
 
-infra-status: ## Show infrastructure status
-	@echo "📊 Infrastructure status..."
-	@cd pulumi && pulumi stack
-
-infra-output: ## Show infrastructure outputs
-	@echo "📤 Infrastructure outputs..."
-	@cd pulumi && pulumi stack output
-
-infra-login: ## Login to Pulumi
-	@cd pulumi && pulumi login
-
-# Testing
-test: ## Run all tests
-	@echo "🧪 Running all tests..."
-	@$(MAKE) backend-test
-	@$(MAKE) ui-test
-	@echo "✅ All tests complete!"
-
-test-integration: ## Run integration tests
-	@echo "🧪 Running integration tests..."
-	@$(MAKE) docker-run
-	@sleep 10
-	@curl -s http://localhost:8080/health >/dev/null && echo "✅ Backend integration test passed"
-	@curl -s http://localhost:4200 >/dev/null && echo "✅ Frontend integration test passed"
-	@$(MAKE) docker-stop
-	@echo "✅ Integration tests complete!"
-
-# Development Utilities
-health: ## Check application health endpoints
-	@echo "🏥 Health Check:"
-	@echo "🔧 Backend Health:"
-	@curl -s http://localhost:8080/health | jq . 2>/dev/null || echo "  ❌ Backend health endpoint not responding"
-	@echo "🗄️ Database Connection:"
-	@docker-compose exec postgres pg_isready -U kellogg_user 2>/dev/null && echo "  ✅ Database ready" || echo "  ❌ Database not ready"
-
-restart: ## Restart all services
-	@echo "🔄 Restarting services..."
-	@$(MAKE) docker-stop
-	@sleep 2
-	@$(MAKE) docker-run
-	@echo "✅ Services restarted!"
-
-build-all: ## Build all components (Docker images + dependencies)
-	@echo "🏗️ Building all components..."
-	@echo "📦 Generating backend code..."
-	@cd backend && $(MAKE) generate
-	@echo "🗄️ Generating SQLC code..."
-	@cd backend && $(MAKE) generate-sqlc
-	@echo "� Generating OpenAPI server code..."
-	@$(MAKE) docker-build
-	@echo "✅ OpenAPI code generation complete!"
-	@echo "📦 Generated files are in the 'generated' package"
-	@echo "💼 Business logic remains in the 'business' package"
-	@echo "🚀 Application entry point is in 'cmd/main.go'"
-
-# Cleanup
-clean: ## Clean build artifacts and containers
-	@echo "🧹 Cleaning up..."
-	@docker-compose down -v --remove-orphans
-	@docker system prune -f
-	@cd backend && $(MAKE) clean 2>/dev/null || true
-	@cd ui && rm -rf dist/ node_modules/.cache/ 2>/dev/null || true
-	@echo "✅ Cleanup complete!"
-
-# Forwarding targets for component-specific commands
-backend-%: ## Forward backend commands (e.g., make backend-test, backend-build)
-	@cd backend && $(MAKE) $*
-
-ui-%: ## Forward UI commands (e.g., make ui-build, ui-lint)  
-	@cd ui && npm run $*
-
-infra-%: ## Forward infrastructure commands (e.g., make infra-refresh)
-	@cd pulumi && pulumi $*
-
-db-%: ## Forward database commands to scripts
-	@cd database && ../scripts/flyway.sh $*
-
-# K3s Development Commands
+# k3s Commands
 k3s-import: ## Import Docker images to k3s
 	@echo "🚢 Importing Docker images to k3s..."
 	@./scripts/k3s-image-import.sh import
-	@echo "✅ All images imported to k3s!"
+	@echo "✅ Images imported to k3s!"
 
-k3s-build-import: docker-build k3s-import ## Build and import Docker images to k3s
+k3s-build-import: docker-build k3s-import ## Build and import images to k3s
 
-k3s-registry: ## Setup local Docker registry for k3s
-	@echo "🏗️ Setting up local Docker registry for k3s..."
-	@./scripts/k3s-image-import.sh registry
-	@echo "✅ Local registry configured!"
-
-k3s-push: ## Push images to local registry
-	@echo "📤 Pushing images to local registry..."
-	@./scripts/k3s-image-import.sh push
-	@echo "✅ Images pushed to local registry!"
-
-k3s-images: ## Show current images in k3s
-	@echo "🔍 Current k3s images:"
-	@./scripts/k3s-image-import.sh show
-
-k3s-deploy: k3s-build-import ## Build, import, and deploy to k3s
+k3s-deploy: k3s-build-import ## Deploy to k3s
 	@echo "🚀 Deploying to k3s..."
-	@kubectl apply -f pulumi/k8s/ -n kmm || echo "⚠️ Deploy k8s manifests manually"
-	@echo "✅ Deployment complete!"
+	@kubectl apply -f pulumi/k8s/ -n kmm || echo "⚠️ Manual k8s deployment needed"
+	@echo "✅ k3s deployment complete!"
 
-k3s-status: ## Show k3s cluster and application status
-	@echo "📊 K3s Cluster Status:"
+k3s-status: ## Show k3s cluster status
+	@echo "📊 k3s Cluster Status:"
 	@echo ""
-	@echo "🏗️ Cluster Info:"
+	@echo "🏗️ Nodes:"
 	@sudo k3s kubectl get nodes
 	@echo ""
-	@echo "🚀 Application Pods:"
-	@kubectl get pods -n kmm 2>/dev/null || echo "  No pods found in kmm namespace"
+	@echo "🚀 Pods:"
+	@kubectl get pods -n kmm 2>/dev/null || echo "  No pods in kmm namespace"
 	@echo ""
 	@echo "🔧 Services:"
-	@kubectl get services -n kmm 2>/dev/null || echo "  No services found in kmm namespace"
+	@kubectl get services -n kmm 2>/dev/null || echo "  No services in kmm namespace"
 
-# Default target
+# Forwarding Commands
+backend-%: ## Forward backend commands
+	@cd backend && make $*
+
+ui-%: ## Forward UI commands
+	@cd ui && npm run $*
+
+infra-%: ## Forward infrastructure commands
+	@cd pulumi && pulumi $*
+
 .DEFAULT_GOAL := help

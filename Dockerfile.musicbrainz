@@ -7,11 +7,11 @@ RUN apk add --no-cache bash curl postgresql-client postgresql-dev gcc musl-dev
 # Install Python dependencies
 RUN pip install psycopg2-binary
 
-# Copy the MusicBrainz CSV data
-COPY musicbrainz_artists_50k.csv /data/musicbrainz_artists_50k.csv
+# Copy the MusicBrainz CSV data (deduplicated version)
+COPY musicbrainz_artists_50k_deduplicated.csv /data/musicbrainz_artists_50k_deduplicated.csv
 
 # Set proper permissions
-RUN chmod 644 /data/musicbrainz_artists_50k.csv
+RUN chmod 644 /data/musicbrainz_artists_50k_deduplicated.csv
 
 # Create a scripts directory
 RUN mkdir -p /scripts

@@ -40,17 +40,23 @@ kellogg-music-match/
 
 ### 🎨 Frontend  
 - **Angular 17+** with reactive forms and modern UI
+- **Chicago Events Page** - Standalone component with infinite scroll and artist search
 - **Real-time validation** for password complexity and user input
 - **State Management** - Robust user session handling with automatic match clearing on user change
 - **Responsive design** optimized for music discovery and concert browsing
+- **Consistent Theming** - Light/dark mode support across all components
 - **Docker** containerization with Nginx
-- **Concert Integration** - UI components for browsing Ticketmaster events
+- **Concert Integration** - Complete UI for browsing 6 months of Chicago area events
 
 ### 🎵 Concert Integration
-- **Ticketmaster API** - Live concert and event discovery
+- **Ticketmaster API** - Live concert and event discovery with 6-month configurable date range
+- **Chicago Events Page** - Dedicated UI component with infinite scroll and search functionality
+- **Real-time Search** - Case-insensitive artist filtering with debounced input
+- **Pagination Support** - Efficient data loading with configurable page sizes
+- **Automated Sync** - 24-hour scheduled synchronization of concert data
 - **Dependency Inversion** - Clean architecture with EventProvider interface
-- **Configuration Management** - Environment-based API credentials
-- **Geographic Targeting** - Configurable location-based event search (default: Chicago)
+- **Configuration Management** - Environment-based API credentials and date ranges
+- **Geographic Targeting** - Configurable location-based event search (default: Chicago, IL)
 - **Comprehensive Testing** - MockEventProvider for testing without API calls
 - **API Abstraction** - Clean separation between business logic and external APIs
 
@@ -90,6 +96,12 @@ curl -X POST http://localhost:8080/findMusicMatches \
   -H "Content-Type: application/json" \
   -H "X-User-Username: testuser" \
   -d '{"artists":["The Beatles","Taylor Swift"]}'
+
+# Test Chicago Events API (6 months of events)
+curl "http://localhost:8080/chicago/events?limit=5&offset=0"
+
+# Search Chicago events by artist
+curl "http://localhost:8080/chicago/events?limit=10&artist=john&offset=0"
 ```
 
 ## 🛠️ Development Commands
@@ -237,7 +249,139 @@ Password: [from kubernetes secret]
 - **`DATABASE_SCHEMA.md`**: Comprehensive documentation with examples and queries
 - **`postgres.dockerfile`**: PostgreSQL image configuration
 
-## 🔄 Development Workflows
+## � API Documentation
+
+### Core Endpoints
+
+#### Authentication & User Management
+```bash
+# User Registration
+POST /register
+Content-Type: application/json
+{
+  "username": "string",
+  "email": "string", 
+  "password": "string",
+  "firstName": "string",
+  "lastName": "string",
+  "program": "string",      # e.g., "2Y", "1Y", "MMM"
+  "graduationYear": 2026
+}
+
+# User Login
+POST /login
+Content-Type: application/json
+{
+  "username": "string",
+  "password": "string"
+}
+```
+
+#### Music Matching
+```bash
+# Find Music Matches (PWO Algorithm)
+POST /findMusicMatches
+Content-Type: application/json
+X-User-Username: testuser
+{
+  "artists": ["The Beatles", "Taylor Swift", "Drake"]
+}
+
+# Response includes PWO similarity scores (0.0-1.0, higher = more similar)
+```
+
+#### Artist Search
+```bash
+# Search Artists (MusicBrainz Database - 47,452 artists)
+GET /artists/search?query={search_term}&limit={count}
+
+# Returns: Artist names and IDs matching the search term
+```
+
+### Chicago Events API
+
+#### Get Chicago Events (6-month range)
+```bash
+# Get Events with Pagination
+GET /chicago/events?limit={count}&offset={start}
+
+# Search Events by Artist (case-insensitive)
+GET /chicago/events?limit={count}&offset={start}&artist={search_term}
+
+Response format:
+{
+  "events": [
+    {
+      "id": "string",
+      "name": "string", 
+      "date": "2025-10-15T19:30:00Z",
+      "venue": {
+        "name": "string",
+        "address": {
+          "street": "string",
+          "city": "Chicago", 
+          "state": "IL",
+          "country": "US"
+        }
+      },
+      "artists": [
+        {
+          "name": "string",
+          "genres": ["string"]
+        }
+      ],
+      "priceRange": {
+        "min": 0,
+        "max": 0,
+        "currency": "USD"
+      },
+      "ticketUrl": "string"
+    }
+  ],
+  "hasMore": true,
+  "totalCount": 953
+}
+```
+
+#### Concert Search & Discovery
+```bash
+# Search Concerts by Artist
+GET /concerts/search?artist={artist_name}
+
+# Get Concert Details  
+GET /concerts/{eventId}
+```
+
+#### Health & Status
+```bash
+# Application Health Check
+GET /health
+
+# Returns service status and database connectivity
+```
+
+### Configuration Parameters
+
+#### Ticketmaster Integration
+- `TICKETMASTER_CONSUMER_KEY` - API consumer key (required)
+- `TICKETMASTER_CONSUMER_SECRET` - API consumer secret (required)
+- `TICKETMASTER_DATE_RANGE_MONTHS` - Event date range (default: 6 months)
+- `TICKETMASTER_DEFAULT_CITY` - Search city (default: "Chicago")
+- `TICKETMASTER_DEFAULT_STATE` - Search state (default: "IL")
+- `TICKETMASTER_MAX_RESULTS` - Max results per API call (default: 200)
+
+#### Backend Configuration
+- `SERVER_PORT` - Backend server port (default: 8080)
+- `DB_HOST`, `DB_PORT`, `DB_NAME` - Database connection settings
+- `CORS_ALLOWED_ORIGINS` - Frontend URL for CORS (default: http://localhost:4200)
+
+### Current Data Status
+- **Chicago Events**: 953+ events (September 2025 - March 2026)
+- **MusicBrainz Artists**: 47,452 deduplicated artist records
+- **Auto-sync**: Events refreshed every 24 hours
+- **Search Performance**: Indexed for fast artist and date filtering
+
+## �🔄 Development Workflows
 
 ### Quick Development Cycle
 ```bash

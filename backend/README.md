@@ -1,13 +1,15 @@
 # Kellogg Music Match Backend
 
-A Go backend server with consolidated PostgreSQL database schema, SQLC type-safe queries, OpenAPI specification, scientific similarity calculations, and comprehensive behavioral testing for Kellogg student music matching.
+A Go backend server with consolidated PostgreSQL database schema, SQLC type-safe queries, OpenAPI specification, scientific similarity calculations, Chicago Events integration, and comprehensive behavioral testing for Kellogg student music matching.
 
 ## 🏗️ Architecture
 
 - **`generated/`** - OpenAPI generated code (controllers, models, routing)
-- **`business/`** - Custom business logic (authentication, matching, database repository)  
+- **`business/`** - Custom business logic (authentication, matching, database repository, concert integration)  
   - **`matching.go`** - Music matching engine with hybrid similarity calculations
   - **`database.go`** - UserRepository implementation with enhanced PostgreSQL integration
+  - **`chicago_events_api.go`** - Chicago Events API with search and pagination
+  - **`concert/`** - Complete Ticketmaster integration with sync service and event management
   - **`business_suite_test.go`** - Ginkgo test suite bootstrap
   - **`matching_behavior_test.go`** - Comprehensive behavioral tests for similarity algorithms
   - **`TESTING.md`** - Behavioral testing documentation
