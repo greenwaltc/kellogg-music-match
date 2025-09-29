@@ -2,7 +2,7 @@ package business_test
 
 import (
 	"context"
-	
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -45,7 +45,7 @@ var _ = Describe("Concert Synchronization", func() {
 		// Initialize mocks
 		mockProvider := &MockEventProvider{}
 		mockRepo = concert.NewMockRepository()
-		
+
 		// Initialize sync service with mock dependencies
 		syncService = concert.NewSyncService(mockProvider, mockRepo, cfg)
 	})

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/greenwaltc/kellogg-music-match/backend/config"
-	"github.com/greenwaltc/kellogg-music-match/backend/db/sqlc"
+	database "github.com/greenwaltc/kellogg-music-match/backend/db/sqlc"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -199,5 +199,5 @@ func (m *MockRepository) IsHealthy(ctx context.Context) error {
 
 // Common errors
 var (
-ErrEventNotFound = fmt.Errorf("event not found")
+	ErrEventNotFound = fmt.Errorf("event not found")
 )

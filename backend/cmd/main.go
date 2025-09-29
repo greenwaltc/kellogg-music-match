@@ -77,7 +77,7 @@ func main() {
 		log.Printf("Concert features will be disabled")
 	} else {
 		log.Printf("Concert service initialized with Ticketmaster API")
-		
+
 		// Initialize concert repository
 		concertRepo, err := concert.NewPostgreSQLRepository(&cfg.Database)
 		if err != nil {
@@ -85,22 +85,22 @@ func main() {
 			log.Printf("Concert sync will be disabled")
 		} else {
 			log.Printf("Concert repository initialized successfully")
-			
+
 			// Create Ticketmaster event provider
 			eventProvider := concert.NewTicketmasterAdapter(&cfg.Ticketmaster)
-			
+
 			// Initialize and start concert sync service
 			concertSyncService = concert.NewSyncService(eventProvider, concertRepo, cfg)
-			
+
 			// Start the sync service in a separate goroutine
 			go func() {
 				if err := concertSyncService.Start(context.Background()); err != nil {
 					log.Printf("Error starting concert sync service: %v", err)
 				}
 			}()
-			
+
 			log.Printf("Concert sync service started - will sync every 24 hours")
-			
+
 			// Ensure graceful shutdown of sync service
 			defer func() {
 				if concertSyncService != nil {

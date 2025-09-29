@@ -98,9 +98,9 @@ func (s *SyncService) syncEvents(ctx context.Context) error {
 
 	for {
 		criteria.Page = page
-		
+
 		log.Printf("Fetching events page %d...", page)
-		
+
 		// Get events from the provider
 		result, err := s.eventProvider.SearchEvents(ctx, criteria)
 		if err != nil {
@@ -160,11 +160,11 @@ func (s *SyncService) GetSyncStatus(ctx context.Context) (*SyncStatus, error) {
 	}
 
 	return &SyncStatus{
-		IsRunning:   s.ticker != nil,
-		EventCount:  count,
-		Provider:    s.eventProvider.GetProviderName(),
-		LastSyncAt:  time.Now(), // In production, you'd track this properly
-		NextSyncAt:  time.Now().Add(24 * time.Hour),
+		IsRunning:  s.ticker != nil,
+		EventCount: count,
+		Provider:   s.eventProvider.GetProviderName(),
+		LastSyncAt: time.Now(), // In production, you'd track this properly
+		NextSyncAt: time.Now().Add(24 * time.Hour),
 	}, nil
 }
 
