@@ -81,15 +81,15 @@ func (s *SyncService) syncEvents(ctx context.Context) error {
 		return fmt.Errorf("event provider is not healthy: %w", err)
 	}
 
-	// Define search criteria for Chicago area events over next 6 months
-	endDate := time.Now().AddDate(0, 6, 0) // 6 months from now
+	// Define search criteria for Chicago area events over configured date range
+	endDate := time.Now().AddDate(0, s.config.Ticketmaster.DateRangeMonths, 0)
 	criteria := SearchCriteria{
-		City:       "Chicago",
-		State:      "IL",
-		Country:    "US",
+		City:       s.config.Ticketmaster.DefaultCity,
+		State:      s.config.Ticketmaster.DefaultState,
+		Country:    s.config.Ticketmaster.DefaultCountry,
 		StartDate:  time.Now(),
 		EndDate:    endDate,
-		MaxResults: 200, // Fetch up to 200 events per request
+		MaxResults: s.config.Ticketmaster.MaxResults, // Use configured max results
 		Page:       1,
 	}
 
