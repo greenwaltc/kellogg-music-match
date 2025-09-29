@@ -23,6 +23,13 @@ func NewConcertAPIService(cfg *config.Config) *ConcertAPIService {
 	}
 }
 
+// NewConcertAPIServiceWithRepository creates a new concert API service with repository access
+func NewConcertAPIServiceWithRepository(provider concert.EventProvider, repository concert.Repository, cfg *config.Config) *ConcertAPIService {
+	return &ConcertAPIService{
+		concertService: NewConcertServiceWithRepository(provider, repository, cfg),
+	}
+}
+
 // ValidateConfiguration validates the concert service configuration
 func (s *ConcertAPIService) ValidateConfiguration(ctx context.Context) error {
 	return s.concertService.ValidateConfiguration(ctx)
@@ -176,4 +183,37 @@ func (s *ConcertAPIService) convertToAPIConcert(event concert.Event) generated.C
 	}
 
 	return concert
+}
+
+// GetChicagoEvents retrieves Chicago area events with search and pagination
+func (s *ConcertAPIService) GetChicagoEvents(ctx context.Context, artistName string, limit int32, offset int32) (generated.ImplResponse, error) {
+	// Convert empty string to nil pointer for optional parameter
+	var artistNamePtr *string
+	if artistName != "" {
+		artistNamePtr = &artistName
+	}
+
+	events, totalCount, err := s.concertService.GetChicagoEvents(ctx, artistNamePtr, limit, offset)
+	if err != nil {
+		return generated.Response(http.StatusInternalServerError, generated.ErrorResponse{
+			Message: fmt.Sprintf("Failed to get Chicago events: %v", err),
+		}), nil
+	}
+
+	// Convert events to API format
+	apiEvents := make([]generated.Concert, 0, len(events))
+	for _, event := range events {
+		apiEvents = append(apiEvents, s.convertToAPIConcert(*event))
+	}
+
+	// Calculate hasMore flag
+	hasMore := int64(offset+limit) < totalCount
+
+	result := generated.ChicagoEventsResult{
+		Events:     apiEvents,
+		HasMore:    hasMore,
+		TotalCount: int32(totalCount),
+	}
+
+	return generated.Response(http.StatusOK, result), nil
 }

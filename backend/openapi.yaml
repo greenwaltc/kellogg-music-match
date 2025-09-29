@@ -558,6 +558,64 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /chicago/events:
+    get:
+      tags:
+        - Concerts
+      summary: Get Chicago area events with search and pagination
+      description: |
+        Retrieve upcoming concert events in the Chicago area with optional artist name filtering.
+        Results are sorted chronologically (soonest first) and support efficient pagination.
+        Perfect for building scrollable event lists with search functionality.
+      operationId: getChicagoEvents
+      parameters:
+        - name: artistName
+          in: query
+          description: Filter events by artist name (case-insensitive partial match)
+          required: false
+          schema:
+            type: string
+            maxLength: 100
+            example: "Taylor"
+        - name: limit
+          in: query
+          description: Maximum number of events to return per page
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+            example: 20
+        - name: offset
+          in: query
+          description: Number of events to skip (for pagination)
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+            example: 0
+      responses:
+        '200':
+          description: Chicago events retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChicagoEventsResult'
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
 components:
   schemas:
     User:
@@ -910,6 +968,28 @@ components:
         - currentPage
         - totalPages
         - hasMore
+
+    ChicagoEventsResult:
+      type: object
+      description: Result set for Chicago area events with pagination support
+      properties:
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/Concert'
+          description: List of Chicago area concert events, sorted chronologically
+        hasMore:
+          type: boolean
+          description: Whether there are more events available for pagination
+          example: true
+        totalCount:
+          type: integer
+          description: Total number of events matching the search criteria
+          example: 42
+      required:
+        - events
+        - hasMore
+        - totalCount
 
     Venue:
       type: object

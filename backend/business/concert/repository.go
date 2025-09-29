@@ -17,6 +17,8 @@ type Repository interface {
 	DeleteOldEvents(ctx context.Context, cutoffDate time.Time) error
 	GetEventCount(ctx context.Context) (int64, error)
 	IsHealthy(ctx context.Context) error
+	GetChicagoEvents(ctx context.Context, artistName *string, limit int32, offset int32) ([]*Event, error)
+	GetChicagoEventsCount(ctx context.Context, artistName *string) (int64, error)
 }
 
 // PostgreSQLRepository implements Repository using SQLC and pgx
@@ -158,6 +160,83 @@ func (r *PostgreSQLRepository) IsHealthy(ctx context.Context) error {
 	return nil
 }
 
+// GetChicagoEvents retrieves Chicago area events with optional artist filtering and pagination
+func (r *PostgreSQLRepository) GetChicagoEvents(ctx context.Context, artistName *string, limit int32, offset int32) ([]*Event, error) {
+	artistNameParam := ""
+	if artistName != nil {
+		artistNameParam = *artistName
+	}
+
+	params := database.GetChicagoEventsWithArtistSearchParams{
+		ArtistName:  artistNameParam,
+		LimitCount:  limit,
+		OffsetCount: offset,
+	}
+
+	rows, err := r.queries.GetChicagoEventsWithArtistSearch(ctx, params)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get Chicago events: %w", err)
+	}
+
+	events := make([]*Event, 0, len(rows))
+	for _, row := range rows {
+		event := &Event{
+			ID:        row.ID,
+			Name:      row.Name,
+			Date:      row.EventDate.Time,
+			Status:    row.Status,
+			TicketURL: row.TicketUrl.String,
+			Venue: Venue{
+				ID:   row.VenueID.String,
+				Name: row.VenueName.String,
+				Address: Address{
+					Street:  row.VenueStreet.String,
+					City:    row.VenueCity.String,
+					State:   row.VenueState.String,
+					Country: row.VenueCountry.String,
+					Postal:  row.VenuePostal.String,
+				},
+				Capacity: int(row.VenueCapacity.Int32),
+			},
+		}
+
+		// Fetch artists for this event
+		eventArtists, err := r.queries.GetEventArtists(ctx, row.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get artists for event %s: %w", row.ID, err)
+		}
+
+		artists := make([]Artist, 0, len(eventArtists))
+		for _, artist := range eventArtists {
+			artists = append(artists, Artist{
+				ID:     artist.ID,
+				Name:   artist.Name,
+				Genres: artist.Genres,
+			})
+		}
+		event.Artists = artists
+
+		events = append(events, event)
+	}
+
+	return events, nil
+}
+
+// GetChicagoEventsCount returns the total count of Chicago area events with optional artist filtering
+func (r *PostgreSQLRepository) GetChicagoEventsCount(ctx context.Context, artistName *string) (int64, error) {
+	artistNameParam := ""
+	if artistName != nil {
+		artistNameParam = *artistName
+	}
+
+	count, err := r.queries.GetChicagoEventsCountWithArtistSearch(ctx, artistNameParam)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get Chicago events count: %w", err)
+	}
+
+	return count, nil
+}
+
 // Close closes the database connection pool
 func (r *PostgreSQLRepository) Close() {
 	r.db.Close()
@@ -195,6 +274,86 @@ func (m *MockRepository) GetEventCount(ctx context.Context) (int64, error) {
 
 func (m *MockRepository) IsHealthy(ctx context.Context) error {
 	return nil
+}
+
+func (m *MockRepository) GetChicagoEvents(ctx context.Context, artistName *string, limit int32, offset int32) ([]*Event, error) {
+	// Simple mock implementation - filter for Chicago events
+	var results []*Event
+	count := int32(0)
+	skipped := int32(0)
+
+	for _, event := range m.events {
+		// Simple Chicago filter
+		if event.Venue.Address.City != "Chicago" {
+			continue
+		}
+
+		// Artist name filter
+		if artistName != nil && *artistName != "" {
+			found := false
+			for _, artist := range event.Artists {
+				if len(artist.Name) > 0 && len(*artistName) > 0 &&
+					artist.Name[:min(len(artist.Name), len(*artistName))] == (*artistName)[:min(len(artist.Name), len(*artistName))] {
+					found = true
+					break
+				}
+			}
+			if !found {
+				continue
+			}
+		}
+
+		// Skip for offset
+		if skipped < offset {
+			skipped++
+			continue
+		}
+
+		// Add to results up to limit
+		if count >= limit {
+			break
+		}
+
+		results = append(results, event)
+		count++
+	}
+
+	return results, nil
+}
+
+func (m *MockRepository) GetChicagoEventsCount(ctx context.Context, artistName *string) (int64, error) {
+	count := int64(0)
+	for _, event := range m.events {
+		// Simple Chicago filter
+		if event.Venue.Address.City != "Chicago" {
+			continue
+		}
+
+		// Artist name filter
+		if artistName != nil && *artistName != "" {
+			found := false
+			for _, artist := range event.Artists {
+				if len(artist.Name) > 0 && len(*artistName) > 0 &&
+					artist.Name[:min(len(artist.Name), len(*artistName))] == (*artistName)[:min(len(artist.Name), len(*artistName))] {
+					found = true
+					break
+				}
+			}
+			if !found {
+				continue
+			}
+		}
+
+		count++
+	}
+	return count, nil
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // Common errors

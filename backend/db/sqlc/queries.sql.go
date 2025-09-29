@@ -571,6 +571,124 @@ func (q *Queries) GetArtistUsers(ctx context.Context, artistID int32) ([]GetArti
 	return items, nil
 }
 
+const getChicagoEventsCountWithArtistSearch = `-- name: GetChicagoEventsCountWithArtistSearch :one
+SELECT COUNT(DISTINCT ce.id)
+FROM concert_events ce
+LEFT JOIN venues v ON ce.venue_id = v.id
+LEFT JOIN concert_event_artists cea ON ce.id = cea.event_id
+LEFT JOIN concert_artists ca ON cea.artist_id = ca.id
+WHERE ce.event_date >= CURRENT_TIMESTAMP
+  AND v.city ILIKE '%Chicago%'
+  AND ce.status = 'onsale'
+  AND ($1 = '' OR ca.name ILIKE '%' || $1 || '%')
+`
+
+func (q *Queries) GetChicagoEventsCountWithArtistSearch(ctx context.Context, artistName interface{}) (int64, error) {
+	row := q.db.QueryRow(ctx, getChicagoEventsCountWithArtistSearch, artistName)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const getChicagoEventsWithArtistSearch = `-- name: GetChicagoEventsWithArtistSearch :many
+SELECT 
+    ce.id, ce.name, ce.event_date, ce.venue_id, ce.genres, ce.price_min, ce.price_max, ce.price_currency, ce.ticket_url, ce.description, ce.status, ce.age_restriction, ce.provider, ce.external_url, ce.created_at, ce.updated_at,
+    v.name as venue_name,
+    v.street as venue_street,
+    v.city as venue_city,
+    v.state as venue_state,
+    v.country as venue_country,
+    v.postal as venue_postal,
+    v.capacity as venue_capacity
+FROM concert_events ce
+LEFT JOIN venues v ON ce.venue_id = v.id
+LEFT JOIN concert_event_artists cea ON ce.id = cea.event_id
+LEFT JOIN concert_artists ca ON cea.artist_id = ca.id
+WHERE ce.event_date >= CURRENT_TIMESTAMP
+  AND v.city ILIKE '%Chicago%'
+  AND ce.status = 'onsale'
+  AND ($1 = '' OR ca.name ILIKE '%' || $1 || '%')
+GROUP BY ce.id, v.name, v.street, v.city, v.state, v.country, v.postal, v.capacity
+ORDER BY ce.event_date ASC
+LIMIT $3 OFFSET $2
+`
+
+type GetChicagoEventsWithArtistSearchParams struct {
+	ArtistName  interface{} `json:"artist_name"`
+	OffsetCount int32       `json:"offset_count"`
+	LimitCount  int32       `json:"limit_count"`
+}
+
+type GetChicagoEventsWithArtistSearchRow struct {
+	ID             string           `json:"id"`
+	Name           string           `json:"name"`
+	EventDate      pgtype.Timestamp `json:"event_date"`
+	VenueID        pgtype.Text      `json:"venue_id"`
+	Genres         []string         `json:"genres"`
+	PriceMin       pgtype.Numeric   `json:"price_min"`
+	PriceMax       pgtype.Numeric   `json:"price_max"`
+	PriceCurrency  pgtype.Text      `json:"price_currency"`
+	TicketUrl      pgtype.Text      `json:"ticket_url"`
+	Description    pgtype.Text      `json:"description"`
+	Status         string           `json:"status"`
+	AgeRestriction pgtype.Text      `json:"age_restriction"`
+	Provider       string           `json:"provider"`
+	ExternalUrl    pgtype.Text      `json:"external_url"`
+	CreatedAt      pgtype.Timestamp `json:"created_at"`
+	UpdatedAt      pgtype.Timestamp `json:"updated_at"`
+	VenueName      pgtype.Text      `json:"venue_name"`
+	VenueStreet    pgtype.Text      `json:"venue_street"`
+	VenueCity      pgtype.Text      `json:"venue_city"`
+	VenueState     pgtype.Text      `json:"venue_state"`
+	VenueCountry   pgtype.Text      `json:"venue_country"`
+	VenuePostal    pgtype.Text      `json:"venue_postal"`
+	VenueCapacity  pgtype.Int4      `json:"venue_capacity"`
+}
+
+func (q *Queries) GetChicagoEventsWithArtistSearch(ctx context.Context, arg GetChicagoEventsWithArtistSearchParams) ([]GetChicagoEventsWithArtistSearchRow, error) {
+	rows, err := q.db.Query(ctx, getChicagoEventsWithArtistSearch, arg.ArtistName, arg.OffsetCount, arg.LimitCount)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetChicagoEventsWithArtistSearchRow{}
+	for rows.Next() {
+		var i GetChicagoEventsWithArtistSearchRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.EventDate,
+			&i.VenueID,
+			&i.Genres,
+			&i.PriceMin,
+			&i.PriceMax,
+			&i.PriceCurrency,
+			&i.TicketUrl,
+			&i.Description,
+			&i.Status,
+			&i.AgeRestriction,
+			&i.Provider,
+			&i.ExternalUrl,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.VenueName,
+			&i.VenueStreet,
+			&i.VenueCity,
+			&i.VenueState,
+			&i.VenueCountry,
+			&i.VenuePostal,
+			&i.VenueCapacity,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getConcertEventByID = `-- name: GetConcertEventByID :one
 SELECT 
     ce.id, ce.name, ce.event_date, ce.venue_id, ce.genres, ce.price_min, ce.price_max, ce.price_currency, ce.ticket_url, ce.description, ce.status, ce.age_restriction, ce.provider, ce.external_url, ce.created_at, ce.updated_at,

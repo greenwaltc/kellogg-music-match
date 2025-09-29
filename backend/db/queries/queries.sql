@@ -422,3 +422,36 @@ WHERE ce.event_date >= CURRENT_TIMESTAMP
   AND ce.status = 'onsale'
 ORDER BY ce.event_date ASC
 LIMIT sqlc.arg(lim);
+
+-- name: GetChicagoEventsWithArtistSearch :many
+SELECT 
+    ce.*,
+    v.name as venue_name,
+    v.street as venue_street,
+    v.city as venue_city,
+    v.state as venue_state,
+    v.country as venue_country,
+    v.postal as venue_postal,
+    v.capacity as venue_capacity
+FROM concert_events ce
+LEFT JOIN venues v ON ce.venue_id = v.id
+LEFT JOIN concert_event_artists cea ON ce.id = cea.event_id
+LEFT JOIN concert_artists ca ON cea.artist_id = ca.id
+WHERE ce.event_date >= CURRENT_TIMESTAMP
+  AND v.city ILIKE '%Chicago%'
+  AND ce.status = 'onsale'
+  AND (sqlc.arg(artist_name) = '' OR ca.name ILIKE '%' || sqlc.arg(artist_name) || '%')
+GROUP BY ce.id, v.name, v.street, v.city, v.state, v.country, v.postal, v.capacity
+ORDER BY ce.event_date ASC
+LIMIT sqlc.arg(limit_count) OFFSET sqlc.arg(offset_count);
+
+-- name: GetChicagoEventsCountWithArtistSearch :one
+SELECT COUNT(DISTINCT ce.id)
+FROM concert_events ce
+LEFT JOIN venues v ON ce.venue_id = v.id
+LEFT JOIN concert_event_artists cea ON ce.id = cea.event_id
+LEFT JOIN concert_artists ca ON cea.artist_id = ca.id
+WHERE ce.event_date >= CURRENT_TIMESTAMP
+  AND v.city ILIKE '%Chicago%'
+  AND ce.status = 'onsale'
+  AND (sqlc.arg(artist_name) = '' OR ca.name ILIKE '%' || sqlc.arg(artist_name) || '%');

@@ -50,14 +50,15 @@ type ArtistConfig struct {
 
 // TicketmasterConfig holds Ticketmaster API configuration
 type TicketmasterConfig struct {
-	ConsumerKey    string
-	ConsumerSecret string
-	BaseURL        string
-	Timeout        int // timeout in seconds
-	MaxResults     int // maximum results per API call
-	DefaultCity    string
-	DefaultState   string
-	DefaultCountry string
+	ConsumerKey     string
+	ConsumerSecret  string
+	BaseURL         string
+	Timeout         int // timeout in seconds
+	MaxResults      int // maximum results per API call
+	DefaultCity     string
+	DefaultState    string
+	DefaultCountry  string
+	DateRangeMonths int // number of months to look ahead for events
 }
 
 // DebugConfig holds debug-related configuration
@@ -96,14 +97,15 @@ func Load() *Config {
 			SearchLimit:     getEnvIntWithDefault("ARTIST_SEARCH_LIMIT", 10),
 		},
 		Ticketmaster: TicketmasterConfig{
-			ConsumerKey:    getEnvWithDefault("TICKETMASTER_CONSUMER_KEY", ""),
-			ConsumerSecret: getEnvWithDefault("TICKETMASTER_CONSUMER_SECRET", ""),
-			BaseURL:        getEnvWithDefault("TICKETMASTER_BASE_URL", "https://app.ticketmaster.com/discovery/v2"),
-			Timeout:        getEnvIntWithDefault("TICKETMASTER_TIMEOUT", 30),
-			MaxResults:     getEnvIntWithDefault("TICKETMASTER_MAX_RESULTS", 200),
-			DefaultCity:    getEnvWithDefault("TICKETMASTER_DEFAULT_CITY", "Chicago"),
-			DefaultState:   getEnvWithDefault("TICKETMASTER_DEFAULT_STATE", "IL"),
-			DefaultCountry: getEnvWithDefault("TICKETMASTER_DEFAULT_COUNTRY", "US"),
+			ConsumerKey:     getEnvWithDefault("TICKETMASTER_CONSUMER_KEY", ""),
+			ConsumerSecret:  getEnvWithDefault("TICKETMASTER_CONSUMER_SECRET", ""),
+			BaseURL:         getEnvWithDefault("TICKETMASTER_BASE_URL", "https://app.ticketmaster.com/discovery/v2"),
+			Timeout:         getEnvIntWithDefault("TICKETMASTER_TIMEOUT", 30),
+			MaxResults:      getEnvIntWithDefault("TICKETMASTER_MAX_RESULTS", 200),
+			DefaultCity:     getEnvWithDefault("TICKETMASTER_DEFAULT_CITY", "Chicago"),
+			DefaultState:    getEnvWithDefault("TICKETMASTER_DEFAULT_STATE", "IL"),
+			DefaultCountry:  getEnvWithDefault("TICKETMASTER_DEFAULT_COUNTRY", "US"),
+			DateRangeMonths: getEnvIntWithDefault("TICKETMASTER_DATE_RANGE_MONTHS", 6),
 		},
 		Debug: DebugConfig{
 			Enabled: getEnvBoolWithDefault("DEBUG_ENABLED", false),

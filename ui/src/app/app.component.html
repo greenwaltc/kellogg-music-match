@@ -11,6 +11,7 @@
       <a routerLink="/matches" routerLinkActive="active">Matches</a>
       <a routerLink="/feedback" routerLinkActive="active">Feedback</a>
       <a routerLink="/roadmap" routerLinkActive="active">Roadmap</a>
+      <a routerLink="/chicago-events" routerLinkActive="active">Chicago Events</a>
       <button type="button" class="ghost" (click)="toggleTheme()" aria-label="Toggle theme">{{ theme.mode() === 'dark' ? '🌞' : '🌙' }}</button>
       <button type="button" (click)="logout()">Logout</button>
     </nav>
@@ -38,6 +39,7 @@
       <a routerLink="/matches" routerLinkActive="active" (click)="closeMobileMenu()">Matches</a>
       <a routerLink="/feedback" routerLinkActive="active" (click)="closeMobileMenu()">Feedback</a>
       <a routerLink="/roadmap" routerLinkActive="active" (click)="closeMobileMenu()">Roadmap</a>
+      <a routerLink="/chicago-events" routerLinkActive="active" (click)="closeMobileMenu()">Chicago Events</a>
       <button type="button" class="ghost" (click)="toggleTheme()" aria-label="Toggle theme">{{ theme.mode() === 'dark' ? '🌞' : '🌙' }}</button>
       <button type="button" (click)="logout(); closeMobileMenu()">Logout</button>
     </nav>

@@ -68,13 +68,19 @@ func main() {
 	healthService := business.NewHealthService()
 	matchingService := business.NewMatchingServiceWithConfig(userRepo, matchingEngine, &cfg.Artist)
 	feedbackService := business.NewFeedbackService(userRepo)
-	concertAPIService := business.NewConcertAPIService(cfg)
+
+	// Initialize concert API service (will be enhanced with repository if available)
+	var concertAPIService *business.ConcertAPIService
 
 	// Initialize concert synchronization service
 	var concertSyncService *concert.SyncService
-	if err := concertAPIService.ValidateConfiguration(context.Background()); err != nil {
+
+	// Try to initialize concert service with Ticketmaster API
+	tempConcertAPIService := business.NewConcertAPIService(cfg)
+	if err := tempConcertAPIService.ValidateConfiguration(context.Background()); err != nil {
 		log.Printf("Warning: Concert service configuration invalid: %v", err)
 		log.Printf("Concert features will be disabled")
+		concertAPIService = tempConcertAPIService // Use basic service without repository
 	} else {
 		log.Printf("Concert service initialized with Ticketmaster API")
 
@@ -83,11 +89,15 @@ func main() {
 		if err != nil {
 			log.Printf("Warning: Failed to initialize concert repository: %v", err)
 			log.Printf("Concert sync will be disabled")
+			concertAPIService = tempConcertAPIService // Use basic service without repository
 		} else {
 			log.Printf("Concert repository initialized successfully")
 
 			// Create Ticketmaster event provider
 			eventProvider := concert.NewTicketmasterAdapter(&cfg.Ticketmaster)
+
+			// Create concert API service with repository access
+			concertAPIService = business.NewConcertAPIServiceWithRepository(eventProvider, concertRepo, cfg)
 
 			// Initialize and start concert sync service
 			concertSyncService = concert.NewSyncService(eventProvider, concertRepo, cfg)

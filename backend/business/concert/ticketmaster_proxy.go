@@ -79,11 +79,20 @@ func NewTicketmasterProxy(cfg *config.TicketmasterConfig) *TicketmasterProxy {
 	}
 }
 
-// FetchConcerts fetches concerts from Ticketmaster API for Chicago area in the next 3 months
+// FetchConcerts fetches concerts from Ticketmaster API for Chicago area in the configured date range
 func (p *TicketmasterProxy) FetchConcerts(ctx context.Context) (*TicketmasterResponse, error) {
-	// Calculate date range for next 3 months
+	return p.FetchConcertsWithPagination(ctx, 0)
+}
+
+// FetchConcertsWithPagination fetches concerts with pagination support
+func (p *TicketmasterProxy) FetchConcertsWithPagination(ctx context.Context, page int) (*TicketmasterResponse, error) {
+	// Calculate date range based on configuration (default 6 months)
 	now := time.Now()
-	endDate := now.AddDate(0, 3, 0) // 3 months from now
+	months := p.config.DateRangeMonths
+	if months <= 0 {
+		months = 6 // Default to 6 months if not configured
+	}
+	endDate := now.AddDate(0, months, 0)
 
 	// Build query parameters
 	params := url.Values{}
@@ -95,7 +104,7 @@ func (p *TicketmasterProxy) FetchConcerts(ctx context.Context) (*TicketmasterRes
 	params.Set("startDateTime", now.Format("2006-01-02T15:04:05Z"))
 	params.Set("endDateTime", endDate.Format("2006-01-02T15:04:05Z"))
 	params.Set("size", fmt.Sprintf("%d", p.config.MaxResults)) // Configurable max results per page
-	params.Set("page", "0")                                    // First page
+	params.Set("page", fmt.Sprintf("%d", page))                // Requested page
 	params.Set("sort", "date,asc")                             // Sort by date ascending
 	params.Set("includeSpellcheck", "yes")                     // Include spell suggestions
 
@@ -134,7 +143,11 @@ func (p *TicketmasterProxy) FetchConcerts(ctx context.Context) (*TicketmasterRes
 // FetchConcertsByArtist fetches concerts for a specific artist in Chicago
 func (p *TicketmasterProxy) FetchConcertsByArtist(ctx context.Context, artistName string) (*TicketmasterResponse, error) {
 	now := time.Now()
-	endDate := now.AddDate(0, 3, 0)
+	months := p.config.DateRangeMonths
+	if months <= 0 {
+		months = 6 // Default to 6 months if not configured
+	}
+	endDate := now.AddDate(0, months, 0)
 
 	params := url.Values{}
 	params.Set("apikey", p.config.ConsumerKey)

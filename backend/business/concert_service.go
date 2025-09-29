@@ -10,8 +10,9 @@ import (
 
 // ConcertService handles concert-related business logic using provider abstraction
 type ConcertService struct {
-	provider concert.EventProvider
-	config   *config.Config
+	provider   concert.EventProvider
+	repository concert.Repository
+	config     *config.Config
 }
 
 // NewConcertService creates a new concert service with a configurable provider
@@ -23,6 +24,15 @@ func NewConcertService(cfg *config.Config) *ConcertService {
 	return &ConcertService{
 		provider: provider,
 		config:   cfg,
+	}
+}
+
+// NewConcertServiceWithRepository creates a concert service with both provider and repository
+func NewConcertServiceWithRepository(provider concert.EventProvider, repository concert.Repository, cfg *config.Config) *ConcertService {
+	return &ConcertService{
+		provider:   provider,
+		repository: repository,
+		config:     cfg,
 	}
 }
 
@@ -99,4 +109,23 @@ func (s *ConcertService) GetProviderName() string {
 // ValidateConfiguration checks if the current provider configuration is valid
 func (s *ConcertService) ValidateConfiguration(ctx context.Context) error {
 	return s.provider.IsHealthy(ctx)
+}
+
+// GetChicagoEvents retrieves Chicago area events from the local database with search and pagination
+func (s *ConcertService) GetChicagoEvents(ctx context.Context, artistName *string, limit int32, offset int32) ([]*concert.Event, int64, error) {
+	if s.repository == nil {
+		return nil, 0, fmt.Errorf("repository not available")
+	}
+
+	events, err := s.repository.GetChicagoEvents(ctx, artistName, limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get Chicago events: %w", err)
+	}
+
+	count, err := s.repository.GetChicagoEventsCount(ctx, artistName)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get Chicago events count: %w", err)
+	}
+
+	return events, count, nil
 }

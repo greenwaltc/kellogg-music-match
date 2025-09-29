@@ -50,6 +50,8 @@ type Querier interface {
 	GetArtistByID(ctx context.Context, id int32) (Artist, error)
 	GetArtistByName(ctx context.Context, name string) (Artist, error)
 	GetArtistUsers(ctx context.Context, artistID int32) ([]GetArtistUsersRow, error)
+	GetChicagoEventsCountWithArtistSearch(ctx context.Context, artistName interface{}) (int64, error)
+	GetChicagoEventsWithArtistSearch(ctx context.Context, arg GetChicagoEventsWithArtistSearchParams) ([]GetChicagoEventsWithArtistSearchRow, error)
 	GetConcertEventByID(ctx context.Context, id string) (GetConcertEventByIDRow, error)
 	GetConcertEventCount(ctx context.Context) (int64, error)
 	GetConcertEventsInDateRange(ctx context.Context, arg GetConcertEventsInDateRangeParams) ([]GetConcertEventsInDateRangeRow, error)

@@ -30,8 +30,8 @@ func (a *TicketmasterAdapter) SearchEvents(ctx context.Context, criteria SearchC
 		return a.GetEventsForArtist(ctx, criteria.Artist, criteria)
 	}
 
-	// Otherwise, use general concert search
-	response, err := a.proxy.FetchConcerts(ctx)
+	// Otherwise, use general concert search with pagination
+	response, err := a.proxy.FetchConcertsWithPagination(ctx, criteria.Page-1) // Convert 1-based to 0-based
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch concerts from Ticketmaster: %w", err)
 	}

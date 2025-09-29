@@ -8,6 +8,7 @@ import { ArtistsComponent } from './app/artists.component';
 import { MatchesComponent } from './app/matches.component';
 import { FeedbackComponent } from './app/feedback.component';
 import { RoadmapComponent } from './app/roadmap.component';
+import { ChicagoEventsComponent } from './app/chicago-events.component';
 import { authGuard } from './app/auth.guard';
 
 declare global {
@@ -22,6 +23,7 @@ const routes: Routes = [
   { path: 'matches', component: MatchesComponent, canActivate: [authGuard] },
   { path: 'feedback', component: FeedbackComponent, canActivate: [authGuard] },
   { path: 'roadmap', component: RoadmapComponent, canActivate: [authGuard] },
+  { path: 'chicago-events', component: ChicagoEventsComponent, canActivate: [authGuard] },
   { path: '**', redirectTo: '' }
 ];
 
