@@ -105,6 +105,7 @@ func (a *TicketmasterAdapter) convertTicketmasterEvent(tmEvent TicketmasterEvent
 		Artists:   a.convertArtists(tmEvent),
 		Genres:    a.extractGenres(tmEvent),
 		TicketURL: tmEvent.URL,
+		Status:    "onsale", // Default to onsale for Ticketmaster events
 	}
 
 	// Convert price range if available
@@ -169,6 +170,7 @@ func (a *TicketmasterAdapter) convertArtists(tmEvent TicketmasterEvent) []Artist
 
 	for _, attraction := range tmEvent.Embedded.Attractions {
 		artist := Artist{
+			ID:   attraction.ID,
 			Name: attraction.Name,
 		}
 

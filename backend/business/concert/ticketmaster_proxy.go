@@ -38,6 +38,7 @@ type TicketmasterEvent struct {
 			} `json:"city"`
 		} `json:"venues"`
 		Attractions []struct {
+			ID              string `json:"id"`
 			Name            string `json:"name"`
 			Classifications []struct {
 				Segment struct {

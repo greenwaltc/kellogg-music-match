@@ -280,3 +280,145 @@ FROM feedback f
 JOIN users u ON f.user_id = u.id
 ORDER BY f.created_at DESC
 LIMIT sqlc.arg(lim);
+
+-- =======================
+-- Concert Events
+-- =======================
+
+-- name: UpsertVenue :one
+INSERT INTO venues (id, name, street, city, state, country, postal, capacity)
+VALUES (sqlc.arg(id), sqlc.arg(name), sqlc.arg(street), sqlc.arg(city), sqlc.arg(state), sqlc.arg(country), sqlc.arg(postal), sqlc.arg(capacity))
+ON CONFLICT (id) DO UPDATE SET
+    name = EXCLUDED.name,
+    street = EXCLUDED.street,
+    city = EXCLUDED.city,
+    state = EXCLUDED.state,
+    country = EXCLUDED.country,
+    postal = EXCLUDED.postal,
+    capacity = EXCLUDED.capacity,
+    updated_at = CURRENT_TIMESTAMP
+RETURNING *;
+
+-- name: UpsertConcertArtist :one
+INSERT INTO concert_artists (id, name, genres)
+VALUES (sqlc.arg(id), sqlc.arg(name), sqlc.arg(genres))
+ON CONFLICT (id) DO UPDATE SET
+    name = EXCLUDED.name,
+    genres = EXCLUDED.genres,
+    updated_at = CURRENT_TIMESTAMP
+RETURNING *;
+
+-- name: UpsertConcertEvent :one
+INSERT INTO concert_events (id, name, event_date, venue_id, genres, price_min, price_max, price_currency, ticket_url, description, status, age_restriction, provider, external_url)
+VALUES (sqlc.arg(id), sqlc.arg(name), sqlc.arg(event_date), sqlc.arg(venue_id), sqlc.arg(genres), sqlc.arg(price_min), sqlc.arg(price_max), sqlc.arg(price_currency), sqlc.arg(ticket_url), sqlc.arg(description), sqlc.arg(status), sqlc.arg(age_restriction), sqlc.arg(provider), sqlc.arg(external_url))
+ON CONFLICT (id) DO UPDATE SET
+    name = EXCLUDED.name,
+    event_date = EXCLUDED.event_date,
+    venue_id = EXCLUDED.venue_id,
+    genres = EXCLUDED.genres,
+    price_min = EXCLUDED.price_min,
+    price_max = EXCLUDED.price_max,
+    price_currency = EXCLUDED.price_currency,
+    ticket_url = EXCLUDED.ticket_url,
+    description = EXCLUDED.description,
+    status = EXCLUDED.status,
+    age_restriction = EXCLUDED.age_restriction,
+    provider = EXCLUDED.provider,
+    external_url = EXCLUDED.external_url,
+    updated_at = CURRENT_TIMESTAMP
+RETURNING *;
+
+-- name: UpsertEventArtist :exec
+INSERT INTO concert_event_artists (event_id, artist_id, role)
+VALUES (sqlc.arg(event_id), sqlc.arg(artist_id), sqlc.arg(role))
+ON CONFLICT (event_id, artist_id) DO UPDATE SET
+    role = EXCLUDED.role;
+
+-- name: GetConcertEventByID :one
+SELECT 
+    ce.*,
+    v.name as venue_name,
+    v.street as venue_street, 
+    v.city as venue_city,
+    v.state as venue_state,
+    v.country as venue_country,
+    v.postal as venue_postal,
+    v.capacity as venue_capacity
+FROM concert_events ce
+LEFT JOIN venues v ON ce.venue_id = v.id
+WHERE ce.id = sqlc.arg(id);
+
+-- name: GetConcertEventsInDateRange :many
+SELECT 
+    ce.*,
+    v.name as venue_name,
+    v.street as venue_street,
+    v.city as venue_city,
+    v.state as venue_state,
+    v.country as venue_country,
+    v.postal as venue_postal,
+    v.capacity as venue_capacity
+FROM concert_events ce
+LEFT JOIN venues v ON ce.venue_id = v.id
+WHERE ce.event_date >= sqlc.arg(start_date)
+  AND ce.event_date <= sqlc.arg(end_date)
+  AND (sqlc.arg(city)::text IS NULL OR v.city ILIKE '%' || sqlc.arg(city) || '%')
+  AND (sqlc.arg(status)::text IS NULL OR ce.status = sqlc.arg(status))
+ORDER BY ce.event_date ASC
+LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off_set);
+
+-- name: GetEventArtists :many
+SELECT 
+    ca.id,
+    ca.name,
+    ca.genres,
+    cea.role
+FROM concert_artists ca
+JOIN concert_event_artists cea ON ca.id = cea.artist_id
+WHERE cea.event_id = sqlc.arg(event_id);
+
+-- name: GetEventsForArtist :many
+SELECT 
+    ce.*,
+    v.name as venue_name,
+    v.street as venue_street,
+    v.city as venue_city,
+    v.state as venue_state,
+    v.country as venue_country,
+    v.postal as venue_postal,
+    v.capacity as venue_capacity,
+    ca.name as artist_name
+FROM concert_events ce
+LEFT JOIN venues v ON ce.venue_id = v.id
+JOIN concert_event_artists cea ON ce.id = cea.event_id
+JOIN concert_artists ca ON cea.artist_id = ca.id
+WHERE ca.name ILIKE '%' || sqlc.arg(artist_name) || '%'
+  AND ce.event_date >= CURRENT_TIMESTAMP
+  AND (sqlc.arg(city)::text IS NULL OR v.city ILIKE '%' || sqlc.arg(city) || '%')
+ORDER BY ce.event_date ASC
+LIMIT sqlc.arg(lim);
+
+-- name: DeleteOldConcertEvents :exec
+DELETE FROM concert_events 
+WHERE event_date < sqlc.arg(cutoff_date);
+
+-- name: GetConcertEventCount :one
+SELECT COUNT(*) FROM concert_events;
+
+-- name: GetUpcomingConcertEventsInCity :many
+SELECT 
+    ce.*,
+    v.name as venue_name,
+    v.street as venue_street,
+    v.city as venue_city,
+    v.state as venue_state,
+    v.country as venue_country,
+    v.postal as venue_postal,
+    v.capacity as venue_capacity
+FROM concert_events ce
+LEFT JOIN venues v ON ce.venue_id = v.id
+WHERE ce.event_date >= CURRENT_TIMESTAMP
+  AND v.city ILIKE '%' || sqlc.arg(city) || '%'
+  AND ce.status = 'onsale'
+ORDER BY ce.event_date ASC
+LIMIT sqlc.arg(lim);

@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/greenwaltc/kellogg-music-match/backend/business"
+	"github.com/greenwaltc/kellogg-music-match/backend/business/concert"
 	"github.com/greenwaltc/kellogg-music-match/backend/config"
 	"github.com/greenwaltc/kellogg-music-match/backend/generated"
 )
@@ -69,12 +70,49 @@ func main() {
 	feedbackService := business.NewFeedbackService(userRepo)
 	concertAPIService := business.NewConcertAPIService(cfg)
 
-	// Validate concert service configuration
+	// Initialize concert synchronization service
+	var concertSyncService *concert.SyncService
 	if err := concertAPIService.ValidateConfiguration(context.Background()); err != nil {
 		log.Printf("Warning: Concert service configuration invalid: %v", err)
 		log.Printf("Concert features will be disabled")
 	} else {
 		log.Printf("Concert service initialized with Ticketmaster API")
+		
+		// Initialize concert repository
+		concertRepo, err := concert.NewPostgreSQLRepository(&cfg.Database)
+		if err != nil {
+			log.Printf("Warning: Failed to initialize concert repository: %v", err)
+			log.Printf("Concert sync will be disabled")
+		} else {
+			log.Printf("Concert repository initialized successfully")
+			
+			// Create Ticketmaster event provider
+			eventProvider := concert.NewTicketmasterAdapter(&cfg.Ticketmaster)
+			
+			// Initialize and start concert sync service
+			concertSyncService = concert.NewSyncService(eventProvider, concertRepo, cfg)
+			
+			// Start the sync service in a separate goroutine
+			go func() {
+				if err := concertSyncService.Start(context.Background()); err != nil {
+					log.Printf("Error starting concert sync service: %v", err)
+				}
+			}()
+			
+			log.Printf("Concert sync service started - will sync every 24 hours")
+			
+			// Ensure graceful shutdown of sync service
+			defer func() {
+				if concertSyncService != nil {
+					log.Printf("Shutting down concert sync service...")
+					concertSyncService.Stop()
+				}
+				if concertRepo != nil {
+					log.Printf("Closing concert repository connection...")
+					concertRepo.Close()
+				}
+			}()
+		}
 	}
 
 	// Create service wrappers that implement the OpenAPI service interfaces

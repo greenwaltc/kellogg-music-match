@@ -195,6 +195,16 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 	return i, err
 }
 
+const deleteOldConcertEvents = `-- name: DeleteOldConcertEvents :exec
+DELETE FROM concert_events 
+WHERE event_date < $1
+`
+
+func (q *Queries) DeleteOldConcertEvents(ctx context.Context, cutoffDate pgtype.Timestamp) error {
+	_, err := q.db.Exec(ctx, deleteOldConcertEvents, cutoffDate)
+	return err
+}
+
 const deleteUser = `-- name: DeleteUser :exec
 DELETE FROM users WHERE id = $1
 `
@@ -561,6 +571,338 @@ func (q *Queries) GetArtistUsers(ctx context.Context, artistID int32) ([]GetArti
 	return items, nil
 }
 
+const getConcertEventByID = `-- name: GetConcertEventByID :one
+SELECT 
+    ce.id, ce.name, ce.event_date, ce.venue_id, ce.genres, ce.price_min, ce.price_max, ce.price_currency, ce.ticket_url, ce.description, ce.status, ce.age_restriction, ce.provider, ce.external_url, ce.created_at, ce.updated_at,
+    v.name as venue_name,
+    v.street as venue_street, 
+    v.city as venue_city,
+    v.state as venue_state,
+    v.country as venue_country,
+    v.postal as venue_postal,
+    v.capacity as venue_capacity
+FROM concert_events ce
+LEFT JOIN venues v ON ce.venue_id = v.id
+WHERE ce.id = $1
+`
+
+type GetConcertEventByIDRow struct {
+	ID             string           `json:"id"`
+	Name           string           `json:"name"`
+	EventDate      pgtype.Timestamp `json:"event_date"`
+	VenueID        pgtype.Text      `json:"venue_id"`
+	Genres         []string         `json:"genres"`
+	PriceMin       pgtype.Numeric   `json:"price_min"`
+	PriceMax       pgtype.Numeric   `json:"price_max"`
+	PriceCurrency  pgtype.Text      `json:"price_currency"`
+	TicketUrl      pgtype.Text      `json:"ticket_url"`
+	Description    pgtype.Text      `json:"description"`
+	Status         string           `json:"status"`
+	AgeRestriction pgtype.Text      `json:"age_restriction"`
+	Provider       string           `json:"provider"`
+	ExternalUrl    pgtype.Text      `json:"external_url"`
+	CreatedAt      pgtype.Timestamp `json:"created_at"`
+	UpdatedAt      pgtype.Timestamp `json:"updated_at"`
+	VenueName      pgtype.Text      `json:"venue_name"`
+	VenueStreet    pgtype.Text      `json:"venue_street"`
+	VenueCity      pgtype.Text      `json:"venue_city"`
+	VenueState     pgtype.Text      `json:"venue_state"`
+	VenueCountry   pgtype.Text      `json:"venue_country"`
+	VenuePostal    pgtype.Text      `json:"venue_postal"`
+	VenueCapacity  pgtype.Int4      `json:"venue_capacity"`
+}
+
+func (q *Queries) GetConcertEventByID(ctx context.Context, id string) (GetConcertEventByIDRow, error) {
+	row := q.db.QueryRow(ctx, getConcertEventByID, id)
+	var i GetConcertEventByIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.EventDate,
+		&i.VenueID,
+		&i.Genres,
+		&i.PriceMin,
+		&i.PriceMax,
+		&i.PriceCurrency,
+		&i.TicketUrl,
+		&i.Description,
+		&i.Status,
+		&i.AgeRestriction,
+		&i.Provider,
+		&i.ExternalUrl,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.VenueName,
+		&i.VenueStreet,
+		&i.VenueCity,
+		&i.VenueState,
+		&i.VenueCountry,
+		&i.VenuePostal,
+		&i.VenueCapacity,
+	)
+	return i, err
+}
+
+const getConcertEventCount = `-- name: GetConcertEventCount :one
+SELECT COUNT(*) FROM concert_events
+`
+
+func (q *Queries) GetConcertEventCount(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, getConcertEventCount)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const getConcertEventsInDateRange = `-- name: GetConcertEventsInDateRange :many
+SELECT 
+    ce.id, ce.name, ce.event_date, ce.venue_id, ce.genres, ce.price_min, ce.price_max, ce.price_currency, ce.ticket_url, ce.description, ce.status, ce.age_restriction, ce.provider, ce.external_url, ce.created_at, ce.updated_at,
+    v.name as venue_name,
+    v.street as venue_street,
+    v.city as venue_city,
+    v.state as venue_state,
+    v.country as venue_country,
+    v.postal as venue_postal,
+    v.capacity as venue_capacity
+FROM concert_events ce
+LEFT JOIN venues v ON ce.venue_id = v.id
+WHERE ce.event_date >= $1
+  AND ce.event_date <= $2
+  AND ($3::text IS NULL OR v.city ILIKE '%' || $3 || '%')
+  AND ($4::text IS NULL OR ce.status = $4)
+ORDER BY ce.event_date ASC
+LIMIT $6 OFFSET $5
+`
+
+type GetConcertEventsInDateRangeParams struct {
+	StartDate pgtype.Timestamp `json:"start_date"`
+	EndDate   pgtype.Timestamp `json:"end_date"`
+	City      string           `json:"city"`
+	Status    string           `json:"status"`
+	OffSet    int32            `json:"off_set"`
+	Lim       int32            `json:"lim"`
+}
+
+type GetConcertEventsInDateRangeRow struct {
+	ID             string           `json:"id"`
+	Name           string           `json:"name"`
+	EventDate      pgtype.Timestamp `json:"event_date"`
+	VenueID        pgtype.Text      `json:"venue_id"`
+	Genres         []string         `json:"genres"`
+	PriceMin       pgtype.Numeric   `json:"price_min"`
+	PriceMax       pgtype.Numeric   `json:"price_max"`
+	PriceCurrency  pgtype.Text      `json:"price_currency"`
+	TicketUrl      pgtype.Text      `json:"ticket_url"`
+	Description    pgtype.Text      `json:"description"`
+	Status         string           `json:"status"`
+	AgeRestriction pgtype.Text      `json:"age_restriction"`
+	Provider       string           `json:"provider"`
+	ExternalUrl    pgtype.Text      `json:"external_url"`
+	CreatedAt      pgtype.Timestamp `json:"created_at"`
+	UpdatedAt      pgtype.Timestamp `json:"updated_at"`
+	VenueName      pgtype.Text      `json:"venue_name"`
+	VenueStreet    pgtype.Text      `json:"venue_street"`
+	VenueCity      pgtype.Text      `json:"venue_city"`
+	VenueState     pgtype.Text      `json:"venue_state"`
+	VenueCountry   pgtype.Text      `json:"venue_country"`
+	VenuePostal    pgtype.Text      `json:"venue_postal"`
+	VenueCapacity  pgtype.Int4      `json:"venue_capacity"`
+}
+
+func (q *Queries) GetConcertEventsInDateRange(ctx context.Context, arg GetConcertEventsInDateRangeParams) ([]GetConcertEventsInDateRangeRow, error) {
+	rows, err := q.db.Query(ctx, getConcertEventsInDateRange,
+		arg.StartDate,
+		arg.EndDate,
+		arg.City,
+		arg.Status,
+		arg.OffSet,
+		arg.Lim,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetConcertEventsInDateRangeRow{}
+	for rows.Next() {
+		var i GetConcertEventsInDateRangeRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.EventDate,
+			&i.VenueID,
+			&i.Genres,
+			&i.PriceMin,
+			&i.PriceMax,
+			&i.PriceCurrency,
+			&i.TicketUrl,
+			&i.Description,
+			&i.Status,
+			&i.AgeRestriction,
+			&i.Provider,
+			&i.ExternalUrl,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.VenueName,
+			&i.VenueStreet,
+			&i.VenueCity,
+			&i.VenueState,
+			&i.VenueCountry,
+			&i.VenuePostal,
+			&i.VenueCapacity,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getEventArtists = `-- name: GetEventArtists :many
+SELECT 
+    ca.id,
+    ca.name,
+    ca.genres,
+    cea.role
+FROM concert_artists ca
+JOIN concert_event_artists cea ON ca.id = cea.artist_id
+WHERE cea.event_id = $1
+`
+
+type GetEventArtistsRow struct {
+	ID     string      `json:"id"`
+	Name   string      `json:"name"`
+	Genres []string    `json:"genres"`
+	Role   pgtype.Text `json:"role"`
+}
+
+func (q *Queries) GetEventArtists(ctx context.Context, eventID string) ([]GetEventArtistsRow, error) {
+	rows, err := q.db.Query(ctx, getEventArtists, eventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetEventArtistsRow{}
+	for rows.Next() {
+		var i GetEventArtistsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Genres,
+			&i.Role,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getEventsForArtist = `-- name: GetEventsForArtist :many
+SELECT 
+    ce.id, ce.name, ce.event_date, ce.venue_id, ce.genres, ce.price_min, ce.price_max, ce.price_currency, ce.ticket_url, ce.description, ce.status, ce.age_restriction, ce.provider, ce.external_url, ce.created_at, ce.updated_at,
+    v.name as venue_name,
+    v.street as venue_street,
+    v.city as venue_city,
+    v.state as venue_state,
+    v.country as venue_country,
+    v.postal as venue_postal,
+    v.capacity as venue_capacity,
+    ca.name as artist_name
+FROM concert_events ce
+LEFT JOIN venues v ON ce.venue_id = v.id
+JOIN concert_event_artists cea ON ce.id = cea.event_id
+JOIN concert_artists ca ON cea.artist_id = ca.id
+WHERE ca.name ILIKE '%' || $1 || '%'
+  AND ce.event_date >= CURRENT_TIMESTAMP
+  AND ($2::text IS NULL OR v.city ILIKE '%' || $2 || '%')
+ORDER BY ce.event_date ASC
+LIMIT $3
+`
+
+type GetEventsForArtistParams struct {
+	ArtistName pgtype.Text `json:"artist_name"`
+	City       string      `json:"city"`
+	Lim        int32       `json:"lim"`
+}
+
+type GetEventsForArtistRow struct {
+	ID             string           `json:"id"`
+	Name           string           `json:"name"`
+	EventDate      pgtype.Timestamp `json:"event_date"`
+	VenueID        pgtype.Text      `json:"venue_id"`
+	Genres         []string         `json:"genres"`
+	PriceMin       pgtype.Numeric   `json:"price_min"`
+	PriceMax       pgtype.Numeric   `json:"price_max"`
+	PriceCurrency  pgtype.Text      `json:"price_currency"`
+	TicketUrl      pgtype.Text      `json:"ticket_url"`
+	Description    pgtype.Text      `json:"description"`
+	Status         string           `json:"status"`
+	AgeRestriction pgtype.Text      `json:"age_restriction"`
+	Provider       string           `json:"provider"`
+	ExternalUrl    pgtype.Text      `json:"external_url"`
+	CreatedAt      pgtype.Timestamp `json:"created_at"`
+	UpdatedAt      pgtype.Timestamp `json:"updated_at"`
+	VenueName      pgtype.Text      `json:"venue_name"`
+	VenueStreet    pgtype.Text      `json:"venue_street"`
+	VenueCity      pgtype.Text      `json:"venue_city"`
+	VenueState     pgtype.Text      `json:"venue_state"`
+	VenueCountry   pgtype.Text      `json:"venue_country"`
+	VenuePostal    pgtype.Text      `json:"venue_postal"`
+	VenueCapacity  pgtype.Int4      `json:"venue_capacity"`
+	ArtistName     string           `json:"artist_name"`
+}
+
+func (q *Queries) GetEventsForArtist(ctx context.Context, arg GetEventsForArtistParams) ([]GetEventsForArtistRow, error) {
+	rows, err := q.db.Query(ctx, getEventsForArtist, arg.ArtistName, arg.City, arg.Lim)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetEventsForArtistRow{}
+	for rows.Next() {
+		var i GetEventsForArtistRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.EventDate,
+			&i.VenueID,
+			&i.Genres,
+			&i.PriceMin,
+			&i.PriceMax,
+			&i.PriceCurrency,
+			&i.TicketUrl,
+			&i.Description,
+			&i.Status,
+			&i.AgeRestriction,
+			&i.Provider,
+			&i.ExternalUrl,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.VenueName,
+			&i.VenueStreet,
+			&i.VenueCity,
+			&i.VenueState,
+			&i.VenueCountry,
+			&i.VenuePostal,
+			&i.VenueCapacity,
+			&i.ArtistName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getFeedbackByUser = `-- name: GetFeedbackByUser :many
 SELECT id, user_id, feedback_text, created_at, updated_at FROM feedback
 WHERE user_id = $1
@@ -582,6 +924,100 @@ func (q *Queries) GetFeedbackByUser(ctx context.Context, userID uuid.UUID) ([]Fe
 			&i.FeedbackText,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getUpcomingConcertEventsInCity = `-- name: GetUpcomingConcertEventsInCity :many
+SELECT 
+    ce.id, ce.name, ce.event_date, ce.venue_id, ce.genres, ce.price_min, ce.price_max, ce.price_currency, ce.ticket_url, ce.description, ce.status, ce.age_restriction, ce.provider, ce.external_url, ce.created_at, ce.updated_at,
+    v.name as venue_name,
+    v.street as venue_street,
+    v.city as venue_city,
+    v.state as venue_state,
+    v.country as venue_country,
+    v.postal as venue_postal,
+    v.capacity as venue_capacity
+FROM concert_events ce
+LEFT JOIN venues v ON ce.venue_id = v.id
+WHERE ce.event_date >= CURRENT_TIMESTAMP
+  AND v.city ILIKE '%' || $1 || '%'
+  AND ce.status = 'onsale'
+ORDER BY ce.event_date ASC
+LIMIT $2
+`
+
+type GetUpcomingConcertEventsInCityParams struct {
+	City pgtype.Text `json:"city"`
+	Lim  int32       `json:"lim"`
+}
+
+type GetUpcomingConcertEventsInCityRow struct {
+	ID             string           `json:"id"`
+	Name           string           `json:"name"`
+	EventDate      pgtype.Timestamp `json:"event_date"`
+	VenueID        pgtype.Text      `json:"venue_id"`
+	Genres         []string         `json:"genres"`
+	PriceMin       pgtype.Numeric   `json:"price_min"`
+	PriceMax       pgtype.Numeric   `json:"price_max"`
+	PriceCurrency  pgtype.Text      `json:"price_currency"`
+	TicketUrl      pgtype.Text      `json:"ticket_url"`
+	Description    pgtype.Text      `json:"description"`
+	Status         string           `json:"status"`
+	AgeRestriction pgtype.Text      `json:"age_restriction"`
+	Provider       string           `json:"provider"`
+	ExternalUrl    pgtype.Text      `json:"external_url"`
+	CreatedAt      pgtype.Timestamp `json:"created_at"`
+	UpdatedAt      pgtype.Timestamp `json:"updated_at"`
+	VenueName      pgtype.Text      `json:"venue_name"`
+	VenueStreet    pgtype.Text      `json:"venue_street"`
+	VenueCity      pgtype.Text      `json:"venue_city"`
+	VenueState     pgtype.Text      `json:"venue_state"`
+	VenueCountry   pgtype.Text      `json:"venue_country"`
+	VenuePostal    pgtype.Text      `json:"venue_postal"`
+	VenueCapacity  pgtype.Int4      `json:"venue_capacity"`
+}
+
+func (q *Queries) GetUpcomingConcertEventsInCity(ctx context.Context, arg GetUpcomingConcertEventsInCityParams) ([]GetUpcomingConcertEventsInCityRow, error) {
+	rows, err := q.db.Query(ctx, getUpcomingConcertEventsInCity, arg.City, arg.Lim)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetUpcomingConcertEventsInCityRow{}
+	for rows.Next() {
+		var i GetUpcomingConcertEventsInCityRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.EventDate,
+			&i.VenueID,
+			&i.Genres,
+			&i.PriceMin,
+			&i.PriceMax,
+			&i.PriceCurrency,
+			&i.TicketUrl,
+			&i.Description,
+			&i.Status,
+			&i.AgeRestriction,
+			&i.Provider,
+			&i.ExternalUrl,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.VenueName,
+			&i.VenueStreet,
+			&i.VenueCity,
+			&i.VenueState,
+			&i.VenueCountry,
+			&i.VenuePostal,
+			&i.VenueCapacity,
 		); err != nil {
 			return nil, err
 		}
@@ -952,6 +1388,187 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		&i.UpdatedAt,
 		&i.Program,
 		&i.GraduationYear,
+	)
+	return i, err
+}
+
+const upsertConcertArtist = `-- name: UpsertConcertArtist :one
+INSERT INTO concert_artists (id, name, genres)
+VALUES ($1, $2, $3)
+ON CONFLICT (id) DO UPDATE SET
+    name = EXCLUDED.name,
+    genres = EXCLUDED.genres,
+    updated_at = CURRENT_TIMESTAMP
+RETURNING id, name, genres, created_at, updated_at
+`
+
+type UpsertConcertArtistParams struct {
+	ID     string   `json:"id"`
+	Name   string   `json:"name"`
+	Genres []string `json:"genres"`
+}
+
+func (q *Queries) UpsertConcertArtist(ctx context.Context, arg UpsertConcertArtistParams) (ConcertArtist, error) {
+	row := q.db.QueryRow(ctx, upsertConcertArtist, arg.ID, arg.Name, arg.Genres)
+	var i ConcertArtist
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Genres,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const upsertConcertEvent = `-- name: UpsertConcertEvent :one
+INSERT INTO concert_events (id, name, event_date, venue_id, genres, price_min, price_max, price_currency, ticket_url, description, status, age_restriction, provider, external_url)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+ON CONFLICT (id) DO UPDATE SET
+    name = EXCLUDED.name,
+    event_date = EXCLUDED.event_date,
+    venue_id = EXCLUDED.venue_id,
+    genres = EXCLUDED.genres,
+    price_min = EXCLUDED.price_min,
+    price_max = EXCLUDED.price_max,
+    price_currency = EXCLUDED.price_currency,
+    ticket_url = EXCLUDED.ticket_url,
+    description = EXCLUDED.description,
+    status = EXCLUDED.status,
+    age_restriction = EXCLUDED.age_restriction,
+    provider = EXCLUDED.provider,
+    external_url = EXCLUDED.external_url,
+    updated_at = CURRENT_TIMESTAMP
+RETURNING id, name, event_date, venue_id, genres, price_min, price_max, price_currency, ticket_url, description, status, age_restriction, provider, external_url, created_at, updated_at
+`
+
+type UpsertConcertEventParams struct {
+	ID             string           `json:"id"`
+	Name           string           `json:"name"`
+	EventDate      pgtype.Timestamp `json:"event_date"`
+	VenueID        pgtype.Text      `json:"venue_id"`
+	Genres         []string         `json:"genres"`
+	PriceMin       pgtype.Numeric   `json:"price_min"`
+	PriceMax       pgtype.Numeric   `json:"price_max"`
+	PriceCurrency  pgtype.Text      `json:"price_currency"`
+	TicketUrl      pgtype.Text      `json:"ticket_url"`
+	Description    pgtype.Text      `json:"description"`
+	Status         string           `json:"status"`
+	AgeRestriction pgtype.Text      `json:"age_restriction"`
+	Provider       string           `json:"provider"`
+	ExternalUrl    pgtype.Text      `json:"external_url"`
+}
+
+func (q *Queries) UpsertConcertEvent(ctx context.Context, arg UpsertConcertEventParams) (ConcertEvent, error) {
+	row := q.db.QueryRow(ctx, upsertConcertEvent,
+		arg.ID,
+		arg.Name,
+		arg.EventDate,
+		arg.VenueID,
+		arg.Genres,
+		arg.PriceMin,
+		arg.PriceMax,
+		arg.PriceCurrency,
+		arg.TicketUrl,
+		arg.Description,
+		arg.Status,
+		arg.AgeRestriction,
+		arg.Provider,
+		arg.ExternalUrl,
+	)
+	var i ConcertEvent
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.EventDate,
+		&i.VenueID,
+		&i.Genres,
+		&i.PriceMin,
+		&i.PriceMax,
+		&i.PriceCurrency,
+		&i.TicketUrl,
+		&i.Description,
+		&i.Status,
+		&i.AgeRestriction,
+		&i.Provider,
+		&i.ExternalUrl,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const upsertEventArtist = `-- name: UpsertEventArtist :exec
+INSERT INTO concert_event_artists (event_id, artist_id, role)
+VALUES ($1, $2, $3)
+ON CONFLICT (event_id, artist_id) DO UPDATE SET
+    role = EXCLUDED.role
+`
+
+type UpsertEventArtistParams struct {
+	EventID  string      `json:"event_id"`
+	ArtistID string      `json:"artist_id"`
+	Role     pgtype.Text `json:"role"`
+}
+
+func (q *Queries) UpsertEventArtist(ctx context.Context, arg UpsertEventArtistParams) error {
+	_, err := q.db.Exec(ctx, upsertEventArtist, arg.EventID, arg.ArtistID, arg.Role)
+	return err
+}
+
+const upsertVenue = `-- name: UpsertVenue :one
+
+INSERT INTO venues (id, name, street, city, state, country, postal, capacity)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+ON CONFLICT (id) DO UPDATE SET
+    name = EXCLUDED.name,
+    street = EXCLUDED.street,
+    city = EXCLUDED.city,
+    state = EXCLUDED.state,
+    country = EXCLUDED.country,
+    postal = EXCLUDED.postal,
+    capacity = EXCLUDED.capacity,
+    updated_at = CURRENT_TIMESTAMP
+RETURNING id, name, street, city, state, country, postal, capacity, created_at, updated_at
+`
+
+type UpsertVenueParams struct {
+	ID       string      `json:"id"`
+	Name     string      `json:"name"`
+	Street   pgtype.Text `json:"street"`
+	City     string      `json:"city"`
+	State    pgtype.Text `json:"state"`
+	Country  string      `json:"country"`
+	Postal   pgtype.Text `json:"postal"`
+	Capacity pgtype.Int4 `json:"capacity"`
+}
+
+// =======================
+// Concert Events
+// =======================
+func (q *Queries) UpsertVenue(ctx context.Context, arg UpsertVenueParams) (Venue, error) {
+	row := q.db.QueryRow(ctx, upsertVenue,
+		arg.ID,
+		arg.Name,
+		arg.Street,
+		arg.City,
+		arg.State,
+		arg.Country,
+		arg.Postal,
+		arg.Capacity,
+	)
+	var i Venue
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Street,
+		&i.City,
+		&i.State,
+		&i.Country,
+		&i.Postal,
+		&i.Capacity,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }

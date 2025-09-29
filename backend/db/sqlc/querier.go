@@ -8,6 +8,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
@@ -30,6 +31,7 @@ type Querier interface {
 	// Users
 	// =======================
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	DeleteOldConcertEvents(ctx context.Context, cutoffDate pgtype.Timestamp) error
 	DeleteUser(ctx context.Context, id uuid.UUID) error
 	// =======================
 	// Nearest neighbors (Chamfer-based)
@@ -48,7 +50,13 @@ type Querier interface {
 	GetArtistByID(ctx context.Context, id int32) (Artist, error)
 	GetArtistByName(ctx context.Context, name string) (Artist, error)
 	GetArtistUsers(ctx context.Context, artistID int32) ([]GetArtistUsersRow, error)
+	GetConcertEventByID(ctx context.Context, id string) (GetConcertEventByIDRow, error)
+	GetConcertEventCount(ctx context.Context) (int64, error)
+	GetConcertEventsInDateRange(ctx context.Context, arg GetConcertEventsInDateRangeParams) ([]GetConcertEventsInDateRangeRow, error)
+	GetEventArtists(ctx context.Context, eventID string) ([]GetEventArtistsRow, error)
+	GetEventsForArtist(ctx context.Context, arg GetEventsForArtistParams) ([]GetEventsForArtistRow, error)
 	GetFeedbackByUser(ctx context.Context, userID uuid.UUID) ([]Feedback, error)
+	GetUpcomingConcertEventsInCity(ctx context.Context, arg GetUpcomingConcertEventsInCityParams) ([]GetUpcomingConcertEventsInCityRow, error)
 	GetUserArtists(ctx context.Context, userID uuid.UUID) ([]GetUserArtistsRow, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
@@ -67,6 +75,13 @@ type Querier interface {
 	SearchArtists(ctx context.Context, arg SearchArtistsParams) ([]Artist, error)
 	SetUserArtists(ctx context.Context, arg SetUserArtistsParams) error
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
+	UpsertConcertArtist(ctx context.Context, arg UpsertConcertArtistParams) (ConcertArtist, error)
+	UpsertConcertEvent(ctx context.Context, arg UpsertConcertEventParams) (ConcertEvent, error)
+	UpsertEventArtist(ctx context.Context, arg UpsertEventArtistParams) error
+	// =======================
+	// Concert Events
+	// =======================
+	UpsertVenue(ctx context.Context, arg UpsertVenueParams) (Venue, error)
 	UserChamferSimilarity(ctx context.Context, arg UserChamferSimilarityParams) (float64, error)
 	UserExistsByEmail(ctx context.Context, email string) (bool, error)
 	UserExistsByUsername(ctx context.Context, username string) (bool, error)

@@ -38,6 +38,45 @@ type ArtistNeighbor struct {
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
+// Artists/performers separate from MusicBrainz artists table
+type ConcertArtist struct {
+	ID        string           `json:"id"`
+	Name      string           `json:"name"`
+	Genres    []string         `json:"genres"`
+	CreatedAt pgtype.Timestamp `json:"created_at"`
+	UpdatedAt pgtype.Timestamp `json:"updated_at"`
+}
+
+// Concert events fetched from external APIs like Ticketmaster
+type ConcertEvent struct {
+	ID             string           `json:"id"`
+	Name           string           `json:"name"`
+	EventDate      pgtype.Timestamp `json:"event_date"`
+	VenueID        pgtype.Text      `json:"venue_id"`
+	Genres         []string         `json:"genres"`
+	PriceMin       pgtype.Numeric   `json:"price_min"`
+	PriceMax       pgtype.Numeric   `json:"price_max"`
+	PriceCurrency  pgtype.Text      `json:"price_currency"`
+	TicketUrl      pgtype.Text      `json:"ticket_url"`
+	Description    pgtype.Text      `json:"description"`
+	Status         string           `json:"status"`
+	AgeRestriction pgtype.Text      `json:"age_restriction"`
+	// External API provider (ticketmaster, eventbrite, etc.)
+	Provider string `json:"provider"`
+	// Original URL from the external provider
+	ExternalUrl pgtype.Text      `json:"external_url"`
+	CreatedAt   pgtype.Timestamp `json:"created_at"`
+	UpdatedAt   pgtype.Timestamp `json:"updated_at"`
+}
+
+// Many-to-many relationship between events and artists
+type ConcertEventArtist struct {
+	EventID   string           `json:"event_id"`
+	ArtistID  string           `json:"artist_id"`
+	Role      pgtype.Text      `json:"role"`
+	CreatedAt pgtype.Timestamp `json:"created_at"`
+}
+
 type Feedback struct {
 	ID           int32              `json:"id"`
 	UserID       uuid.UUID          `json:"user_id"`
@@ -86,4 +125,18 @@ type UserSubmittedArtist struct {
 	ID        int32              `json:"id"`
 	Name      string             `json:"name"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+// Concert venues with location information
+type Venue struct {
+	ID        string           `json:"id"`
+	Name      string           `json:"name"`
+	Street    pgtype.Text      `json:"street"`
+	City      string           `json:"city"`
+	State     pgtype.Text      `json:"state"`
+	Country   string           `json:"country"`
+	Postal    pgtype.Text      `json:"postal"`
+	Capacity  pgtype.Int4      `json:"capacity"`
+	CreatedAt pgtype.Timestamp `json:"created_at"`
+	UpdatedAt pgtype.Timestamp `json:"updated_at"`
 }
