@@ -33,7 +33,7 @@ generate: generate-sqlc ## Generate OpenAPI server code and SQLC code from speci
 	fi
 	@# Generate fresh OpenAPI code
 	@mkdir -p generated/temp_gen
-	@docker run --rm -v $$(pwd):/local openapitools/openapi-generator-cli generate \
+	@docker run --rm --user $$(id -u):$$(id -g) -v $$(pwd):/local openapitools/openapi-generator-cli generate \
 		-i /local/openapi.yaml \
 		-g go-server \
 		-o /local/generated/temp_gen \
