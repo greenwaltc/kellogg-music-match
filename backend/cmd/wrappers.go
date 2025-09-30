@@ -60,7 +60,17 @@ func NewMatchingAPIServiceWrapper(matchingService *business.MatchingService) gen
 
 // FindMusicMatches delegates to business logic
 func (w *MatchingAPIServiceWrapper) FindMusicMatches(ctx context.Context, artistsRequest generated.ArtistsRequest, xUserUsername string) (generated.ImplResponse, error) {
-	return w.matchingService.FindMusicMatches(ctx, artistsRequest, xUserUsername)
+	// Try to get user from JWT context first
+	if user, ok := GetUserFromContext(ctx); ok && user.Username != "" {
+		return w.matchingService.FindMusicMatches(ctx, artistsRequest, user.Username)
+	}
+
+	// Fall back to header-based auth for backward compatibility
+	if xUserUsername != "" {
+		return w.matchingService.FindMusicMatches(ctx, artistsRequest, xUserUsername)
+	}
+
+	return w.matchingService.FindMusicMatches(ctx, artistsRequest, "")
 }
 
 // SearchArtists delegates to business logic
@@ -82,7 +92,13 @@ func NewFeedbackAPIServiceWrapper(feedbackService *business.FeedbackService) gen
 
 // SubmitFeedback delegates to business logic
 func (w *FeedbackAPIServiceWrapper) SubmitFeedback(ctx context.Context, xUserUsername string, feedbackRequest generated.FeedbackRequest) (generated.ImplResponse, error) {
-	feedback, err := w.feedbackService.SubmitFeedback(ctx, xUserUsername, feedbackRequest.Feedback)
+	// Try to get user from JWT context first
+	username := xUserUsername
+	if user, ok := GetUserFromContext(ctx); ok && user.Username != "" {
+		username = user.Username
+	}
+
+	feedback, err := w.feedbackService.SubmitFeedback(ctx, username, feedbackRequest.Feedback)
 	if err != nil {
 		return generated.Response(400, generated.ErrorResponse{
 			Message: err.Error(),

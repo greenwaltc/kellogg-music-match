@@ -1,5 +1,4 @@
 package business
-package business
 
 import (
 	"context"
@@ -78,16 +77,16 @@ func TestConcertAPIService_GetChicagoEvents(t *testing.T) {
 	t.Run("GetAllChicagoEvents", func(t *testing.T) {
 		response, err := service.GetChicagoEvents(ctx, "", 10, 0)
 		require.NoError(t, err)
-		
+
 		assert.Equal(t, http.StatusOK, response.Code)
-		
+
 		result, ok := response.Body.(generated.ChicagoEventsResult)
 		require.True(t, ok, "Response should be ChicagoEventsResult")
-		
+
 		assert.Len(t, result.Events, 2, "Should return both events")
 		assert.Equal(t, int32(2), result.TotalCount, "Should have correct total count")
 		assert.False(t, result.HasMore, "Should not have more events")
-		
+
 		// Verify events are sorted by date (earliest first)
 		assert.Equal(t, "Rock Concert", result.Events[0].Name)
 		assert.Equal(t, "Pop Concert", result.Events[1].Name)
@@ -96,12 +95,12 @@ func TestConcertAPIService_GetChicagoEvents(t *testing.T) {
 	t.Run("SearchByArtistName", func(t *testing.T) {
 		response, err := service.GetChicagoEvents(ctx, "Rock", 10, 0)
 		require.NoError(t, err)
-		
+
 		assert.Equal(t, http.StatusOK, response.Code)
-		
+
 		result, ok := response.Body.(generated.ChicagoEventsResult)
 		require.True(t, ok, "Response should be ChicagoEventsResult")
-		
+
 		assert.Len(t, result.Events, 1, "Should return only Rock Band event")
 		assert.Equal(t, "Rock Concert", result.Events[0].Name)
 		assert.Equal(t, int32(1), result.TotalCount, "Should have correct total count")
@@ -110,10 +109,10 @@ func TestConcertAPIService_GetChicagoEvents(t *testing.T) {
 	t.Run("PaginationWithLimit", func(t *testing.T) {
 		response, err := service.GetChicagoEvents(ctx, "", 1, 0)
 		require.NoError(t, err)
-		
+
 		result, ok := response.Body.(generated.ChicagoEventsResult)
 		require.True(t, ok, "Response should be ChicagoEventsResult")
-		
+
 		assert.Len(t, result.Events, 1, "Should return only 1 event due to limit")
 		assert.True(t, result.HasMore, "Should indicate more events available")
 		assert.Equal(t, int32(2), result.TotalCount, "Should have correct total count")
@@ -122,10 +121,10 @@ func TestConcertAPIService_GetChicagoEvents(t *testing.T) {
 	t.Run("PaginationWithOffset", func(t *testing.T) {
 		response, err := service.GetChicagoEvents(ctx, "", 1, 1)
 		require.NoError(t, err)
-		
+
 		result, ok := response.Body.(generated.ChicagoEventsResult)
 		require.True(t, ok, "Response should be ChicagoEventsResult")
-		
+
 		assert.Len(t, result.Events, 1, "Should return 1 event")
 		assert.Equal(t, "Pop Concert", result.Events[0].Name, "Should return second event due to offset")
 		assert.False(t, result.HasMore, "Should not have more events")
@@ -134,10 +133,10 @@ func TestConcertAPIService_GetChicagoEvents(t *testing.T) {
 	t.Run("NoResults", func(t *testing.T) {
 		response, err := service.GetChicagoEvents(ctx, "NonexistentArtist", 10, 0)
 		require.NoError(t, err)
-		
+
 		result, ok := response.Body.(generated.ChicagoEventsResult)
 		require.True(t, ok, "Response should be ChicagoEventsResult")
-		
+
 		assert.Len(t, result.Events, 0, "Should return no events")
 		assert.Equal(t, int32(0), result.TotalCount, "Should have zero total count")
 		assert.False(t, result.HasMore, "Should not have more events")
@@ -146,29 +145,29 @@ func TestConcertAPIService_GetChicagoEvents(t *testing.T) {
 	t.Run("EventDataIntegrity", func(t *testing.T) {
 		response, err := service.GetChicagoEvents(ctx, "", 1, 0)
 		require.NoError(t, err)
-		
+
 		result, ok := response.Body.(generated.ChicagoEventsResult)
 		require.True(t, ok, "Response should be ChicagoEventsResult")
-		
+
 		event := result.Events[0]
-		
+
 		// Verify complete event data
 		assert.Equal(t, "chicago-1", event.Id)
 		assert.Equal(t, "Rock Concert", event.Name)
 		assert.NotEmpty(t, event.Date, "Date should be set")
-		
+
 		// Verify venue data
 		assert.Equal(t, "Chicago Theater", event.Venue.Name)
 		assert.Equal(t, "175 N State St", event.Venue.Address.Street)
 		assert.Equal(t, "Chicago", event.Venue.Address.City)
 		assert.Equal(t, "IL", event.Venue.Address.State)
 		assert.Equal(t, "US", event.Venue.Address.Country)
-		
+
 		// Verify artist data
 		assert.Len(t, event.Artists, 1)
 		assert.Equal(t, "Rock Band", event.Artists[0].Name)
 		assert.Equal(t, []string{"Rock"}, event.Artists[0].Genres)
-		
+
 		// Verify ticket URL
 		assert.Equal(t, "https://example.com/tickets/1", event.TicketUrl)
 	})

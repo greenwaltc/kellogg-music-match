@@ -45,6 +45,7 @@ paths:
       summary: Health check endpoint
       description: Returns the current status and timestamp of the service
       operationId: getHealth
+      security: []  # Override global security - no authentication required
       responses:
         '200':
           description: Service is healthy
@@ -224,6 +225,7 @@ paths:
         Creates a new user account with secure password hashing. All fields are required.
         Username and email must be unique across all users.
       operationId: registerUser
+      security: []  # Override global security - no authentication required
       requestBody:
         required: true
         content:
@@ -290,6 +292,7 @@ paths:
         Authenticates a user with username and password. Returns user information 
         including any previously saved artist preferences.
       operationId: loginUser
+      security: []  # Override global security - no authentication required
       requestBody:
         required: true
         content:
@@ -1070,15 +1073,16 @@ components:
         - currency
 
   securitySchemes:
-    # Reserved for future JWT implementation
+    # JWT implementation now active
     BearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: JWT token authentication (not currently implemented)
+      description: JWT token authentication for secure API access
 
-# Global security (currently none, but reserved for future JWT)
-security: []
+# Global security - all endpoints except auth require JWT
+security:
+  - BearerAuth: []
 
 externalDocs:
   description: Project Repository

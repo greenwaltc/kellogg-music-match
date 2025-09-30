@@ -12,13 +12,15 @@ import (
 
 // AuthService implements the business logic for authentication
 type AuthService struct {
-	userRepo UserRepository
+	userRepo   UserRepository
+	jwtService *JWTService
 }
 
 // NewAuthService creates a new authentication service
-func NewAuthService(userRepo UserRepository) *AuthService {
+func NewAuthService(userRepo UserRepository, jwtService *JWTService) *AuthService {
 	return &AuthService{
-		userRepo: userRepo,
+		userRepo:   userRepo,
+		jwtService: jwtService,
 	}
 }
 
@@ -99,9 +101,18 @@ func (s *AuthService) RegisterUser(ctx context.Context, registerRequest generate
 		Artists:        []string{}, // Will be populated when user sets artists
 	}
 
+	// Generate JWT token
+	token, err := s.jwtService.GenerateToken(dbUser.ID.String(), dbUser.Username, dbUser.Email)
+	if err != nil {
+		return generated.Response(http.StatusInternalServerError, generated.ErrorResponse{
+			Message: "failed to generate authentication token",
+		}), nil
+	}
+
 	// Return response
 	response := generated.AuthResponse{
-		User: *user,
+		User:  *user,
+		Token: &token,
 	}
 	return generated.Response(http.StatusCreated, response), nil
 }
@@ -165,9 +176,18 @@ func (s *AuthService) LoginUser(ctx context.Context, loginRequest generated.Logi
 		Artists:        artistNames,
 	}
 
+	// Generate JWT token
+	token, err := s.jwtService.GenerateToken(dbUser.ID.String(), dbUser.Username, dbUser.Email)
+	if err != nil {
+		return generated.Response(http.StatusInternalServerError, generated.ErrorResponse{
+			Message: "failed to generate authentication token",
+		}), nil
+	}
+
 	// Return response
 	response := generated.AuthResponse{
-		User: *user,
+		User:  *user,
+		Token: &token,
 	}
 	return generated.Response(http.StatusOK, response), nil
 }

@@ -1,5 +1,5 @@
 import { Injectable, signal } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { environment } from '../environments/environment';
 import { AuthService } from './auth.service';
 
@@ -50,8 +50,8 @@ export class MatchService {
     if (currentUser?.artists?.length) {
       this.loading.set(true);
       const username = currentUser.username;
-      const headers = username ? new HttpHeaders({ 'X-User-Username': username }) : undefined;
-      this.http.post<MatchUser[]>(this.url('/findMusicMatches'), { artists: currentUser.artists }, { headers }).subscribe({
+      // JWT interceptor will automatically add the Authorization header
+      this.http.post<MatchUser[]>(this.url('/findMusicMatches'), { artists: currentUser.artists }).subscribe({
         next: (res: MatchUser[]) => { 
           this.matches.set(res); 
           this.loading.set(false);

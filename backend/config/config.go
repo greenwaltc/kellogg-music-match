@@ -14,6 +14,7 @@ type Config struct {
 	Artist       ArtistConfig
 	Ticketmaster TicketmasterConfig
 	Debug        DebugConfig
+	JWT          JWTConfig
 }
 
 // ServerConfig holds server-related configuration
@@ -66,6 +67,13 @@ type DebugConfig struct {
 	Enabled bool
 }
 
+// JWTConfig holds JWT-related configuration
+type JWTConfig struct {
+	SecretKey    string
+	ExpiryHours  int
+	RefreshHours int
+}
+
 // Load creates a new Config instance from environment variables
 func Load() *Config {
 	return &Config{
@@ -109,6 +117,11 @@ func Load() *Config {
 		},
 		Debug: DebugConfig{
 			Enabled: getEnvBoolWithDefault("DEBUG_ENABLED", false),
+		},
+		JWT: JWTConfig{
+			SecretKey:    getEnvWithDefault("JWT_SECRET_KEY", "your-secret-key-change-in-production"),
+			ExpiryHours:  getEnvIntWithDefault("JWT_EXPIRY_HOURS", 24),
+			RefreshHours: getEnvIntWithDefault("JWT_REFRESH_HOURS", 168), // 7 days
 		},
 	}
 }

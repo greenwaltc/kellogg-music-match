@@ -1,6 +1,6 @@
 import { bootstrapApplication } from '@angular/platform-browser';
 import { provideAnimations } from '@angular/platform-browser/animations';
-import { provideHttpClient, withFetch } from '@angular/common/http';
+import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
 import { provideRouter, Routes } from '@angular/router';
 import { AppComponent } from './app/app.component';
 import { LoginComponent } from './app/login.component';
@@ -10,6 +10,7 @@ import { FeedbackComponent } from './app/feedback.component';
 import { RoadmapComponent } from './app/roadmap.component';
 import { ChicagoEventsComponent } from './app/chicago-events.component';
 import { authGuard } from './app/auth.guard';
+import { jwtInterceptor } from './app/jwt.interceptor';
 
 declare global {
   interface Window {
@@ -43,7 +44,7 @@ async function loadConfigAndBootstrap() {
   bootstrapApplication(AppComponent, {
     providers: [
       provideAnimations(),
-      provideHttpClient(withFetch()),
+      provideHttpClient(withFetch(), withInterceptors([jwtInterceptor])),
       provideRouter(routes)
     ]
   }).catch((err: unknown) => console.error(err));

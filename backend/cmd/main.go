@@ -63,8 +63,11 @@ func main() {
 
 	matchingEngine := business.NewMatchingEngine()
 
+	// Initialize JWT service
+	jwtService := business.NewJWTService(&cfg.JWT)
+
 	// Initialize business services with config
-	authService := business.NewAuthService(userRepo)
+	authService := business.NewAuthService(userRepo, jwtService)
 	healthService := business.NewHealthService()
 	matchingService := business.NewMatchingServiceWithConfig(userRepo, matchingEngine, &cfg.Artist)
 	feedbackService := business.NewFeedbackService(userRepo)
@@ -140,8 +143,12 @@ func main() {
 
 	router := generated.NewRouter(AuthenticationAPIController, HealthAPIController, MatchingAPIController, FeedbackAPIController, ConcertsAPIController)
 
-	// Wrap router with CORS middleware
-	corsRouter := corsMiddleware(cfg)(router)
+	// Initialize JWT middleware
+	jwtMiddleware := NewJWTMiddleware(jwtService)
+
+	// Wrap router with middleware layers (innermost to outermost)
+	protectedRouter := jwtMiddleware.Middleware(router)
+	corsRouter := corsMiddleware(cfg)(protectedRouter)
 
 	serverAddr := ":" + cfg.Server.Port
 	log.Printf("Server listening on %s with CORS enabled for origins: %v", serverAddr, cfg.CORS.AllowedOrigins)
