@@ -84,6 +84,7 @@ services:
       DB_USER: kellogg_user
       DB_PASSWORD: kellogg_secure_pass_2024
       DB_SSLMODE: disable
+      DEBUG_ENABLED: true
       # Ticketmaster API configuration
       TICKETMASTER_CONSUMER_KEY: 3RVuRqbo6iLpQj0iEG6UUAZiWa2Z5Y0O
       TICKETMASTER_CONSUMER_SECRET: EzfZFlmQwTHXIrsb
@@ -93,6 +94,12 @@ services:
       TICKETMASTER_DEFAULT_CITY: Chicago
       TICKETMASTER_DEFAULT_STATE: IL
       TICKETMASTER_DEFAULT_COUNTRY: US
+      EMAIL_ENABLED: true
+      EMAIL_PROVIDER: sendgrid
+      EMAIL_FROM_EMAIL: support@kelloggmatch.com
+      EMAIL_FROM_NAME: Kellogg Music Match
+      APP_BASE_URL: https://kelloggmatch.com
+      SENDGRID_API_KEY: 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
     depends_on:
       flyway:
         condition: service_completed_successfully

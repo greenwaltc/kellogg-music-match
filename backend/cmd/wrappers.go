@@ -9,13 +9,15 @@ import (
 
 // AuthAPIServiceWrapper wraps business logic to implement OpenAPI service interface
 type AuthAPIServiceWrapper struct {
-	authService *business.AuthService
+	authService          *business.AuthService
+	passwordResetService *business.PasswordResetService
 }
 
 // NewAuthAPIServiceWrapper creates a new wrapper
-func NewAuthAPIServiceWrapper(authService *business.AuthService) generated.AuthenticationAPIServicer {
+func NewAuthAPIServiceWrapper(authService *business.AuthService, passwordResetService *business.PasswordResetService) generated.AuthenticationAPIServicer {
 	return &AuthAPIServiceWrapper{
-		authService: authService,
+		authService:          authService,
+		passwordResetService: passwordResetService,
 	}
 }
 
@@ -27,6 +29,16 @@ func (w *AuthAPIServiceWrapper) RegisterUser(ctx context.Context, registerReques
 // LoginUser delegates to business logic
 func (w *AuthAPIServiceWrapper) LoginUser(ctx context.Context, loginRequest generated.LoginRequest) (generated.ImplResponse, error) {
 	return w.authService.LoginUser(ctx, loginRequest)
+}
+
+// ForgotPassword delegates to business logic
+func (w *AuthAPIServiceWrapper) ForgotPassword(ctx context.Context, forgotPasswordRequest generated.ForgotPasswordRequest) (generated.ImplResponse, error) {
+	return w.passwordResetService.ForgotPassword(ctx, forgotPasswordRequest)
+}
+
+// ResetPassword delegates to business logic
+func (w *AuthAPIServiceWrapper) ResetPassword(ctx context.Context, resetPasswordRequest generated.ResetPasswordRequest) (generated.ImplResponse, error) {
+	return w.passwordResetService.ResetPassword(ctx, resetPasswordRequest)
 }
 
 // HealthAPIServiceWrapper wraps business logic to implement OpenAPI service interface

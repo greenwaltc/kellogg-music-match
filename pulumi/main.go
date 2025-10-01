@@ -458,6 +458,62 @@ echo "🎉 MusicBrainz data loading completed"`),
 										Name:  pulumi.String("TICKETMASTER_DEFAULT_COUNTRY"),
 										Value: pulumi.String("US"),
 									},
+									// Email Configuration
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("EMAIL_ENABLED"),
+										Value: pulumi.String("true"),
+									},
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("EMAIL_PROVIDER"),
+										Value: pulumi.String("sendgrid"),
+									},
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("EMAIL_FROM_EMAIL"),
+										Value: pulumi.String("support@kelloggmatch.com"),
+									},
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("EMAIL_FROM_NAME"),
+										Value: pulumi.String("Kellogg Music Match"),
+									},
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("APP_BASE_URL"),
+										Value: pulumi.String("https://kelloggmatch.com"),
+									},
+									// SendGrid Configuration (will be set when service is configured)
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("SENDGRID_API_KEY"),
+										Value: pulumi.String("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"),
+									},
+									// SMTP Configuration (alternative to SendGrid)
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("SMTP_HOST"),
+										Value: pulumi.String("smtp.gmail.com"),
+									},
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("SMTP_PORT"),
+										Value: pulumi.String("587"),
+									},
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("SMTP_USER"),
+										Value: pulumi.String("dummy-user@gmail.com"),
+									},
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("SMTP_PASS"),
+										Value: pulumi.String("dummy-password"),
+									},
+									// JWT Configuration
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("JWT_SECRET_KEY"),
+										Value: pulumi.String("your-secret-key-here-change-in-production"),
+									},
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("JWT_EXPIRY_HOURS"),
+										Value: pulumi.String("24"),
+									},
+									&corev1.EnvVarArgs{
+										Name:  pulumi.String("JWT_REFRESH_HOURS"),
+										Value: pulumi.String("720"),
+									},
 									// Legacy environment variables for backward compatibility
 									&corev1.EnvVarArgs{
 										Name:  pulumi.String("PORT"),
@@ -684,11 +740,15 @@ echo "🎉 MusicBrainz data loading completed"`),
 					"app": pulumi.String("kmm"),
 				},
 				Annotations: pulumi.StringMap{
-					"traefik.ingress.kubernetes.io/router.entrypoints": pulumi.String("web,websecure"),
+					// Use nginx ingress controller in local/dev environments where Traefik
+					// may not be installed. For Traefik, set this back to the Traefik annotation.
+					"kubernetes.io/ingress.class": pulumi.String("nginx"),
 				},
 			},
 			Spec: &networkingv1.IngressSpecArgs{
-				IngressClassName: pulumi.String("traefik"),
+				// Use the nginx IngressClass which exists in the local cluster. Change
+				// back to "traefik" if Traefik is installed in your environment.
+				IngressClassName: pulumi.String("nginx"),
 				Rules: networkingv1.IngressRuleArray{
 					// UI ingress rule for traefik.me domain
 					&networkingv1.IngressRuleArgs{

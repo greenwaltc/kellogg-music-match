@@ -1,10 +1,12 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators, FormGroup, FormControl } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import { AuthService } from './auth.service';
 import { MatchService } from './match.service';
 import { passwordComplexityValidator, confirmPasswordValidator, getPasswordStrength, PasswordComplexity } from './password-validators';
+
+type AuthMode = 'login' | 'register' | 'forgot-password' | 'reset-password';
 
 interface LoginFormShape { 
   username: FormControl<string | null>; 
@@ -15,6 +17,8 @@ interface LoginFormShape {
   graduationYear: FormControl<number | null>;
   password: FormControl<string | null>; 
   confirmPassword: FormControl<string | null>;
+  resetToken: FormControl<string | null>;
+  resetEmail: FormControl<string | null>;
 }
 
 @Component({
@@ -29,7 +33,7 @@ interface LoginFormShape {
     </div>
     
     <div class="auth-container">
-      <div class="auth-toggle">
+      <div class="auth-toggle" *ngIf="authMode === 'login' || authMode === 'register'">
         <button 
           type="button" 
           [class.active]="!isRegisterMode" 
@@ -44,7 +48,7 @@ interface LoginFormShape {
         </button>
       </div>
 
-      <div class="form-card">
+      <div class="form-card" *ngIf="authMode === 'login' || authMode === 'register'">
         <div class="form-header">
           <h2>{{ isRegisterMode ? 'Create Account' : 'Sign In' }}</h2>
         </div>
@@ -172,7 +176,108 @@ interface LoginFormShape {
             {{ auth.loading() ? 'Processing...' : (isRegisterMode ? 'Create Account' : 'Sign In') }}
           </button>
           
+          <div class="forgot-password-link" *ngIf="!isRegisterMode">
+            <button type="button" class="link-btn" (click)="showForgotPassword()">
+              Forgot your password?
+            </button>
+          </div>
+          
           <div class="error form-error" *ngIf="auth.error()">{{ auth.error() }}</div>
+        </form>
+      </div>
+
+      <!-- Forgot Password Form -->
+      <div class="form-card" *ngIf="authMode === 'forgot-password'">
+        <div class="form-header">
+          <h2>Reset Password</h2>
+          <p>Enter your email address and we'll send you a link to reset your password.</p>
+        </div>
+        
+        <form class="auth-form" [formGroup]="form" (ngSubmit)="submitForgotPassword()" novalidate>
+          <div class="field">
+            <label for="resetEmail">Email Address</label>
+            <input id="resetEmail" type="email" formControlName="resetEmail" placeholder="Enter your email" />
+            <div class="error" *ngIf="form.get('resetEmail')?.touched && form.get('resetEmail')?.invalid">Valid email required</div>
+          </div>
+
+          <button type="submit" class="primary-btn" [disabled]="auth.loading() || !isForgotPasswordFormValid()">
+            {{ auth.loading() ? 'Sending...' : 'Send Reset Link' }}
+          </button>
+          
+          <div class="success-message" *ngIf="resetSuccessMessage">{{ resetSuccessMessage }}</div>
+          <div class="error form-error" *ngIf="auth.error()">{{ auth.error() }}</div>
+          
+          <div class="back-to-login">
+            <button type="button" class="link-btn" (click)="showLogin()">
+              ← Back to Login
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Reset Password Form -->
+      <div class="form-card" *ngIf="authMode === 'reset-password'">
+        <div class="form-header">
+          <h2>Set New Password</h2>
+          <p>Enter your reset token and new password.</p>
+        </div>
+        
+        <form class="auth-form" [formGroup]="form" (ngSubmit)="submitResetPassword()" novalidate>
+          <div class="field">
+            <label for="resetToken">Reset Token</label>
+            <input id="resetToken" type="text" formControlName="resetToken" placeholder="Enter reset token from email" />
+            <div class="error" *ngIf="form.get('resetToken')?.touched && !form.get('resetToken')?.value">Reset token required</div>
+          </div>
+
+          <div class="field">
+            <label for="resetPassword">New Password</label>
+            <div class="password-input-container">
+              <input id="resetPassword" [type]="showPassword ? 'text' : 'password'" formControlName="password" placeholder="Enter new password" (input)="onPasswordInput()" />
+              <button type="button" class="password-toggle" (click)="togglePasswordVisibility()">
+                {{ showPassword ? 'Hide' : 'Show' }}
+              </button>
+            </div>
+            
+            <!-- Password requirements -->
+            <div class="password-requirements">
+              <div class="requirement-header">Password Requirements:</div>
+              <div class="requirements-list">
+                <div class="requirement" [class.met]="passwordComplexity.minLength">
+                  <span class="requirement-icon">{{ passwordComplexity.minLength ? '✓' : '○' }}</span>
+                  At least 8 characters
+                </div>
+                <div class="requirement" [class.met]="passwordComplexity.hasUpperCase">
+                  <span class="requirement-icon">{{ passwordComplexity.hasUpperCase ? '✓' : '○' }}</span>
+                  One uppercase letter
+                </div>
+                <div class="requirement" [class.met]="passwordComplexity.hasLowerCase">
+                  <span class="requirement-icon">{{ passwordComplexity.hasLowerCase ? '✓' : '○' }}</span>
+                  One lowercase letter
+                </div>
+                <div class="requirement" [class.met]="passwordComplexity.hasNumber">
+                  <span class="requirement-icon">{{ passwordComplexity.hasNumber ? '✓' : '○' }}</span>
+                  One number
+                </div>
+                <div class="requirement" [class.met]="passwordComplexity.hasSpecialChar">
+                  <span class="requirement-icon">{{ passwordComplexity.hasSpecialChar ? '✓' : '○' }}</span>
+                  One special character (!&#64;#$%^&*_)
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <button type="submit" class="primary-btn" [disabled]="auth.loading() || !form.get('resetToken')?.value || !form.get('password')?.value || !isResetPasswordValid()">
+            {{ auth.loading() ? 'Resetting...' : 'Reset Password' }}
+          </button>
+          
+          <div class="success-message" *ngIf="resetSuccessMessage">{{ resetSuccessMessage }}</div>
+          <div class="error form-error" *ngIf="auth.error()">{{ auth.error() }}</div>
+          
+          <div class="back-to-login">
+            <button type="button" class="link-btn" (click)="showLogin()">
+              ← Back to Login
+            </button>
+          </div>
         </form>
       </div>
       
@@ -460,13 +565,45 @@ interface LoginFormShape {
       transform: none; 
     }
 
-    .error {
-      color: var(--color-error);
-      font-size: 0.85rem;
-      margin-top: 0.25rem;
+    .error { 
+      color: var(--color-error); 
+      font-size: 0.85rem; 
+      margin-top: 0.25rem; 
     }
-    
-    .form-error { 
+
+    .success-message {
+      color: var(--color-accent);
+      font-size: 0.9rem;
+      margin-top: 0.5rem;
+      padding: 0.75rem;
+      background: var(--color-accent-light, #e0f2fe);
+      border-radius: 6px;
+      border: 1px solid var(--color-accent);
+    }
+
+    .back-to-login {
+      text-align: center;
+      margin-top: 1rem;
+    }
+
+    .link-btn {
+      background: none;
+      border: none;
+      color: var(--color-accent);
+      cursor: pointer;
+      font-size: 0.9rem;
+      text-decoration: underline;
+      padding: 0;
+    }
+
+    .link-btn:hover {
+      color: var(--color-accent-dark, #1976d2);
+    }
+
+    .forgot-password-link {
+      text-align: center;
+      margin-top: 1rem;
+    }    .form-error { 
       margin-top: 1rem; 
       text-align: center; 
     }
@@ -507,6 +644,7 @@ interface LoginFormShape {
 export class LoginComponent {
   form!: FormGroup<LoginFormShape>;
   isRegisterMode = false;
+  authMode: AuthMode = 'login';
   showPassword = false;
   showConfirmPassword = false;
   passwordComplexity: PasswordComplexity = {
@@ -517,9 +655,19 @@ export class LoginComponent {
     hasSpecialChar: false
   };
   passwordStrength = { score: 0, label: 'Enter password', color: '#6b7280' };
+  resetSuccessMessage = '';
 
-  constructor(private fb: FormBuilder, public auth: AuthService, private router: Router, private matches: MatchService) {
+  constructor(private fb: FormBuilder, public auth: AuthService, private router: Router, private matches: MatchService, private route: ActivatedRoute) {
     this.initializeForm();
+    
+    // Check for reset token in query parameters
+    this.route.queryParams.subscribe(params => {
+      if (params['token']) {
+        this.authMode = 'reset-password';
+        this.form.get('resetToken')?.setValue(params['token']);
+        this.updateValidators();
+      }
+    });
   }
 
   private initializeForm(): void {
@@ -531,13 +679,16 @@ export class LoginComponent {
       program: this.fb.control<string | null>('', [Validators.required]),
       graduationYear: this.fb.control<number | null>(null, [Validators.required, Validators.min(2025), Validators.max(2030)]),
       password: this.fb.control<string | null>('', [Validators.required, Validators.minLength(6)]),
-      confirmPassword: this.fb.control<string | null>('', [Validators.required])
+      confirmPassword: this.fb.control<string | null>('', [Validators.required]),
+      resetToken: this.fb.control<string | null>('', []),
+      resetEmail: this.fb.control<string | null>('', [])
     });
     this.updateValidators();
   }
 
   toggleMode(isRegister: boolean): void {
     this.isRegisterMode = isRegister;
+    this.authMode = isRegister ? 'register' : 'login';
     this.auth.error.set(null);
     this.form.reset();
     this.passwordComplexity = {
@@ -559,8 +710,21 @@ export class LoginComponent {
     const graduationYearControl = this.form.get('graduationYear');
     const passwordControl = this.form.get('password');
     const confirmPasswordControl = this.form.get('confirmPassword');
+    const resetEmailControl = this.form.get('resetEmail');
+    const resetTokenControl = this.form.get('resetToken');
     
-    if (this.isRegisterMode) {
+    // Clear all validators first
+    emailControl?.clearValidators();
+    firstNameControl?.clearValidators();
+    lastNameControl?.clearValidators();
+    programControl?.clearValidators();
+    graduationYearControl?.clearValidators();
+    passwordControl?.clearValidators();
+    confirmPasswordControl?.clearValidators();
+    resetEmailControl?.clearValidators();
+    resetTokenControl?.clearValidators();
+    
+    if (this.authMode === 'register' || this.isRegisterMode) {
       emailControl?.setValidators([Validators.required, Validators.email]);
       firstNameControl?.setValidators([Validators.required, Validators.minLength(2)]);
       lastNameControl?.setValidators([Validators.required, Validators.minLength(2)]);
@@ -568,16 +732,16 @@ export class LoginComponent {
       graduationYearControl?.setValidators([Validators.required, Validators.min(2025), Validators.max(2030)]);
       passwordControl?.setValidators([Validators.required, passwordComplexityValidator()]);
       confirmPasswordControl?.setValidators([Validators.required, confirmPasswordValidator('password')]);
-    } else {
-      emailControl?.clearValidators();
-      firstNameControl?.clearValidators();
-      lastNameControl?.clearValidators();
-      programControl?.clearValidators();
-      graduationYearControl?.clearValidators();
+    } else if (this.authMode === 'login') {
       passwordControl?.setValidators([Validators.required, Validators.minLength(6)]);
-      confirmPasswordControl?.clearValidators();
+    } else if (this.authMode === 'forgot-password') {
+      resetEmailControl?.setValidators([Validators.required, Validators.email]);
+    } else if (this.authMode === 'reset-password') {
+      resetTokenControl?.setValidators([Validators.required]);
+      passwordControl?.setValidators([Validators.required, passwordComplexityValidator()]);
     }
     
+    // Update validity for all controls
     emailControl?.updateValueAndValidity();
     firstNameControl?.updateValueAndValidity();
     lastNameControl?.updateValueAndValidity();
@@ -585,6 +749,8 @@ export class LoginComponent {
     graduationYearControl?.updateValueAndValidity();
     passwordControl?.updateValueAndValidity();
     confirmPasswordControl?.updateValueAndValidity();
+    resetEmailControl?.updateValueAndValidity();
+    resetTokenControl?.updateValueAndValidity();
   }
 
   onPasswordInput(): void {
@@ -684,5 +850,70 @@ export class LoginComponent {
 
   toggleConfirmPasswordVisibility(): void {
     this.showConfirmPassword = !this.showConfirmPassword;
+  }
+
+  showForgotPassword(): void {
+    this.authMode = 'forgot-password';
+    this.auth.error.set(null);
+    this.resetSuccessMessage = '';
+    this.updateValidators();
+    console.log('Switched to forgot password mode, resetEmail validators:', this.form.get('resetEmail')?.validator);
+  }
+
+  showLogin(): void {
+    this.authMode = 'login';
+    this.isRegisterMode = false;
+    this.auth.error.set(null);
+    this.resetSuccessMessage = '';
+    this.updateValidators();
+  }
+
+  submitForgotPassword(): void {
+    const email = this.form.get('resetEmail')?.value;
+    if (!email) return;
+
+    this.auth.forgotPassword(email).subscribe({
+      next: (response) => {
+        this.resetSuccessMessage = response.message;
+      },
+      error: () => {
+        // Error handling is done in the service
+      }
+    });
+  }
+
+  submitResetPassword(): void {
+    const token = this.form.get('resetToken')?.value;
+    const password = this.form.get('password')?.value;
+    if (!token || !password) return;
+
+    this.auth.resetPassword(token, password).subscribe({
+      next: (response) => {
+        this.resetSuccessMessage = response.message;
+        setTimeout(() => {
+          this.showLogin();
+        }, 2000);
+      },
+      error: () => {
+        // Error handling is done in the service
+      }
+    });
+  }
+
+  isResetPasswordValid(): boolean {
+    return Object.values(this.passwordComplexity).every(req => req);
+  }
+
+  isForgotPasswordFormValid(): boolean {
+    const resetEmailControl = this.form.get('resetEmail');
+    const isValid = !!(resetEmailControl?.value && resetEmailControl?.valid);
+    console.log('Debug forgot password form:', {
+      value: resetEmailControl?.value,
+      valid: resetEmailControl?.valid,
+      errors: resetEmailControl?.errors,
+      authMode: this.authMode,
+      overall: isValid
+    });
+    return isValid;
   }
 }

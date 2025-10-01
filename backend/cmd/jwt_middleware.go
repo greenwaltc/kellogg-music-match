@@ -93,9 +93,11 @@ func (m *JWTMiddleware) Middleware(next http.Handler) http.Handler {
 // isPublicEndpoint determines if an endpoint should be accessible without authentication
 func isPublicEndpoint(path, method string) bool {
 	publicEndpoints := map[string][]string{
-		"/health":   {"GET"},
-		"/login":    {"POST"},
-		"/register": {"POST"},
+		"/health":          {"GET"},
+		"/login":           {"POST"},
+		"/register":        {"POST"},
+		"/forgot-password": {"POST"},
+		"/reset-password":  {"POST"},
 	}
 
 	if methods, exists := publicEndpoints[path]; exists {

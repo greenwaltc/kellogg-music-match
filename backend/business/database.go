@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/greenwaltc/kellogg-music-match/backend/config"
@@ -42,6 +43,14 @@ type UserRepository interface {
 	// Feedback operations
 	CreateFeedback(ctx context.Context, userID uuid.UUID, feedbackText string) (*sqlc.Feedback, error)
 	GetFeedbackByUser(ctx context.Context, userID uuid.UUID) ([]sqlc.Feedback, error)
+
+	// Password reset operations
+	CreatePasswordResetToken(ctx context.Context, userID uuid.UUID, token string, expiresAt time.Time) (sqlc.PasswordResetToken, error)
+	GetPasswordResetToken(ctx context.Context, token string) (sqlc.PasswordResetToken, error)
+	MarkPasswordResetTokenAsUsed(ctx context.Context, token string) error
+	DeleteExpiredPasswordResetTokens(ctx context.Context) error
+	DeleteUserPasswordResetTokens(ctx context.Context, userID uuid.UUID) error
+	UpdateUserPassword(ctx context.Context, userID uuid.UUID, passwordHash string) (sqlc.UpdateUserPasswordRow, error)
 }
 
 // PostgreSQLUserRepository implements UserRepository using pgxpool
@@ -299,4 +308,41 @@ func NewPoolFromEnv() (*pgxpool.Pool, error) {
 		return nil, err
 	}
 	return pool, nil
+}
+
+// CreatePasswordResetToken creates a new password reset token
+func (r *PostgreSQLUserRepository) CreatePasswordResetToken(ctx context.Context, userID uuid.UUID, token string, expiresAt time.Time) (sqlc.PasswordResetToken, error) {
+	return r.queries.CreatePasswordResetToken(ctx, sqlc.CreatePasswordResetTokenParams{
+		UserID:    userID,
+		Token:     token,
+		ExpiresAt: pgtype.Timestamptz{Time: expiresAt, Valid: true},
+	})
+}
+
+// GetPasswordResetToken retrieves a password reset token if valid
+func (r *PostgreSQLUserRepository) GetPasswordResetToken(ctx context.Context, token string) (sqlc.PasswordResetToken, error) {
+	return r.queries.GetPasswordResetToken(ctx, token)
+}
+
+// MarkPasswordResetTokenAsUsed marks a token as used
+func (r *PostgreSQLUserRepository) MarkPasswordResetTokenAsUsed(ctx context.Context, token string) error {
+	return r.queries.MarkPasswordResetTokenAsUsed(ctx, token)
+}
+
+// DeleteExpiredPasswordResetTokens removes expired tokens
+func (r *PostgreSQLUserRepository) DeleteExpiredPasswordResetTokens(ctx context.Context) error {
+	return r.queries.DeleteExpiredPasswordResetTokens(ctx)
+}
+
+// DeleteUserPasswordResetTokens removes all reset tokens for a user
+func (r *PostgreSQLUserRepository) DeleteUserPasswordResetTokens(ctx context.Context, userID uuid.UUID) error {
+	return r.queries.DeleteUserPasswordResetTokens(ctx, userID)
+}
+
+// UpdateUserPassword updates a user's password
+func (r *PostgreSQLUserRepository) UpdateUserPassword(ctx context.Context, userID uuid.UUID, passwordHash string) (sqlc.UpdateUserPasswordRow, error) {
+	return r.queries.UpdateUserPassword(ctx, sqlc.UpdateUserPasswordParams{
+		ID:           userID,
+		PasswordHash: passwordHash,
+	})
 }

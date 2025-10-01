@@ -3,6 +3,7 @@ package business_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/greenwaltc/kellogg-music-match/backend/business/concert"
@@ -292,4 +293,33 @@ func (m *MockUserRepository) CreateFeedback(ctx context.Context, userID uuid.UUI
 
 func (m *MockUserRepository) GetFeedbackByUser(ctx context.Context, userID uuid.UUID) ([]sqlc.Feedback, error) {
 	return nil, nil // Not implemented for these tests
+}
+
+// Password Reset methods - stub implementations for existing tests
+func (m *MockUserRepository) CreatePasswordResetToken(ctx context.Context, userID uuid.UUID, token string, expiresAt time.Time) (sqlc.PasswordResetToken, error) {
+	return sqlc.PasswordResetToken{}, nil // Not implemented for these tests
+}
+
+func (m *MockUserRepository) GetPasswordResetToken(ctx context.Context, token string) (sqlc.PasswordResetToken, error) {
+	return sqlc.PasswordResetToken{}, nil // Not implemented for these tests
+}
+
+func (m *MockUserRepository) MarkPasswordResetTokenUsed(ctx context.Context, token string) error {
+	return nil // Not implemented for these tests
+}
+
+func (m *MockUserRepository) MarkPasswordResetTokenAsUsed(ctx context.Context, token string) error {
+	return nil // Not implemented for these tests
+}
+
+func (m *MockUserRepository) UpdateUserPassword(ctx context.Context, userID uuid.UUID, passwordHash string) (sqlc.UpdateUserPasswordRow, error) {
+	return sqlc.UpdateUserPasswordRow{}, nil // Not implemented for these tests
+}
+
+func (m *MockUserRepository) DeleteExpiredPasswordResetTokens(ctx context.Context) error {
+	return nil // Not implemented for these tests
+}
+
+func (m *MockUserRepository) DeleteUserPasswordResetTokens(ctx context.Context, userID uuid.UUID) error {
+	return nil // Not implemented for these tests
 }

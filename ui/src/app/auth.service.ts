@@ -32,6 +32,19 @@ export interface AuthResponse {
   token?: string;
 }
 
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface ResetPasswordRequest {
+  token: string;
+  newPassword: string;
+}
+
+export interface MessageResponse {
+  message: string;
+}
+
 const STORAGE_KEY = 'kmm_user';
 
 @Injectable({ providedIn: 'root' })
@@ -113,6 +126,38 @@ export class AuthService {
     this.user.set(null);
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem('kmm_token');
+  }
+
+  forgotPassword(email: string) {
+    this.loading.set(true);
+    this.error.set(null);
+    return this.http.post<MessageResponse>(this.url('/forgot-password'), { email }).pipe(
+      tap({
+        next: () => {
+          this.loading.set(false);
+        },
+        error: (err: any) => {
+          this.loading.set(false);
+          this.error.set(this.extractError(err));
+        }
+      })
+    );
+  }
+
+  resetPassword(token: string, newPassword: string) {
+    this.loading.set(true);
+    this.error.set(null);
+    return this.http.post<MessageResponse>(this.url('/reset-password'), { token, newPassword }).pipe(
+      tap({
+        next: () => {
+          this.loading.set(false);
+        },
+        error: (err: any) => {
+          this.loading.set(false);
+          this.error.set(this.extractError(err));
+        }
+      })
+    );
   }
 
   private url(path: string): string {

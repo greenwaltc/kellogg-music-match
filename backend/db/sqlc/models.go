@@ -85,6 +85,15 @@ type Feedback struct {
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 }
 
+type PasswordResetToken struct {
+	ID        uuid.UUID          `json:"id"`
+	UserID    uuid.UUID          `json:"user_id"`
+	Token     string             `json:"token"`
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
+	Used      pgtype.Bool        `json:"used"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
 type ReferenceArtist struct {
 	ID               int32       `json:"id"`
 	Name             string      `json:"name"`

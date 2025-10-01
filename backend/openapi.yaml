@@ -335,6 +335,109 @@ paths:
                   value:
                     message: "invalid username or password"
 
+  /forgot-password:
+    post:
+      tags:
+        - Authentication
+      summary: Request password reset
+      description: |
+        Initiates a password reset process by sending a reset token to the user's email address.
+        The token expires in 1 hour for security.
+      operationId: forgotPassword
+      security: []  # Override global security - no authentication required
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+            examples:
+              validEmail:
+                summary: Valid email address
+                value:
+                  email: "student@kellogg.northwestern.edu"
+      responses:
+        '200':
+          description: Password reset email sent (always returns success for security)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              examples:
+                success:
+                  summary: Reset email sent
+                  value:
+                    message: "If an account with that email exists, a password reset link has been sent"
+        '400':
+          description: Invalid request format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missingEmail:
+                  summary: Missing email
+                  value:
+                    message: "email is required"
+                invalidEmail:
+                  summary: Invalid email format
+                  value:
+                    message: "invalid email format"
+
+  /reset-password:
+    post:
+      tags:
+        - Authentication
+      summary: Reset password with token
+      description: |
+        Resets a user's password using a valid reset token received via email.
+        The token can only be used once and expires in 1 hour.
+      operationId: resetPassword
+      security: []  # Override global security - no authentication required
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+            examples:
+              validReset:
+                summary: Valid password reset
+                value:
+                  token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  newPassword: "NewSecurePass123!"
+      responses:
+        '200':
+          description: Password reset successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              examples:
+                success:
+                  summary: Password reset successful
+                  value:
+                    message: "Password has been reset successfully"
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missingFields:
+                  summary: Missing required fields
+                  value:
+                    message: "token and newPassword are required"
+                invalidToken:
+                  summary: Invalid or expired token
+                  value:
+                    message: "invalid or expired reset token"
+                weakPassword:
+                  summary: Password too weak
+                  value:
+                    message: "password must be at least 8 characters and contain uppercase, lowercase, and number"
+
   /findMusicMatches:
     post:
       tags:
@@ -1071,6 +1174,47 @@ components:
         - min
         - max
         - currency
+
+    ForgotPasswordRequest:
+      type: object
+      description: Request to initiate password reset
+      properties:
+        email:
+          type: string
+          format: email
+          description: Email address of the user requesting password reset
+          example: "student@kellogg.northwestern.edu"
+      required:
+        - email
+
+    ResetPasswordRequest:
+      type: object
+      description: Request to reset password with token
+      properties:
+        token:
+          type: string
+          description: Password reset token received via email
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        newPassword:
+          type: string
+          format: password
+          description: New password (minimum 8 characters, must contain uppercase, lowercase, and number)
+          minLength: 8
+          example: "NewSecurePass123!"
+      required:
+        - token
+        - newPassword
+
+    MessageResponse:
+      type: object
+      description: Generic message response
+      properties:
+        message:
+          type: string
+          description: Response message
+          example: "Operation completed successfully"
+      required:
+        - message
 
   securitySchemes:
     # JWT implementation now active

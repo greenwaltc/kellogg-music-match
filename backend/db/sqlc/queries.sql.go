@@ -147,6 +147,36 @@ func (q *Queries) CreateFeedback(ctx context.Context, arg CreateFeedbackParams) 
 	return i, err
 }
 
+const createPasswordResetToken = `-- name: CreatePasswordResetToken :one
+
+INSERT INTO password_reset_tokens (user_id, token, expires_at)
+VALUES ($1, $2, $3)
+RETURNING id, user_id, token, expires_at, used, created_at
+`
+
+type CreatePasswordResetTokenParams struct {
+	UserID    uuid.UUID          `json:"user_id"`
+	Token     string             `json:"token"`
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
+}
+
+// =======================
+// Password Reset Tokens
+// =======================
+func (q *Queries) CreatePasswordResetToken(ctx context.Context, arg CreatePasswordResetTokenParams) (PasswordResetToken, error) {
+	row := q.db.QueryRow(ctx, createPasswordResetToken, arg.UserID, arg.Token, arg.ExpiresAt)
+	var i PasswordResetToken
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Token,
+		&i.ExpiresAt,
+		&i.Used,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const createUser = `-- name: CreateUser :one
 
 INSERT INTO users (id, username, email, first_name, last_name, password_hash, program, graduation_year)
@@ -195,6 +225,16 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 	return i, err
 }
 
+const deleteExpiredPasswordResetTokens = `-- name: DeleteExpiredPasswordResetTokens :exec
+DELETE FROM password_reset_tokens 
+WHERE expires_at < NOW() - INTERVAL '1 hour'
+`
+
+func (q *Queries) DeleteExpiredPasswordResetTokens(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, deleteExpiredPasswordResetTokens)
+	return err
+}
+
 const deleteOldConcertEvents = `-- name: DeleteOldConcertEvents :exec
 DELETE FROM concert_events 
 WHERE event_date < $1
@@ -211,6 +251,16 @@ DELETE FROM users WHERE id = $1
 
 func (q *Queries) DeleteUser(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.Exec(ctx, deleteUser, id)
+	return err
+}
+
+const deleteUserPasswordResetTokens = `-- name: DeleteUserPasswordResetTokens :exec
+DELETE FROM password_reset_tokens 
+WHERE user_id = $1
+`
+
+func (q *Queries) DeleteUserPasswordResetTokens(ctx context.Context, userID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteUserPasswordResetTokens, userID)
 	return err
 }
 
@@ -1053,6 +1103,28 @@ func (q *Queries) GetFeedbackByUser(ctx context.Context, userID uuid.UUID) ([]Fe
 	return items, nil
 }
 
+const getPasswordResetToken = `-- name: GetPasswordResetToken :one
+SELECT id, user_id, token, expires_at, used, created_at FROM password_reset_tokens 
+WHERE token = $1 
+  AND expires_at > NOW() 
+  AND used = FALSE 
+LIMIT 1
+`
+
+func (q *Queries) GetPasswordResetToken(ctx context.Context, token string) (PasswordResetToken, error) {
+	row := q.db.QueryRow(ctx, getPasswordResetToken, token)
+	var i PasswordResetToken
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Token,
+		&i.ExpiresAt,
+		&i.Used,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getUpcomingConcertEventsInCity = `-- name: GetUpcomingConcertEventsInCity :many
 SELECT 
     ce.id, ce.name, ce.event_date, ce.venue_id, ce.genres, ce.price_min, ce.price_max, ce.price_currency, ce.ticket_url, ce.description, ce.status, ce.age_restriction, ce.provider, ce.external_url, ce.created_at, ce.updated_at,
@@ -1320,6 +1392,17 @@ func (q *Queries) GetUsersWithArtists(ctx context.Context) ([]GetUsersWithArtist
 	return items, nil
 }
 
+const markPasswordResetTokenAsUsed = `-- name: MarkPasswordResetTokenAsUsed :exec
+UPDATE password_reset_tokens 
+SET used = TRUE 
+WHERE token = $1
+`
+
+func (q *Queries) MarkPasswordResetTokenAsUsed(ctx context.Context, token string) error {
+	_, err := q.db.Exec(ctx, markPasswordResetTokenAsUsed, token)
+	return err
+}
+
 const pairwiseArtistSimilarityByIDs = `-- name: PairwiseArtistSimilarityByIDs :one
 SELECT 1.0 - artist_distance($1::int, $2::int) AS similarity
 `
@@ -1507,6 +1590,31 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		&i.Program,
 		&i.GraduationYear,
 	)
+	return i, err
+}
+
+const updateUserPassword = `-- name: UpdateUserPassword :one
+UPDATE users 
+SET password_hash = $1, updated_at = NOW()
+WHERE id = $2
+RETURNING id, username, email
+`
+
+type UpdateUserPasswordParams struct {
+	PasswordHash string    `json:"password_hash"`
+	ID           uuid.UUID `json:"id"`
+}
+
+type UpdateUserPasswordRow struct {
+	ID       uuid.UUID `json:"id"`
+	Username string    `json:"username"`
+	Email    string    `json:"email"`
+}
+
+func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) (UpdateUserPasswordRow, error) {
+	row := q.db.QueryRow(ctx, updateUserPassword, arg.PasswordHash, arg.ID)
+	var i UpdateUserPasswordRow
+	err := row.Scan(&i.ID, &i.Username, &i.Email)
 	return i, err
 }
 

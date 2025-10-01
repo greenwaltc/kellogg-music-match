@@ -28,11 +28,17 @@ type Querier interface {
 	// Feedback queries
 	CreateFeedback(ctx context.Context, arg CreateFeedbackParams) (Feedback, error)
 	// =======================
+	// Password Reset Tokens
+	// =======================
+	CreatePasswordResetToken(ctx context.Context, arg CreatePasswordResetTokenParams) (PasswordResetToken, error)
+	// =======================
 	// Users
 	// =======================
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	DeleteExpiredPasswordResetTokens(ctx context.Context) error
 	DeleteOldConcertEvents(ctx context.Context, cutoffDate pgtype.Timestamp) error
 	DeleteUser(ctx context.Context, id uuid.UUID) error
+	DeleteUserPasswordResetTokens(ctx context.Context, userID uuid.UUID) error
 	// =======================
 	// Nearest neighbors (Chamfer-based)
 	// Replace old PWO query with Chamfer under the same exported name
@@ -58,6 +64,7 @@ type Querier interface {
 	GetEventArtists(ctx context.Context, eventID string) ([]GetEventArtistsRow, error)
 	GetEventsForArtist(ctx context.Context, arg GetEventsForArtistParams) ([]GetEventsForArtistRow, error)
 	GetFeedbackByUser(ctx context.Context, userID uuid.UUID) ([]Feedback, error)
+	GetPasswordResetToken(ctx context.Context, token string) (PasswordResetToken, error)
 	GetUpcomingConcertEventsInCity(ctx context.Context, arg GetUpcomingConcertEventsInCityParams) ([]GetUpcomingConcertEventsInCityRow, error)
 	GetUserArtists(ctx context.Context, userID uuid.UUID) ([]GetUserArtistsRow, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
@@ -68,6 +75,7 @@ type Querier interface {
 	// Matching helpers / reports
 	// =======================
 	GetUsersWithArtists(ctx context.Context) ([]GetUsersWithArtistsRow, error)
+	MarkPasswordResetTokenAsUsed(ctx context.Context, token string) error
 	PairwiseArtistSimilarityByIDs(ctx context.Context, arg PairwiseArtistSimilarityByIDsParams) (int32, error)
 	// =======================
 	// New similarity APIs (artist + set)
@@ -77,6 +85,7 @@ type Querier interface {
 	SearchArtists(ctx context.Context, arg SearchArtistsParams) ([]Artist, error)
 	SetUserArtists(ctx context.Context, arg SetUserArtistsParams) error
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
+	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) (UpdateUserPasswordRow, error)
 	UpsertConcertArtist(ctx context.Context, arg UpsertConcertArtistParams) (ConcertArtist, error)
 	UpsertConcertEvent(ctx context.Context, arg UpsertConcertEventParams) (ConcertEvent, error)
 	UpsertEventArtist(ctx context.Context, arg UpsertEventArtistParams) error

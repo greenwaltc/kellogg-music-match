@@ -455,3 +455,38 @@ WHERE ce.event_date >= CURRENT_TIMESTAMP
   AND v.city ILIKE '%Chicago%'
   AND ce.status = 'onsale'
   AND (sqlc.arg(artist_name) = '' OR ca.name ILIKE '%' || sqlc.arg(artist_name) || '%');
+
+-- =======================
+-- Password Reset Tokens
+-- =======================
+
+-- name: CreatePasswordResetToken :one
+INSERT INTO password_reset_tokens (user_id, token, expires_at)
+VALUES (sqlc.arg(user_id), sqlc.arg(token), sqlc.arg(expires_at))
+RETURNING *;
+
+-- name: GetPasswordResetToken :one
+SELECT * FROM password_reset_tokens 
+WHERE token = sqlc.arg(token) 
+  AND expires_at > NOW() 
+  AND used = FALSE 
+LIMIT 1;
+
+-- name: MarkPasswordResetTokenAsUsed :exec
+UPDATE password_reset_tokens 
+SET used = TRUE 
+WHERE token = sqlc.arg(token);
+
+-- name: DeleteExpiredPasswordResetTokens :exec
+DELETE FROM password_reset_tokens 
+WHERE expires_at < NOW() - INTERVAL '1 hour';
+
+-- name: DeleteUserPasswordResetTokens :exec
+DELETE FROM password_reset_tokens 
+WHERE user_id = sqlc.arg(user_id);
+
+-- name: UpdateUserPassword :one
+UPDATE users 
+SET password_hash = sqlc.arg(password_hash), updated_at = NOW()
+WHERE id = sqlc.arg(id)
+RETURNING id, username, email;

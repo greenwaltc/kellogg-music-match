@@ -66,8 +66,12 @@ func main() {
 	// Initialize JWT service
 	jwtService := business.NewJWTService(&cfg.JWT)
 
+	// Initialize email service
+	emailService := business.NewEmailService(&cfg.Email)
+
 	// Initialize business services with config
 	authService := business.NewAuthService(userRepo, jwtService)
+	passwordResetService := business.NewPasswordResetService(userRepo, emailService)
 	healthService := business.NewHealthService()
 	matchingService := business.NewMatchingServiceWithConfig(userRepo, matchingEngine, &cfg.Artist)
 	feedbackService := business.NewFeedbackService(userRepo)
@@ -129,7 +133,7 @@ func main() {
 	}
 
 	// Create service wrappers that implement the OpenAPI service interfaces
-	authAPIService := NewAuthAPIServiceWrapper(authService)
+	authAPIService := NewAuthAPIServiceWrapper(authService, passwordResetService)
 	healthAPIService := NewHealthAPIServiceWrapper(healthService)
 	matchingAPIService := NewMatchingAPIServiceWrapper(matchingService)
 	feedbackAPIService := NewFeedbackAPIServiceWrapper(feedbackService)

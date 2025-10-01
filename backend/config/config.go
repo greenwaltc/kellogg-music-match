@@ -15,6 +15,7 @@ type Config struct {
 	Ticketmaster TicketmasterConfig
 	Debug        DebugConfig
 	JWT          JWTConfig
+	Email        EmailConfig
 }
 
 // ServerConfig holds server-related configuration
@@ -65,6 +66,19 @@ type TicketmasterConfig struct {
 // DebugConfig holds debug-related configuration
 type DebugConfig struct {
 	Enabled bool
+}
+
+// EmailConfig holds email service configuration
+type EmailConfig struct {
+	Provider  string // "sendgrid", "ses", "smtp"
+	APIKey    string // For SendGrid
+	FromEmail string
+	FromName  string
+	SMTPHost  string // For SMTP
+	SMTPPort  string
+	SMTPUser  string
+	SMTPPass  string
+	Enabled   bool
 }
 
 // JWTConfig holds JWT-related configuration
@@ -122,6 +136,17 @@ func Load() *Config {
 			SecretKey:    getEnvWithDefault("JWT_SECRET_KEY", "your-secret-key-change-in-production"),
 			ExpiryHours:  getEnvIntWithDefault("JWT_EXPIRY_HOURS", 24),
 			RefreshHours: getEnvIntWithDefault("JWT_REFRESH_HOURS", 168), // 7 days
+		},
+		Email: EmailConfig{
+			Provider:  getEnvWithDefault("EMAIL_PROVIDER", "sendgrid"),
+			APIKey:    getEnvWithDefault("SENDGRID_API_KEY", ""),
+			FromEmail: getEnvWithDefault("EMAIL_FROM_EMAIL", "noreply@kellogg-music-match.com"),
+			FromName:  getEnvWithDefault("EMAIL_FROM_NAME", "Kellogg Music Match"),
+			SMTPHost:  getEnvWithDefault("SMTP_HOST", ""),
+			SMTPPort:  getEnvWithDefault("SMTP_PORT", "587"),
+			SMTPUser:  getEnvWithDefault("SMTP_USER", ""),
+			SMTPPass:  getEnvWithDefault("SMTP_PASS", ""),
+			Enabled:   getEnvBoolWithDefault("EMAIL_ENABLED", false),
 		},
 	}
 }
