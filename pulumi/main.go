@@ -9,6 +9,7 @@ import (
 	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
 	networkingv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/networking/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
+	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 )
 
 func main() {
@@ -731,6 +732,14 @@ echo "🎉 MusicBrainz data loading completed"`),
 			return err
 		}
 
+		// Read ingress class from Pulumi config (default to traefik). This allows
+		// stacks to override the controller (e.g. local development can set nginx).
+		cfg := config.New(ctx, "")
+		ingressClass := cfg.Get("ingressClass")
+		if ingressClass == "" {
+			ingressClass = "traefik"
+		}
+
 		// Create ingress for both UI and backend
 		ingress, err := networkingv1.NewIngress(ctx, "kmm-ingress", &networkingv1.IngressArgs{
 			Metadata: &metav1.ObjectMetaArgs{
@@ -740,15 +749,16 @@ echo "🎉 MusicBrainz data loading completed"`),
 					"app": pulumi.String("kmm"),
 				},
 				Annotations: pulumi.StringMap{
-					// Use nginx ingress controller in local/dev environments where Traefik
-					// may not be installed. For Traefik, set this back to the Traefik annotation.
-					"kubernetes.io/ingress.class": pulumi.String("nginx"),
+					// Allow the ingress class to be configured per-stack. Default is
+					// traefik; local stacks can set this to nginx.
+					"kubernetes.io/ingress.class": pulumi.String(ingressClass),
 				},
 			},
 			Spec: &networkingv1.IngressSpecArgs{
-				// Use the nginx IngressClass which exists in the local cluster. Change
-				// back to "traefik" if Traefik is installed in your environment.
-				IngressClassName: pulumi.String("nginx"),
+				// Use the configured IngressClass which exists in the cluster. This
+				// defaults to "traefik" but can be overridden via Pulumi config
+				// (e.g. set ingressClass=nginx for local development).
+				IngressClassName: pulumi.String(ingressClass),
 				Rules: networkingv1.IngressRuleArray{
 					// UI ingress rule for traefik.me domain
 					&networkingv1.IngressRuleArgs{
