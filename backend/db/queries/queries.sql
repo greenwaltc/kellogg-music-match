@@ -357,22 +357,44 @@ SELECT
     v.state as venue_state,
     v.country as venue_country,
     v.postal as venue_postal,
-    v.capacity as venue_capacity
+    v.capacity as venue_capacity,
+    /* Aggregated artist names */
+    array_remove(array_agg(DISTINCT ca.name), NULL) AS artist_names,
+    /* User interest buckets */
+  array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'INTERESTED'), NULL) AS interested_user_ids,
+  array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'GOING'), NULL) AS going_user_ids,
+  array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'LOOKING_FOR_GROUP'), NULL) AS looking_for_group_user_ids
 FROM concert_events ce
 LEFT JOIN venues v ON ce.venue_id = v.id
+LEFT JOIN concert_event_artists cea ON ce.id = cea.event_id
+LEFT JOIN concert_artists ca ON cea.artist_id = ca.id
+LEFT JOIN user_concert_event_interest ucei ON ucei.event_id = ce.id
 WHERE ce.event_date >= sqlc.arg(start_date)
   AND ce.event_date <= sqlc.arg(end_date)
   AND (sqlc.arg(city)::text IS NULL OR v.city ILIKE '%' || sqlc.arg(city) || '%')
   AND (sqlc.arg(status)::text IS NULL OR ce.status = sqlc.arg(status))
+GROUP BY ce.id, v.name, v.street, v.city, v.state, v.country, v.postal, v.capacity
 ORDER BY ce.event_date ASC
 LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off_set);
+
+-- name: UpsertUserConcertEventInterest :exec
+INSERT INTO user_concert_event_interest (user_id, event_id, interest_status)
+VALUES (sqlc.arg(user_id), sqlc.arg(event_id), sqlc.arg(interest_status))
+ON CONFLICT (user_id, event_id)
+DO UPDATE SET interest_status = EXCLUDED.interest_status, updated_at = NOW();
+
+-- name: DeleteUserConcertEventInterest :exec
+DELETE FROM user_concert_event_interest
+WHERE user_id = sqlc.arg(user_id) AND event_id = sqlc.arg(event_id);
 
 -- name: GetEventArtists :many
 SELECT 
     ca.id,
     ca.name,
     ca.genres,
-    cea.role
+  cea.role,
+  /* How many users have any interest in this event (all statuses) */
+  (SELECT COUNT(DISTINCT ui.user_id) FROM user_concert_event_interest ui WHERE ui.event_id = cea.event_id) AS interested_user_count
 FROM concert_artists ca
 JOIN concert_event_artists cea ON ca.id = cea.artist_id
 WHERE cea.event_id = sqlc.arg(event_id);
@@ -387,14 +409,19 @@ SELECT
     v.country as venue_country,
     v.postal as venue_postal,
     v.capacity as venue_capacity,
-    ca.name as artist_name
+    ca.name as artist_name,
+  array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'INTERESTED'), NULL) AS interested_user_ids,
+  array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'GOING'), NULL) AS going_user_ids,
+  array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'LOOKING_FOR_GROUP'), NULL) AS looking_for_group_user_ids
 FROM concert_events ce
 LEFT JOIN venues v ON ce.venue_id = v.id
 JOIN concert_event_artists cea ON ce.id = cea.event_id
 JOIN concert_artists ca ON cea.artist_id = ca.id
+ LEFT JOIN user_concert_event_interest ucei ON ucei.event_id = ce.id
 WHERE ca.name ILIKE '%' || sqlc.arg(artist_name) || '%'
   AND ce.event_date >= CURRENT_TIMESTAMP
   AND (sqlc.arg(city)::text IS NULL OR v.city ILIKE '%' || sqlc.arg(city) || '%')
+GROUP BY ce.id, v.name, v.street, v.city, v.state, v.country, v.postal, v.capacity, ca.name
 ORDER BY ce.event_date ASC
 LIMIT sqlc.arg(lim);
 
@@ -403,7 +430,11 @@ DELETE FROM concert_events
 WHERE event_date < sqlc.arg(cutoff_date);
 
 -- name: GetConcertEventCount :one
-SELECT COUNT(*) FROM concert_events;
+-- Optional interest_status filter: if provided (non-empty), counts events having at least one user with that status
+SELECT COUNT(DISTINCT ce.id)
+FROM concert_events ce
+LEFT JOIN user_concert_event_interest ucei ON ucei.event_id = ce.id
+WHERE (sqlc.arg(interest_status) = '' OR ucei.interest_status = sqlc.arg(interest_status) OR ucei.interest_status IS NULL);
 
 -- name: GetUpcomingConcertEventsInCity :many
 SELECT 
@@ -414,12 +445,17 @@ SELECT
     v.state as venue_state,
     v.country as venue_country,
     v.postal as venue_postal,
-    v.capacity as venue_capacity
+    v.capacity as venue_capacity,
+  array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'INTERESTED'), NULL) AS interested_user_ids,
+  array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'GOING'), NULL) AS going_user_ids,
+  array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'LOOKING_FOR_GROUP'), NULL) AS looking_for_group_user_ids
 FROM concert_events ce
 LEFT JOIN venues v ON ce.venue_id = v.id
+LEFT JOIN user_concert_event_interest ucei ON ucei.event_id = ce.id
 WHERE ce.event_date >= CURRENT_TIMESTAMP
   AND v.city ILIKE '%' || sqlc.arg(city) || '%'
   AND ce.status = 'onsale'
+GROUP BY ce.id, v.name, v.street, v.city, v.state, v.country, v.postal, v.capacity
 ORDER BY ce.event_date ASC
 LIMIT sqlc.arg(lim);
 
@@ -432,11 +468,16 @@ SELECT
     v.state as venue_state,
     v.country as venue_country,
     v.postal as venue_postal,
-    v.capacity as venue_capacity
+    v.capacity as venue_capacity,
+  COALESCE(jsonb_agg(DISTINCT jsonb_build_object('id', ca.id, 'name', ca.name, 'genres', ca.genres)) FILTER (WHERE ca.id IS NOT NULL), '[]'::jsonb) AS artists_json,
+  (array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'INTERESTED'), NULL))::text[] AS interested_user_ids,
+  (array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'GOING'), NULL))::text[] AS going_user_ids,
+  (array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'LOOKING_FOR_GROUP'), NULL))::text[] AS looking_for_group_user_ids
 FROM concert_events ce
 LEFT JOIN venues v ON ce.venue_id = v.id
 LEFT JOIN concert_event_artists cea ON ce.id = cea.event_id
 LEFT JOIN concert_artists ca ON cea.artist_id = ca.id
+ LEFT JOIN user_concert_event_interest ucei ON ucei.event_id = ce.id
 WHERE ce.event_date >= CURRENT_TIMESTAMP
   AND v.city ILIKE '%Chicago%'
   AND ce.status = 'onsale'
@@ -451,10 +492,40 @@ FROM concert_events ce
 LEFT JOIN venues v ON ce.venue_id = v.id
 LEFT JOIN concert_event_artists cea ON ce.id = cea.event_id
 LEFT JOIN concert_artists ca ON cea.artist_id = ca.id
+LEFT JOIN user_concert_event_interest ucei ON ucei.event_id = ce.id
 WHERE ce.event_date >= CURRENT_TIMESTAMP
   AND v.city ILIKE '%Chicago%'
   AND ce.status = 'onsale'
-  AND (sqlc.arg(artist_name) = '' OR ca.name ILIKE '%' || sqlc.arg(artist_name) || '%');
+  AND (sqlc.arg(artist_name) = '' OR ca.name ILIKE '%' || sqlc.arg(artist_name) || '%')
+  AND (sqlc.arg(interest_status) = '' OR ucei.interest_status = sqlc.arg(interest_status) OR ucei.interest_status IS NULL);
+
+-- name: GetConcertEventsInDateRangeWithInterest :many
+-- Returns events within date range plus associated venue, artists, and user interest buckets
+SELECT 
+    ce.*,
+    v.name as venue_name,
+    v.street as venue_street,
+    v.city as venue_city,
+    v.state as venue_state,
+    v.country as venue_country,
+    v.postal as venue_postal,
+    v.capacity as venue_capacity,
+    array_remove(array_agg(DISTINCT ca.name), NULL) AS artist_names,
+  array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'INTERESTED'), NULL) AS interested_user_ids,
+  array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'GOING'), NULL) AS going_user_ids,
+  array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'LOOKING_FOR_GROUP'), NULL) AS looking_for_group_user_ids
+FROM concert_events ce
+LEFT JOIN venues v ON ce.venue_id = v.id
+LEFT JOIN concert_event_artists cea ON ce.id = cea.event_id
+LEFT JOIN concert_artists ca ON cea.artist_id = ca.id
+LEFT JOIN user_concert_event_interest ucei ON ucei.event_id = ce.id
+WHERE ce.event_date >= sqlc.arg(start_date)
+  AND ce.event_date <= sqlc.arg(end_date)
+  AND (sqlc.arg(city)::text IS NULL OR v.city ILIKE '%' || sqlc.arg(city) || '%')
+  AND (sqlc.arg(status)::text IS NULL OR ce.status = sqlc.arg(status))
+GROUP BY ce.id, v.name, v.street, v.city, v.state, v.country, v.postal, v.capacity
+ORDER BY ce.event_date ASC
+LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off_set);
 
 -- =======================
 -- Password Reset Tokens

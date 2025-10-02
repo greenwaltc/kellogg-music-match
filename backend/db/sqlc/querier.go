@@ -38,6 +38,7 @@ type Querier interface {
 	DeleteExpiredPasswordResetTokens(ctx context.Context) error
 	DeleteOldConcertEvents(ctx context.Context, cutoffDate pgtype.Timestamp) error
 	DeleteUser(ctx context.Context, id uuid.UUID) error
+	DeleteUserConcertEventInterest(ctx context.Context, arg DeleteUserConcertEventInterestParams) error
 	DeleteUserPasswordResetTokens(ctx context.Context, userID uuid.UUID) error
 	// =======================
 	// Nearest neighbors (Chamfer-based)
@@ -56,11 +57,14 @@ type Querier interface {
 	GetArtistByID(ctx context.Context, id int32) (Artist, error)
 	GetArtistByName(ctx context.Context, name string) (Artist, error)
 	GetArtistUsers(ctx context.Context, artistID int32) ([]GetArtistUsersRow, error)
-	GetChicagoEventsCountWithArtistSearch(ctx context.Context, artistName interface{}) (int64, error)
+	GetChicagoEventsCountWithArtistSearch(ctx context.Context, arg GetChicagoEventsCountWithArtistSearchParams) (int64, error)
 	GetChicagoEventsWithArtistSearch(ctx context.Context, arg GetChicagoEventsWithArtistSearchParams) ([]GetChicagoEventsWithArtistSearchRow, error)
 	GetConcertEventByID(ctx context.Context, id string) (GetConcertEventByIDRow, error)
-	GetConcertEventCount(ctx context.Context) (int64, error)
+	// Optional interest_status filter: if provided (non-empty), counts events having at least one user with that status
+	GetConcertEventCount(ctx context.Context, interestStatus interface{}) (int64, error)
 	GetConcertEventsInDateRange(ctx context.Context, arg GetConcertEventsInDateRangeParams) ([]GetConcertEventsInDateRangeRow, error)
+	// Returns events within date range plus associated venue, artists, and user interest buckets
+	GetConcertEventsInDateRangeWithInterest(ctx context.Context, arg GetConcertEventsInDateRangeWithInterestParams) ([]GetConcertEventsInDateRangeWithInterestRow, error)
 	GetEventArtists(ctx context.Context, eventID string) ([]GetEventArtistsRow, error)
 	GetEventsForArtist(ctx context.Context, arg GetEventsForArtistParams) ([]GetEventsForArtistRow, error)
 	GetFeedbackByUser(ctx context.Context, userID uuid.UUID) ([]Feedback, error)
@@ -89,6 +93,7 @@ type Querier interface {
 	UpsertConcertArtist(ctx context.Context, arg UpsertConcertArtistParams) (ConcertArtist, error)
 	UpsertConcertEvent(ctx context.Context, arg UpsertConcertEventParams) (ConcertEvent, error)
 	UpsertEventArtist(ctx context.Context, arg UpsertEventArtistParams) error
+	UpsertUserConcertEventInterest(ctx context.Context, arg UpsertUserConcertEventInterestParams) error
 	// =======================
 	// Concert Events
 	// =======================

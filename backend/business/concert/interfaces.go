@@ -18,6 +18,10 @@ type Event struct {
 	Description    string     `json:"description,omitempty"`
 	Status         string     `json:"status"` // e.g., "onsale", "offsale", "cancelled"
 	AgeRestriction string     `json:"ageRestriction,omitempty"`
+	// Aggregated user interest buckets (UUIDs as strings)
+	InterestedUserIDs      []string `json:"interestedUserIds,omitempty"`
+	GoingUserIDs           []string `json:"goingUserIds,omitempty"`
+	LookingForGroupUserIDs []string `json:"lookingForGroupUserIds,omitempty"`
 }
 
 // Venue represents a concert venue

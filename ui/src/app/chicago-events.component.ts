@@ -30,6 +30,10 @@ interface ChicagoEvent {
     currency: string;
   };
   ticketUrl?: string;
+  // Backend aggregated user interest buckets (new fields)
+  interestedUserIds?: string[];
+  goingUserIds?: string[];
+  lookingForGroupUserIds?: string[];
 }
 
 interface ChicagoEventsResponse {

@@ -130,6 +130,18 @@ type UserArtist struct {
 	Rank      int16              `json:"rank"`
 }
 
+// User interest (INTERESTED, GOING, LOOKING_FOR_GROUP) for concert events
+type UserConcertEventInterest struct {
+	UserID  uuid.UUID `json:"user_id"`
+	EventID string    `json:"event_id"`
+	// Enumerated interest status: INTERESTED | GOING | LOOKING_FOR_GROUP
+	InterestStatus string `json:"interest_status"`
+	// Optional free-form note by user about their attendance plans
+	Note      pgtype.Text        `json:"note"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
 type UserSubmittedArtist struct {
 	ID        int32              `json:"id"`
 	Name      string             `json:"name"`

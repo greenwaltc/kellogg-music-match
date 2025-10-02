@@ -66,6 +66,82 @@ paths:
                 required:
                   - status
                   - time
+  /concerts/{eventId}/interest:
+    post:
+      tags:
+        - Concerts
+      summary: Set or update the authenticated user's interest for an event
+      operationId: setEventInterest
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Concert event ID
+        - name: X-User-Username
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Authenticated username
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                interestType:
+                  $ref: '#/components/schemas/EventInterestType'
+              required:
+                - interestType
+      responses:
+        '204':
+          description: Interest set successfully
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Event not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags:
+        - Concerts
+      summary: Remove the authenticated user's interest for an event
+      operationId: removeEventInterest
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: X-User-Username
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Interest removed
+        '404':
+          description: Event not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /artists/search:
     get:
@@ -1036,6 +1112,24 @@ components:
           format: uri
           description: URL to purchase tickets
           example: "https://www.ticketmaster.com/event/123"
+        interestedUserIds:
+          type: array
+          description: User IDs with INTERESTED status
+          items:
+            type: string
+          example: ["550e8400-e29b-41d4-a716-446655440000"]
+        goingUserIds:
+          type: array
+          description: User IDs with GOING status
+          items:
+            type: string
+          example: ["550e8400-e29b-41d4-a716-446655440111"]
+        lookingForGroupUserIds:
+          type: array
+          description: User IDs with LOOKING_FOR_GROUP status
+          items:
+            type: string
+          example: ["550e8400-e29b-41d4-a716-446655440222"]
       required:
         - id
         - name
@@ -1215,6 +1309,12 @@ components:
           example: "Operation completed successfully"
       required:
         - message
+
+    EventInterestType:
+      type: string
+      description: Enum of possible user interest statuses for an event
+      enum: [INTERESTED, GOING, LOOKING_FOR_GROUP]
+      example: INTERESTED
 
   securitySchemes:
     # JWT implementation now active

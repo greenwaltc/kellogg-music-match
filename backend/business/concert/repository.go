@@ -2,9 +2,14 @@ package concert
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"math/big"
+	"strconv"
+	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/greenwaltc/kellogg-music-match/backend/config"
 	database "github.com/greenwaltc/kellogg-music-match/backend/db/sqlc"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -19,6 +24,9 @@ type Repository interface {
 	IsHealthy(ctx context.Context) error
 	GetChicagoEvents(ctx context.Context, artistName *string, limit int32, offset int32) ([]*Event, error)
 	GetChicagoEventsCount(ctx context.Context, artistName *string) (int64, error)
+	// User interest operations
+	UpsertUserInterest(ctx context.Context, userID string, eventID string, status string) error
+	RemoveUserInterest(ctx context.Context, userID string, eventID string) error
 }
 
 // PostgreSQLRepository implements Repository using SQLC and pgx
@@ -144,7 +152,8 @@ func (r *PostgreSQLRepository) DeleteOldEvents(ctx context.Context, cutoffDate t
 
 // GetEventCount returns the total number of events in the database
 func (r *PostgreSQLRepository) GetEventCount(ctx context.Context) (int64, error) {
-	count, err := r.queries.GetConcertEventCount(ctx)
+	// Pass empty interest status filter (means no filtering)
+	count, err := r.queries.GetConcertEventCount(ctx, "")
 	if err != nil {
 		return 0, fmt.Errorf("failed to get concert event count: %w", err)
 	}
@@ -181,11 +190,14 @@ func (r *PostgreSQLRepository) GetChicagoEvents(ctx context.Context, artistName 
 	events := make([]*Event, 0, len(rows))
 	for _, row := range rows {
 		event := &Event{
-			ID:        row.ID,
-			Name:      row.Name,
-			Date:      row.EventDate.Time,
-			Status:    row.Status,
-			TicketURL: row.TicketUrl.String,
+			ID:             row.ID,
+			Name:           row.Name,
+			Date:           row.EventDate.Time,
+			Status:         row.Status,
+			TicketURL:      row.TicketUrl.String,
+			Description:    row.Description.String,
+			AgeRestriction: row.AgeRestriction.String,
+			Genres:         row.Genres,
 			Venue: Venue{
 				ID:   row.VenueID.String,
 				Name: row.VenueName.String,
@@ -200,21 +212,30 @@ func (r *PostgreSQLRepository) GetChicagoEvents(ctx context.Context, artistName 
 			},
 		}
 
-		// Fetch artists for this event
-		eventArtists, err := r.queries.GetEventArtists(ctx, row.ID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get artists for event %s: %w", row.ID, err)
+		// Price range (convert numeric -> float)
+		minPrice := numericToFloat(row.PriceMin)
+		maxPrice := numericToFloat(row.PriceMax)
+		if minPrice > 0 || maxPrice > 0 || row.PriceCurrency.String != "" {
+			event.PriceRange = PriceRange{
+				Min:      minPrice,
+				Max:      maxPrice,
+				Currency: row.PriceCurrency.String,
+			}
 		}
 
-		artists := make([]Artist, 0, len(eventArtists))
-		for _, artist := range eventArtists {
-			artists = append(artists, Artist{
-				ID:     artist.ID,
-				Name:   artist.Name,
-				Genres: artist.Genres,
-			})
+		// User interest buckets (already []string)
+		event.InterestedUserIDs = row.InterestedUserIds
+		event.GoingUserIDs = row.GoingUserIds
+		event.LookingForGroupUserIDs = row.LookingForGroupUserIds
+
+		// Parse aggregated artists JSON
+		if row.ArtistsJson != nil {
+			parsedArtists, err := parseArtistsJSON(row.ArtistsJson)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse artists for event %s: %w", row.ID, err)
+			}
+			event.Artists = parsedArtists
 		}
-		event.Artists = artists
 
 		events = append(events, event)
 	}
@@ -229,7 +250,8 @@ func (r *PostgreSQLRepository) GetChicagoEventsCount(ctx context.Context, artist
 		artistNameParam = *artistName
 	}
 
-	count, err := r.queries.GetChicagoEventsCountWithArtistSearch(ctx, artistNameParam)
+	params := database.GetChicagoEventsCountWithArtistSearchParams{ArtistName: artistNameParam, InterestStatus: ""}
+	count, err := r.queries.GetChicagoEventsCountWithArtistSearch(ctx, params)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get Chicago events count: %w", err)
 	}
@@ -244,13 +266,15 @@ func (r *PostgreSQLRepository) Close() {
 
 // MockRepository is a simple in-memory implementation for testing
 type MockRepository struct {
-	events map[string]*Event
+	events    map[string]*Event
+	interests map[string]map[string]string // eventID -> userID -> status
 }
 
 // NewMockRepository creates a new mock repository
 func NewMockRepository() Repository {
 	return &MockRepository{
-		events: make(map[string]*Event),
+		events:    make(map[string]*Event),
+		interests: make(map[string]map[string]string),
 	}
 }
 
@@ -288,12 +312,13 @@ func (m *MockRepository) GetChicagoEvents(ctx context.Context, artistName *strin
 			continue
 		}
 
-		// Artist name filter
+		// Artist name filter (case-insensitive prefix match)
 		if artistName != nil && *artistName != "" {
+			query := strings.ToLower(*artistName)
 			found := false
 			for _, artist := range event.Artists {
-				if len(artist.Name) > 0 && len(*artistName) > 0 &&
-					artist.Name[:min(len(artist.Name), len(*artistName))] == (*artistName)[:min(len(artist.Name), len(*artistName))] {
+				nameLower := strings.ToLower(artist.Name)
+				if len(nameLower) >= len(query) && nameLower[:len(query)] == query {
 					found = true
 					break
 				}
@@ -349,6 +374,100 @@ func (m *MockRepository) GetChicagoEventsCount(ctx context.Context, artistName *
 	return count, nil
 }
 
+// UpsertUserInterest records or updates a user's interest for an event in the mock repo.
+func (m *MockRepository) UpsertUserInterest(ctx context.Context, userID string, eventID string, status string) error {
+	if _, ok := m.events[eventID]; !ok {
+		return ErrEventNotFound
+	}
+	if m.interests[eventID] == nil {
+		m.interests[eventID] = make(map[string]string)
+	}
+	m.interests[eventID][userID] = status
+	// Reflect aggregate buckets in Event struct for retrieval
+	evt := m.events[eventID]
+	// Simple rebuild of buckets
+	interested := []string{}
+	going := []string{}
+	lfg := []string{}
+	for uid, st := range m.interests[eventID] {
+		switch st {
+		case "INTERESTED":
+			interested = append(interested, uid)
+		case "GOING":
+			going = append(going, uid)
+		case "LOOKING_FOR_GROUP":
+			lfg = append(lfg, uid)
+		}
+	}
+	evt.InterestedUserIDs = interested
+	evt.GoingUserIDs = going
+	evt.LookingForGroupUserIDs = lfg
+	return nil
+}
+
+// RemoveUserInterest removes a user's interest in the mock repo.
+func (m *MockRepository) RemoveUserInterest(ctx context.Context, userID string, eventID string) error {
+	if m.interests[eventID] != nil {
+		delete(m.interests[eventID], userID)
+		if len(m.interests[eventID]) == 0 {
+			delete(m.interests, eventID)
+		}
+	}
+	// Recompute buckets
+	if evt, ok := m.events[eventID]; ok {
+		interested := []string{}
+		going := []string{}
+		lfg := []string{}
+		for uid, st := range m.interests[eventID] {
+			switch st {
+			case "INTERESTED":
+				interested = append(interested, uid)
+			case "GOING":
+				going = append(going, uid)
+			case "LOOKING_FOR_GROUP":
+				lfg = append(lfg, uid)
+			}
+		}
+		evt.InterestedUserIDs = interested
+		evt.GoingUserIDs = going
+		evt.LookingForGroupUserIDs = lfg
+	}
+	return nil
+}
+
+// Postgres implementations
+func (r *PostgreSQLRepository) UpsertUserInterest(ctx context.Context, userID string, eventID string, status string) error {
+	// Basic validation of enum
+	switch status {
+	case "INTERESTED", "GOING", "LOOKING_FOR_GROUP":
+	default:
+		return fmt.Errorf("invalid interest status: %s", status)
+	}
+	params := database.UpsertUserConcertEventInterestParams{EventID: eventID, InterestStatus: status}
+	// Accept plain string userID (UUID format expected) – rely on DB to validate; convert to uuid via pgx text -> use google/uuid parse
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		return fmt.Errorf("invalid userID uuid: %w", err)
+	}
+	params.UserID = uid
+	if err := r.queries.UpsertUserConcertEventInterest(ctx, params); err != nil {
+		return fmt.Errorf("upsert user interest failed: %w", err)
+	}
+	return nil
+}
+
+func (r *PostgreSQLRepository) RemoveUserInterest(ctx context.Context, userID string, eventID string) error {
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		return fmt.Errorf("invalid userID uuid: %w", err)
+	}
+	params := database.DeleteUserConcertEventInterestParams{UserID: uid, EventID: eventID}
+	if err := r.queries.DeleteUserConcertEventInterest(ctx, params); err != nil {
+		return fmt.Errorf("remove user interest failed: %w", err)
+	}
+	return nil
+}
+
 func min(a, b int) int {
 	if a < b {
 		return a
@@ -356,7 +475,71 @@ func min(a, b int) int {
 	return b
 }
 
+// toStringSlice attempts to coerce various interface{} types returned by sqlc/pgx for text[] into a []string.
+// sqlc used interface{} because it couldn't infer the array type for the aggregated user UUIDs.
+// parseArtistsJSON converts the aggregated jsonb artists array into []Artist
+func parseArtistsJSON(raw interface{}) ([]Artist, error) {
+	if raw == nil {
+		return nil, nil
+	}
+	// raw could be []uint8 or string depending on pgx jsonb decoding
+	var bytes []byte
+	switch v := raw.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	default:
+		// Fallback: JSON marshal the interface
+		b, err := json.Marshal(v)
+		if err != nil {
+			return nil, err
+		}
+		bytes = b
+	}
+	// Expect array of objects with id, name, genres
+	var arr []struct {
+		ID     string   `json:"id"`
+		Name   string   `json:"name"`
+		Genres []string `json:"genres"`
+	}
+	if err := json.Unmarshal(bytes, &arr); err != nil {
+		return nil, err
+	}
+	artists := make([]Artist, 0, len(arr))
+	for _, a := range arr {
+		artists = append(artists, Artist{ID: a.ID, Name: a.Name, Genres: a.Genres})
+	}
+	return artists, nil
+}
+
+// numericToFloat converts a pgtype.Numeric to float64 best-effort.
+func numericToFloat(n pgtype.Numeric) float64 {
+	if !n.Valid {
+		return 0
+	}
+	// Convert through big.Rat using Scan/Value conversions. pgtype.Numeric implements Scan/Value for database/sql compatibility.
+	// We attempt: 1) deserialize to string via fmt, 2) parse as float.
+	// fmt.Sprintf("%v", n) will yield something like {NaN} for invalid, but we already checked Valid.
+	s := fmt.Sprintf("%v", n)
+	if s == "" || s == "<nil>" {
+		return 0
+	}
+	if f, err := strconv.ParseFloat(s, 64); err == nil {
+		return f
+	}
+	// Fallback: try big.Rat parse
+	var rat big.Rat
+	if _, ok := rat.SetString(s); ok {
+		f, _ := rat.Float64()
+		return f
+	}
+	return 0
+}
+
 // Common errors
 var (
-	ErrEventNotFound = fmt.Errorf("event not found")
+	ErrEventNotFound     = fmt.Errorf("event not found")
+	ErrProviderUnhealthy = fmt.Errorf("provider is unhealthy")
+	ErrRepositoryFailure = fmt.Errorf("repository operation failed")
 )

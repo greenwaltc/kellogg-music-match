@@ -254,6 +254,21 @@ func (q *Queries) DeleteUser(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
+const deleteUserConcertEventInterest = `-- name: DeleteUserConcertEventInterest :exec
+DELETE FROM user_concert_event_interest
+WHERE user_id = $1 AND event_id = $2
+`
+
+type DeleteUserConcertEventInterestParams struct {
+	UserID  uuid.UUID `json:"user_id"`
+	EventID string    `json:"event_id"`
+}
+
+func (q *Queries) DeleteUserConcertEventInterest(ctx context.Context, arg DeleteUserConcertEventInterestParams) error {
+	_, err := q.db.Exec(ctx, deleteUserConcertEventInterest, arg.UserID, arg.EventID)
+	return err
+}
+
 const deleteUserPasswordResetTokens = `-- name: DeleteUserPasswordResetTokens :exec
 DELETE FROM password_reset_tokens 
 WHERE user_id = $1
@@ -627,14 +642,21 @@ FROM concert_events ce
 LEFT JOIN venues v ON ce.venue_id = v.id
 LEFT JOIN concert_event_artists cea ON ce.id = cea.event_id
 LEFT JOIN concert_artists ca ON cea.artist_id = ca.id
+LEFT JOIN user_concert_event_interest ucei ON ucei.event_id = ce.id
 WHERE ce.event_date >= CURRENT_TIMESTAMP
   AND v.city ILIKE '%Chicago%'
   AND ce.status = 'onsale'
   AND ($1 = '' OR ca.name ILIKE '%' || $1 || '%')
+  AND ($2 = '' OR ucei.interest_status = $2 OR ucei.interest_status IS NULL)
 `
 
-func (q *Queries) GetChicagoEventsCountWithArtistSearch(ctx context.Context, artistName interface{}) (int64, error) {
-	row := q.db.QueryRow(ctx, getChicagoEventsCountWithArtistSearch, artistName)
+type GetChicagoEventsCountWithArtistSearchParams struct {
+	ArtistName     interface{} `json:"artist_name"`
+	InterestStatus interface{} `json:"interest_status"`
+}
+
+func (q *Queries) GetChicagoEventsCountWithArtistSearch(ctx context.Context, arg GetChicagoEventsCountWithArtistSearchParams) (int64, error) {
+	row := q.db.QueryRow(ctx, getChicagoEventsCountWithArtistSearch, arg.ArtistName, arg.InterestStatus)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -649,11 +671,16 @@ SELECT
     v.state as venue_state,
     v.country as venue_country,
     v.postal as venue_postal,
-    v.capacity as venue_capacity
+    v.capacity as venue_capacity,
+  COALESCE(jsonb_agg(DISTINCT jsonb_build_object('id', ca.id, 'name', ca.name, 'genres', ca.genres)) FILTER (WHERE ca.id IS NOT NULL), '[]'::jsonb) AS artists_json,
+  (array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'INTERESTED'), NULL))::text[] AS interested_user_ids,
+  (array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'GOING'), NULL))::text[] AS going_user_ids,
+  (array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'LOOKING_FOR_GROUP'), NULL))::text[] AS looking_for_group_user_ids
 FROM concert_events ce
 LEFT JOIN venues v ON ce.venue_id = v.id
 LEFT JOIN concert_event_artists cea ON ce.id = cea.event_id
 LEFT JOIN concert_artists ca ON cea.artist_id = ca.id
+ LEFT JOIN user_concert_event_interest ucei ON ucei.event_id = ce.id
 WHERE ce.event_date >= CURRENT_TIMESTAMP
   AND v.city ILIKE '%Chicago%'
   AND ce.status = 'onsale'
@@ -670,29 +697,33 @@ type GetChicagoEventsWithArtistSearchParams struct {
 }
 
 type GetChicagoEventsWithArtistSearchRow struct {
-	ID             string           `json:"id"`
-	Name           string           `json:"name"`
-	EventDate      pgtype.Timestamp `json:"event_date"`
-	VenueID        pgtype.Text      `json:"venue_id"`
-	Genres         []string         `json:"genres"`
-	PriceMin       pgtype.Numeric   `json:"price_min"`
-	PriceMax       pgtype.Numeric   `json:"price_max"`
-	PriceCurrency  pgtype.Text      `json:"price_currency"`
-	TicketUrl      pgtype.Text      `json:"ticket_url"`
-	Description    pgtype.Text      `json:"description"`
-	Status         string           `json:"status"`
-	AgeRestriction pgtype.Text      `json:"age_restriction"`
-	Provider       string           `json:"provider"`
-	ExternalUrl    pgtype.Text      `json:"external_url"`
-	CreatedAt      pgtype.Timestamp `json:"created_at"`
-	UpdatedAt      pgtype.Timestamp `json:"updated_at"`
-	VenueName      pgtype.Text      `json:"venue_name"`
-	VenueStreet    pgtype.Text      `json:"venue_street"`
-	VenueCity      pgtype.Text      `json:"venue_city"`
-	VenueState     pgtype.Text      `json:"venue_state"`
-	VenueCountry   pgtype.Text      `json:"venue_country"`
-	VenuePostal    pgtype.Text      `json:"venue_postal"`
-	VenueCapacity  pgtype.Int4      `json:"venue_capacity"`
+	ID                     string           `json:"id"`
+	Name                   string           `json:"name"`
+	EventDate              pgtype.Timestamp `json:"event_date"`
+	VenueID                pgtype.Text      `json:"venue_id"`
+	Genres                 []string         `json:"genres"`
+	PriceMin               pgtype.Numeric   `json:"price_min"`
+	PriceMax               pgtype.Numeric   `json:"price_max"`
+	PriceCurrency          pgtype.Text      `json:"price_currency"`
+	TicketUrl              pgtype.Text      `json:"ticket_url"`
+	Description            pgtype.Text      `json:"description"`
+	Status                 string           `json:"status"`
+	AgeRestriction         pgtype.Text      `json:"age_restriction"`
+	Provider               string           `json:"provider"`
+	ExternalUrl            pgtype.Text      `json:"external_url"`
+	CreatedAt              pgtype.Timestamp `json:"created_at"`
+	UpdatedAt              pgtype.Timestamp `json:"updated_at"`
+	VenueName              pgtype.Text      `json:"venue_name"`
+	VenueStreet            pgtype.Text      `json:"venue_street"`
+	VenueCity              pgtype.Text      `json:"venue_city"`
+	VenueState             pgtype.Text      `json:"venue_state"`
+	VenueCountry           pgtype.Text      `json:"venue_country"`
+	VenuePostal            pgtype.Text      `json:"venue_postal"`
+	VenueCapacity          pgtype.Int4      `json:"venue_capacity"`
+	ArtistsJson            interface{}      `json:"artists_json"`
+	InterestedUserIds      []string         `json:"interested_user_ids"`
+	GoingUserIds           []string         `json:"going_user_ids"`
+	LookingForGroupUserIds []string         `json:"looking_for_group_user_ids"`
 }
 
 func (q *Queries) GetChicagoEventsWithArtistSearch(ctx context.Context, arg GetChicagoEventsWithArtistSearchParams) ([]GetChicagoEventsWithArtistSearchRow, error) {
@@ -728,6 +759,10 @@ func (q *Queries) GetChicagoEventsWithArtistSearch(ctx context.Context, arg GetC
 			&i.VenueCountry,
 			&i.VenuePostal,
 			&i.VenueCapacity,
+			&i.ArtistsJson,
+			&i.InterestedUserIds,
+			&i.GoingUserIds,
+			&i.LookingForGroupUserIds,
 		); err != nil {
 			return nil, err
 		}
@@ -812,11 +847,15 @@ func (q *Queries) GetConcertEventByID(ctx context.Context, id string) (GetConcer
 }
 
 const getConcertEventCount = `-- name: GetConcertEventCount :one
-SELECT COUNT(*) FROM concert_events
+SELECT COUNT(DISTINCT ce.id)
+FROM concert_events ce
+LEFT JOIN user_concert_event_interest ucei ON ucei.event_id = ce.id
+WHERE ($1 = '' OR ucei.interest_status = $1 OR ucei.interest_status IS NULL)
 `
 
-func (q *Queries) GetConcertEventCount(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, getConcertEventCount)
+// Optional interest_status filter: if provided (non-empty), counts events having at least one user with that status
+func (q *Queries) GetConcertEventCount(ctx context.Context, interestStatus interface{}) (int64, error) {
+	row := q.db.QueryRow(ctx, getConcertEventCount, interestStatus)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -831,13 +870,23 @@ SELECT
     v.state as venue_state,
     v.country as venue_country,
     v.postal as venue_postal,
-    v.capacity as venue_capacity
+    v.capacity as venue_capacity,
+    /* Aggregated artist names */
+    array_remove(array_agg(DISTINCT ca.name), NULL) AS artist_names,
+    /* User interest buckets */
+  array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'INTERESTED'), NULL) AS interested_user_ids,
+  array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'GOING'), NULL) AS going_user_ids,
+  array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'LOOKING_FOR_GROUP'), NULL) AS looking_for_group_user_ids
 FROM concert_events ce
 LEFT JOIN venues v ON ce.venue_id = v.id
+LEFT JOIN concert_event_artists cea ON ce.id = cea.event_id
+LEFT JOIN concert_artists ca ON cea.artist_id = ca.id
+LEFT JOIN user_concert_event_interest ucei ON ucei.event_id = ce.id
 WHERE ce.event_date >= $1
   AND ce.event_date <= $2
   AND ($3::text IS NULL OR v.city ILIKE '%' || $3 || '%')
   AND ($4::text IS NULL OR ce.status = $4)
+GROUP BY ce.id, v.name, v.street, v.city, v.state, v.country, v.postal, v.capacity
 ORDER BY ce.event_date ASC
 LIMIT $6 OFFSET $5
 `
@@ -852,29 +901,33 @@ type GetConcertEventsInDateRangeParams struct {
 }
 
 type GetConcertEventsInDateRangeRow struct {
-	ID             string           `json:"id"`
-	Name           string           `json:"name"`
-	EventDate      pgtype.Timestamp `json:"event_date"`
-	VenueID        pgtype.Text      `json:"venue_id"`
-	Genres         []string         `json:"genres"`
-	PriceMin       pgtype.Numeric   `json:"price_min"`
-	PriceMax       pgtype.Numeric   `json:"price_max"`
-	PriceCurrency  pgtype.Text      `json:"price_currency"`
-	TicketUrl      pgtype.Text      `json:"ticket_url"`
-	Description    pgtype.Text      `json:"description"`
-	Status         string           `json:"status"`
-	AgeRestriction pgtype.Text      `json:"age_restriction"`
-	Provider       string           `json:"provider"`
-	ExternalUrl    pgtype.Text      `json:"external_url"`
-	CreatedAt      pgtype.Timestamp `json:"created_at"`
-	UpdatedAt      pgtype.Timestamp `json:"updated_at"`
-	VenueName      pgtype.Text      `json:"venue_name"`
-	VenueStreet    pgtype.Text      `json:"venue_street"`
-	VenueCity      pgtype.Text      `json:"venue_city"`
-	VenueState     pgtype.Text      `json:"venue_state"`
-	VenueCountry   pgtype.Text      `json:"venue_country"`
-	VenuePostal    pgtype.Text      `json:"venue_postal"`
-	VenueCapacity  pgtype.Int4      `json:"venue_capacity"`
+	ID                     string           `json:"id"`
+	Name                   string           `json:"name"`
+	EventDate              pgtype.Timestamp `json:"event_date"`
+	VenueID                pgtype.Text      `json:"venue_id"`
+	Genres                 []string         `json:"genres"`
+	PriceMin               pgtype.Numeric   `json:"price_min"`
+	PriceMax               pgtype.Numeric   `json:"price_max"`
+	PriceCurrency          pgtype.Text      `json:"price_currency"`
+	TicketUrl              pgtype.Text      `json:"ticket_url"`
+	Description            pgtype.Text      `json:"description"`
+	Status                 string           `json:"status"`
+	AgeRestriction         pgtype.Text      `json:"age_restriction"`
+	Provider               string           `json:"provider"`
+	ExternalUrl            pgtype.Text      `json:"external_url"`
+	CreatedAt              pgtype.Timestamp `json:"created_at"`
+	UpdatedAt              pgtype.Timestamp `json:"updated_at"`
+	VenueName              pgtype.Text      `json:"venue_name"`
+	VenueStreet            pgtype.Text      `json:"venue_street"`
+	VenueCity              pgtype.Text      `json:"venue_city"`
+	VenueState             pgtype.Text      `json:"venue_state"`
+	VenueCountry           pgtype.Text      `json:"venue_country"`
+	VenuePostal            pgtype.Text      `json:"venue_postal"`
+	VenueCapacity          pgtype.Int4      `json:"venue_capacity"`
+	ArtistNames            interface{}      `json:"artist_names"`
+	InterestedUserIds      interface{}      `json:"interested_user_ids"`
+	GoingUserIds           interface{}      `json:"going_user_ids"`
+	LookingForGroupUserIds interface{}      `json:"looking_for_group_user_ids"`
 }
 
 func (q *Queries) GetConcertEventsInDateRange(ctx context.Context, arg GetConcertEventsInDateRangeParams) ([]GetConcertEventsInDateRangeRow, error) {
@@ -917,6 +970,133 @@ func (q *Queries) GetConcertEventsInDateRange(ctx context.Context, arg GetConcer
 			&i.VenueCountry,
 			&i.VenuePostal,
 			&i.VenueCapacity,
+			&i.ArtistNames,
+			&i.InterestedUserIds,
+			&i.GoingUserIds,
+			&i.LookingForGroupUserIds,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getConcertEventsInDateRangeWithInterest = `-- name: GetConcertEventsInDateRangeWithInterest :many
+SELECT 
+    ce.id, ce.name, ce.event_date, ce.venue_id, ce.genres, ce.price_min, ce.price_max, ce.price_currency, ce.ticket_url, ce.description, ce.status, ce.age_restriction, ce.provider, ce.external_url, ce.created_at, ce.updated_at,
+    v.name as venue_name,
+    v.street as venue_street,
+    v.city as venue_city,
+    v.state as venue_state,
+    v.country as venue_country,
+    v.postal as venue_postal,
+    v.capacity as venue_capacity,
+    array_remove(array_agg(DISTINCT ca.name), NULL) AS artist_names,
+  array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'INTERESTED'), NULL) AS interested_user_ids,
+  array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'GOING'), NULL) AS going_user_ids,
+  array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'LOOKING_FOR_GROUP'), NULL) AS looking_for_group_user_ids
+FROM concert_events ce
+LEFT JOIN venues v ON ce.venue_id = v.id
+LEFT JOIN concert_event_artists cea ON ce.id = cea.event_id
+LEFT JOIN concert_artists ca ON cea.artist_id = ca.id
+LEFT JOIN user_concert_event_interest ucei ON ucei.event_id = ce.id
+WHERE ce.event_date >= $1
+  AND ce.event_date <= $2
+  AND ($3::text IS NULL OR v.city ILIKE '%' || $3 || '%')
+  AND ($4::text IS NULL OR ce.status = $4)
+GROUP BY ce.id, v.name, v.street, v.city, v.state, v.country, v.postal, v.capacity
+ORDER BY ce.event_date ASC
+LIMIT $6 OFFSET $5
+`
+
+type GetConcertEventsInDateRangeWithInterestParams struct {
+	StartDate pgtype.Timestamp `json:"start_date"`
+	EndDate   pgtype.Timestamp `json:"end_date"`
+	City      string           `json:"city"`
+	Status    string           `json:"status"`
+	OffSet    int32            `json:"off_set"`
+	Lim       int32            `json:"lim"`
+}
+
+type GetConcertEventsInDateRangeWithInterestRow struct {
+	ID                     string           `json:"id"`
+	Name                   string           `json:"name"`
+	EventDate              pgtype.Timestamp `json:"event_date"`
+	VenueID                pgtype.Text      `json:"venue_id"`
+	Genres                 []string         `json:"genres"`
+	PriceMin               pgtype.Numeric   `json:"price_min"`
+	PriceMax               pgtype.Numeric   `json:"price_max"`
+	PriceCurrency          pgtype.Text      `json:"price_currency"`
+	TicketUrl              pgtype.Text      `json:"ticket_url"`
+	Description            pgtype.Text      `json:"description"`
+	Status                 string           `json:"status"`
+	AgeRestriction         pgtype.Text      `json:"age_restriction"`
+	Provider               string           `json:"provider"`
+	ExternalUrl            pgtype.Text      `json:"external_url"`
+	CreatedAt              pgtype.Timestamp `json:"created_at"`
+	UpdatedAt              pgtype.Timestamp `json:"updated_at"`
+	VenueName              pgtype.Text      `json:"venue_name"`
+	VenueStreet            pgtype.Text      `json:"venue_street"`
+	VenueCity              pgtype.Text      `json:"venue_city"`
+	VenueState             pgtype.Text      `json:"venue_state"`
+	VenueCountry           pgtype.Text      `json:"venue_country"`
+	VenuePostal            pgtype.Text      `json:"venue_postal"`
+	VenueCapacity          pgtype.Int4      `json:"venue_capacity"`
+	ArtistNames            interface{}      `json:"artist_names"`
+	InterestedUserIds      interface{}      `json:"interested_user_ids"`
+	GoingUserIds           interface{}      `json:"going_user_ids"`
+	LookingForGroupUserIds interface{}      `json:"looking_for_group_user_ids"`
+}
+
+// Returns events within date range plus associated venue, artists, and user interest buckets
+func (q *Queries) GetConcertEventsInDateRangeWithInterest(ctx context.Context, arg GetConcertEventsInDateRangeWithInterestParams) ([]GetConcertEventsInDateRangeWithInterestRow, error) {
+	rows, err := q.db.Query(ctx, getConcertEventsInDateRangeWithInterest,
+		arg.StartDate,
+		arg.EndDate,
+		arg.City,
+		arg.Status,
+		arg.OffSet,
+		arg.Lim,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetConcertEventsInDateRangeWithInterestRow{}
+	for rows.Next() {
+		var i GetConcertEventsInDateRangeWithInterestRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.EventDate,
+			&i.VenueID,
+			&i.Genres,
+			&i.PriceMin,
+			&i.PriceMax,
+			&i.PriceCurrency,
+			&i.TicketUrl,
+			&i.Description,
+			&i.Status,
+			&i.AgeRestriction,
+			&i.Provider,
+			&i.ExternalUrl,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.VenueName,
+			&i.VenueStreet,
+			&i.VenueCity,
+			&i.VenueState,
+			&i.VenueCountry,
+			&i.VenuePostal,
+			&i.VenueCapacity,
+			&i.ArtistNames,
+			&i.InterestedUserIds,
+			&i.GoingUserIds,
+			&i.LookingForGroupUserIds,
 		); err != nil {
 			return nil, err
 		}
@@ -933,17 +1113,20 @@ SELECT
     ca.id,
     ca.name,
     ca.genres,
-    cea.role
+  cea.role,
+  /* How many users have any interest in this event (all statuses) */
+  (SELECT COUNT(DISTINCT ui.user_id) FROM user_concert_event_interest ui WHERE ui.event_id = cea.event_id) AS interested_user_count
 FROM concert_artists ca
 JOIN concert_event_artists cea ON ca.id = cea.artist_id
 WHERE cea.event_id = $1
 `
 
 type GetEventArtistsRow struct {
-	ID     string      `json:"id"`
-	Name   string      `json:"name"`
-	Genres []string    `json:"genres"`
-	Role   pgtype.Text `json:"role"`
+	ID                  string      `json:"id"`
+	Name                string      `json:"name"`
+	Genres              []string    `json:"genres"`
+	Role                pgtype.Text `json:"role"`
+	InterestedUserCount int64       `json:"interested_user_count"`
 }
 
 func (q *Queries) GetEventArtists(ctx context.Context, eventID string) ([]GetEventArtistsRow, error) {
@@ -960,6 +1143,7 @@ func (q *Queries) GetEventArtists(ctx context.Context, eventID string) ([]GetEve
 			&i.Name,
 			&i.Genres,
 			&i.Role,
+			&i.InterestedUserCount,
 		); err != nil {
 			return nil, err
 		}
@@ -981,14 +1165,19 @@ SELECT
     v.country as venue_country,
     v.postal as venue_postal,
     v.capacity as venue_capacity,
-    ca.name as artist_name
+    ca.name as artist_name,
+  array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'INTERESTED'), NULL) AS interested_user_ids,
+  array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'GOING'), NULL) AS going_user_ids,
+  array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'LOOKING_FOR_GROUP'), NULL) AS looking_for_group_user_ids
 FROM concert_events ce
 LEFT JOIN venues v ON ce.venue_id = v.id
 JOIN concert_event_artists cea ON ce.id = cea.event_id
 JOIN concert_artists ca ON cea.artist_id = ca.id
+ LEFT JOIN user_concert_event_interest ucei ON ucei.event_id = ce.id
 WHERE ca.name ILIKE '%' || $1 || '%'
   AND ce.event_date >= CURRENT_TIMESTAMP
   AND ($2::text IS NULL OR v.city ILIKE '%' || $2 || '%')
+GROUP BY ce.id, v.name, v.street, v.city, v.state, v.country, v.postal, v.capacity, ca.name
 ORDER BY ce.event_date ASC
 LIMIT $3
 `
@@ -1000,30 +1189,33 @@ type GetEventsForArtistParams struct {
 }
 
 type GetEventsForArtistRow struct {
-	ID             string           `json:"id"`
-	Name           string           `json:"name"`
-	EventDate      pgtype.Timestamp `json:"event_date"`
-	VenueID        pgtype.Text      `json:"venue_id"`
-	Genres         []string         `json:"genres"`
-	PriceMin       pgtype.Numeric   `json:"price_min"`
-	PriceMax       pgtype.Numeric   `json:"price_max"`
-	PriceCurrency  pgtype.Text      `json:"price_currency"`
-	TicketUrl      pgtype.Text      `json:"ticket_url"`
-	Description    pgtype.Text      `json:"description"`
-	Status         string           `json:"status"`
-	AgeRestriction pgtype.Text      `json:"age_restriction"`
-	Provider       string           `json:"provider"`
-	ExternalUrl    pgtype.Text      `json:"external_url"`
-	CreatedAt      pgtype.Timestamp `json:"created_at"`
-	UpdatedAt      pgtype.Timestamp `json:"updated_at"`
-	VenueName      pgtype.Text      `json:"venue_name"`
-	VenueStreet    pgtype.Text      `json:"venue_street"`
-	VenueCity      pgtype.Text      `json:"venue_city"`
-	VenueState     pgtype.Text      `json:"venue_state"`
-	VenueCountry   pgtype.Text      `json:"venue_country"`
-	VenuePostal    pgtype.Text      `json:"venue_postal"`
-	VenueCapacity  pgtype.Int4      `json:"venue_capacity"`
-	ArtistName     string           `json:"artist_name"`
+	ID                     string           `json:"id"`
+	Name                   string           `json:"name"`
+	EventDate              pgtype.Timestamp `json:"event_date"`
+	VenueID                pgtype.Text      `json:"venue_id"`
+	Genres                 []string         `json:"genres"`
+	PriceMin               pgtype.Numeric   `json:"price_min"`
+	PriceMax               pgtype.Numeric   `json:"price_max"`
+	PriceCurrency          pgtype.Text      `json:"price_currency"`
+	TicketUrl              pgtype.Text      `json:"ticket_url"`
+	Description            pgtype.Text      `json:"description"`
+	Status                 string           `json:"status"`
+	AgeRestriction         pgtype.Text      `json:"age_restriction"`
+	Provider               string           `json:"provider"`
+	ExternalUrl            pgtype.Text      `json:"external_url"`
+	CreatedAt              pgtype.Timestamp `json:"created_at"`
+	UpdatedAt              pgtype.Timestamp `json:"updated_at"`
+	VenueName              pgtype.Text      `json:"venue_name"`
+	VenueStreet            pgtype.Text      `json:"venue_street"`
+	VenueCity              pgtype.Text      `json:"venue_city"`
+	VenueState             pgtype.Text      `json:"venue_state"`
+	VenueCountry           pgtype.Text      `json:"venue_country"`
+	VenuePostal            pgtype.Text      `json:"venue_postal"`
+	VenueCapacity          pgtype.Int4      `json:"venue_capacity"`
+	ArtistName             string           `json:"artist_name"`
+	InterestedUserIds      interface{}      `json:"interested_user_ids"`
+	GoingUserIds           interface{}      `json:"going_user_ids"`
+	LookingForGroupUserIds interface{}      `json:"looking_for_group_user_ids"`
 }
 
 func (q *Queries) GetEventsForArtist(ctx context.Context, arg GetEventsForArtistParams) ([]GetEventsForArtistRow, error) {
@@ -1060,6 +1252,9 @@ func (q *Queries) GetEventsForArtist(ctx context.Context, arg GetEventsForArtist
 			&i.VenuePostal,
 			&i.VenueCapacity,
 			&i.ArtistName,
+			&i.InterestedUserIds,
+			&i.GoingUserIds,
+			&i.LookingForGroupUserIds,
 		); err != nil {
 			return nil, err
 		}
@@ -1134,12 +1329,17 @@ SELECT
     v.state as venue_state,
     v.country as venue_country,
     v.postal as venue_postal,
-    v.capacity as venue_capacity
+    v.capacity as venue_capacity,
+  array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'INTERESTED'), NULL) AS interested_user_ids,
+  array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'GOING'), NULL) AS going_user_ids,
+  array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'LOOKING_FOR_GROUP'), NULL) AS looking_for_group_user_ids
 FROM concert_events ce
 LEFT JOIN venues v ON ce.venue_id = v.id
+LEFT JOIN user_concert_event_interest ucei ON ucei.event_id = ce.id
 WHERE ce.event_date >= CURRENT_TIMESTAMP
   AND v.city ILIKE '%' || $1 || '%'
   AND ce.status = 'onsale'
+GROUP BY ce.id, v.name, v.street, v.city, v.state, v.country, v.postal, v.capacity
 ORDER BY ce.event_date ASC
 LIMIT $2
 `
@@ -1150,29 +1350,32 @@ type GetUpcomingConcertEventsInCityParams struct {
 }
 
 type GetUpcomingConcertEventsInCityRow struct {
-	ID             string           `json:"id"`
-	Name           string           `json:"name"`
-	EventDate      pgtype.Timestamp `json:"event_date"`
-	VenueID        pgtype.Text      `json:"venue_id"`
-	Genres         []string         `json:"genres"`
-	PriceMin       pgtype.Numeric   `json:"price_min"`
-	PriceMax       pgtype.Numeric   `json:"price_max"`
-	PriceCurrency  pgtype.Text      `json:"price_currency"`
-	TicketUrl      pgtype.Text      `json:"ticket_url"`
-	Description    pgtype.Text      `json:"description"`
-	Status         string           `json:"status"`
-	AgeRestriction pgtype.Text      `json:"age_restriction"`
-	Provider       string           `json:"provider"`
-	ExternalUrl    pgtype.Text      `json:"external_url"`
-	CreatedAt      pgtype.Timestamp `json:"created_at"`
-	UpdatedAt      pgtype.Timestamp `json:"updated_at"`
-	VenueName      pgtype.Text      `json:"venue_name"`
-	VenueStreet    pgtype.Text      `json:"venue_street"`
-	VenueCity      pgtype.Text      `json:"venue_city"`
-	VenueState     pgtype.Text      `json:"venue_state"`
-	VenueCountry   pgtype.Text      `json:"venue_country"`
-	VenuePostal    pgtype.Text      `json:"venue_postal"`
-	VenueCapacity  pgtype.Int4      `json:"venue_capacity"`
+	ID                     string           `json:"id"`
+	Name                   string           `json:"name"`
+	EventDate              pgtype.Timestamp `json:"event_date"`
+	VenueID                pgtype.Text      `json:"venue_id"`
+	Genres                 []string         `json:"genres"`
+	PriceMin               pgtype.Numeric   `json:"price_min"`
+	PriceMax               pgtype.Numeric   `json:"price_max"`
+	PriceCurrency          pgtype.Text      `json:"price_currency"`
+	TicketUrl              pgtype.Text      `json:"ticket_url"`
+	Description            pgtype.Text      `json:"description"`
+	Status                 string           `json:"status"`
+	AgeRestriction         pgtype.Text      `json:"age_restriction"`
+	Provider               string           `json:"provider"`
+	ExternalUrl            pgtype.Text      `json:"external_url"`
+	CreatedAt              pgtype.Timestamp `json:"created_at"`
+	UpdatedAt              pgtype.Timestamp `json:"updated_at"`
+	VenueName              pgtype.Text      `json:"venue_name"`
+	VenueStreet            pgtype.Text      `json:"venue_street"`
+	VenueCity              pgtype.Text      `json:"venue_city"`
+	VenueState             pgtype.Text      `json:"venue_state"`
+	VenueCountry           pgtype.Text      `json:"venue_country"`
+	VenuePostal            pgtype.Text      `json:"venue_postal"`
+	VenueCapacity          pgtype.Int4      `json:"venue_capacity"`
+	InterestedUserIds      interface{}      `json:"interested_user_ids"`
+	GoingUserIds           interface{}      `json:"going_user_ids"`
+	LookingForGroupUserIds interface{}      `json:"looking_for_group_user_ids"`
 }
 
 func (q *Queries) GetUpcomingConcertEventsInCity(ctx context.Context, arg GetUpcomingConcertEventsInCityParams) ([]GetUpcomingConcertEventsInCityRow, error) {
@@ -1208,6 +1411,9 @@ func (q *Queries) GetUpcomingConcertEventsInCity(ctx context.Context, arg GetUpc
 			&i.VenueCountry,
 			&i.VenuePostal,
 			&i.VenueCapacity,
+			&i.InterestedUserIds,
+			&i.GoingUserIds,
+			&i.LookingForGroupUserIds,
 		); err != nil {
 			return nil, err
 		}
@@ -1739,6 +1945,24 @@ type UpsertEventArtistParams struct {
 
 func (q *Queries) UpsertEventArtist(ctx context.Context, arg UpsertEventArtistParams) error {
 	_, err := q.db.Exec(ctx, upsertEventArtist, arg.EventID, arg.ArtistID, arg.Role)
+	return err
+}
+
+const upsertUserConcertEventInterest = `-- name: UpsertUserConcertEventInterest :exec
+INSERT INTO user_concert_event_interest (user_id, event_id, interest_status)
+VALUES ($1, $2, $3)
+ON CONFLICT (user_id, event_id)
+DO UPDATE SET interest_status = EXCLUDED.interest_status, updated_at = NOW()
+`
+
+type UpsertUserConcertEventInterestParams struct {
+	UserID         uuid.UUID `json:"user_id"`
+	EventID        string    `json:"event_id"`
+	InterestStatus string    `json:"interest_status"`
+}
+
+func (q *Queries) UpsertUserConcertEventInterest(ctx context.Context, arg UpsertUserConcertEventInterestParams) error {
+	_, err := q.db.Exec(ctx, upsertUserConcertEventInterest, arg.UserID, arg.EventID, arg.InterestStatus)
 	return err
 }
 

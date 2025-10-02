@@ -172,6 +172,17 @@ func (s *ConcertAPIService) convertToAPIConcert(event concert.Event) generated.C
 		Genres:  event.Genres,
 	}
 
+	// Include user interest aggregates if present
+	if len(event.InterestedUserIDs) > 0 {
+		concert.InterestedUserIds = event.InterestedUserIDs
+	}
+	if len(event.GoingUserIDs) > 0 {
+		concert.GoingUserIds = event.GoingUserIDs
+	}
+	if len(event.LookingForGroupUserIDs) > 0 {
+		concert.LookingForGroupUserIds = event.LookingForGroupUserIDs
+	}
+
 	// Only include price range if it has values
 	if hasPriceRange {
 		concert.PriceRange = apiPriceRange
@@ -216,4 +227,39 @@ func (s *ConcertAPIService) GetChicagoEvents(ctx context.Context, artistName str
 	}
 
 	return generated.Response(http.StatusOK, result), nil
+}
+
+// SetEventInterest sets/updates the authenticated user's interest for an event
+func (s *ConcertAPIService) SetEventInterest(ctx context.Context, eventId string, xUserUsername string, request generated.SetEventInterestRequest) (generated.ImplResponse, error) {
+	if s.concertService == nil || s.concertService.repository == nil {
+		return generated.Response(http.StatusServiceUnavailable, generated.ErrorResponse{Message: "concert repository unavailable"}), nil
+	}
+	if eventId == "" || request.InterestType == "" {
+		return generated.Response(http.StatusBadRequest, generated.ErrorResponse{Message: "eventId and interestType required"}), nil
+	}
+	status := string(request.InterestType)
+	// Validate
+	switch status {
+	case "INTERESTED", "GOING", "LOOKING_FOR_GROUP":
+	default:
+		return generated.Response(http.StatusBadRequest, generated.ErrorResponse{Message: "invalid status"}), nil
+	}
+	if err := s.concertService.repository.UpsertUserInterest(ctx, xUserUsername, eventId, status); err != nil {
+		return generated.Response(http.StatusInternalServerError, generated.ErrorResponse{Message: fmt.Sprintf("failed to set interest: %v", err)}), nil
+	}
+	return generated.Response(http.StatusNoContent, nil), nil
+}
+
+// RemoveEventInterest removes the authenticated user's interest for an event
+func (s *ConcertAPIService) RemoveEventInterest(ctx context.Context, eventId string, xUserUsername string) (generated.ImplResponse, error) {
+	if s.concertService == nil || s.concertService.repository == nil {
+		return generated.Response(http.StatusServiceUnavailable, generated.ErrorResponse{Message: "concert repository unavailable"}), nil
+	}
+	if eventId == "" {
+		return generated.Response(http.StatusBadRequest, generated.ErrorResponse{Message: "eventId required"}), nil
+	}
+	if err := s.concertService.repository.RemoveUserInterest(ctx, xUserUsername, eventId); err != nil {
+		return generated.Response(http.StatusInternalServerError, generated.ErrorResponse{Message: fmt.Sprintf("failed to remove interest: %v", err)}), nil
+	}
+	return generated.Response(http.StatusNoContent, nil), nil
 }

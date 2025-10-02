@@ -15,22 +15,6 @@ import (
 func TestConcertSync(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Concert Synchronization Suite")
-}ckage concert_test
-
-import (
-	"context"
-	"testing"
-	"time"
-
-	"github.com/greenwaltc/kellogg-music-match/backend/business/concert"
-	"github.com/greenwaltc/kellogg-music-match/backend/config"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-)
-
-func TestConcertSync(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Concert Synchronization Suite")
 }
 
 var _ = Describe("Concert Synchronization", func() {
@@ -45,18 +29,19 @@ var _ = Describe("Concert Synchronization", func() {
 
 	BeforeEach(func() {
 		ctx, cancel = context.WithCancel(context.Background())
-		
+
 		cfg = &config.Config{
 			Ticketmaster: config.TicketmasterConfig{
 				ConsumerKey:    "test_key",
 				ConsumerSecret: "test_secret",
 				BaseURL:        "https://app.ticketmaster.com/discovery/v2",
-				Timeout:        "10s",
+				Timeout:        10,
 			},
 		}
 
 		mockProvider = NewMockEventProvider()
-		mockRepo = NewMockRepository()
+		mr := NewMockRepository()
+		mockRepo = mr.(*MockRepository)
 		syncService = concert.NewSyncService(mockProvider, mockRepo, cfg)
 	})
 
@@ -77,7 +62,7 @@ var _ = Describe("Concert Synchronization", func() {
 		Context("when the provider is healthy", func() {
 			BeforeEach(func() {
 				mockProvider.SetHealthy(true)
-				
+
 				// Set up mock events for Chicago area
 				chicagoEvents := []concert.Event{
 					{
@@ -161,7 +146,7 @@ var _ = Describe("Concert Synchronization", func() {
 
 				// Verify that events were upserted
 				Expect(mockRepo.GetUpsertedEventCount()).To(Equal(2))
-				
+
 				// Verify that old events were cleaned up
 				Expect(mockRepo.WasDeleteOldEventsCalled()).To(BeTrue())
 
@@ -322,7 +307,7 @@ var _ = Describe("Concert Synchronization", func() {
 	Describe("Service Lifecycle", func() {
 		It("should start and stop cleanly", func() {
 			mockProvider.SetHealthy(true)
-			
+
 			err := syncService.Start(ctx)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -341,14 +326,14 @@ var _ = Describe("Concert Synchronization", func() {
 // Mock implementations
 
 type MockEventProvider struct {
-	healthy         bool
-	searchResults   *concert.SearchResult
+	healthy          bool
+	searchResults    *concert.SearchResult
 	paginatedResults map[int]*concert.SearchResult
 }
 
 func NewMockEventProvider() *MockEventProvider {
 	return &MockEventProvider{
-		healthy:         true,
+		healthy:          true,
 		paginatedResults: make(map[int]*concert.SearchResult),
 	}
 }
@@ -411,8 +396,8 @@ func (m *MockEventProvider) IsHealthy(ctx context.Context) error {
 }
 
 type MockRepository struct {
-	upsertedEventCount     int
-	deleteOldEventsCalled  bool
+	upsertedEventCount    int
+	deleteOldEventsCalled bool
 	failUpsert            bool
 	eventCount            int64
 }
@@ -491,7 +476,7 @@ func (m *MockRepository) AssociateEventWithArtist(ctx context.Context, eventID, 
 
 // Custom errors for testing
 var (
-	ErrProviderUnhealthy  = fmt.Errorf("provider is unhealthy")
-	ErrEventNotFound      = fmt.Errorf("event not found")
-	ErrRepositoryFailure  = fmt.Errorf("repository operation failed")
+	ErrProviderUnhealthy = fmt.Errorf("provider is unhealthy")
+	ErrEventNotFound     = fmt.Errorf("event not found")
+	ErrRepositoryFailure = fmt.Errorf("repository operation failed")
 )
