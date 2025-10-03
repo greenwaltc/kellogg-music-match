@@ -306,4 +306,75 @@ var _ = Describe("JWT Service", func() {
 			})
 		})
 	})
+
+	Describe("Leeway Handling", func() {
+		Context("when token not-before is slightly in the future within leeway", func() {
+			It("should still validate successfully", func() {
+				// Configure service with 120s leeway
+				leewayCfg := &config.JWTConfig{
+					SecretKey:     "test-secret-key-for-testing-only",
+					ExpiryHours:   1,
+					RefreshHours:  24,
+					LeewaySeconds: 120,
+				}
+				leewayService := business.NewJWTService(leewayCfg)
+
+				future := time.Now().Add(30 * time.Second) // within 120s leeway
+				claims := &business.JWTClaims{
+					UserID:   "future-user",
+					Username: "future",
+					Email:    "future@example.com",
+					RegisteredClaims: jwt.RegisteredClaims{
+						NotBefore: jwt.NewNumericDate(future),
+						IssuedAt:  jwt.NewNumericDate(future),
+						ExpiresAt: jwt.NewNumericDate(future.Add(time.Hour)),
+						Issuer:    "kellogg-music-match",
+						Subject:   "future-user",
+					},
+				}
+
+				tok := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+				tokenString, err := tok.SignedString([]byte(leewayCfg.SecretKey))
+				Expect(err).ToNot(HaveOccurred())
+
+				validated, err := leewayService.ValidateToken(tokenString)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(validated.UserID).To(Equal("future-user"))
+			})
+		})
+
+		Context("when token not-before is beyond configured leeway", func() {
+			It("should fail validation with not yet valid error", func() {
+				leewayCfg := &config.JWTConfig{
+					SecretKey:     "test-secret-key-for-testing-only",
+					ExpiryHours:   1,
+					RefreshHours:  24,
+					LeewaySeconds: 60, // 1 minute
+				}
+				leewayService := business.NewJWTService(leewayCfg)
+
+				future := time.Now().Add(3 * time.Minute) // beyond 60s leeway
+				claims := &business.JWTClaims{
+					UserID:   "too-future-user",
+					Username: "future2",
+					Email:    "future2@example.com",
+					RegisteredClaims: jwt.RegisteredClaims{
+						NotBefore: jwt.NewNumericDate(future),
+						IssuedAt:  jwt.NewNumericDate(future),
+						ExpiresAt: jwt.NewNumericDate(future.Add(time.Hour)),
+						Issuer:    "kellogg-music-match",
+						Subject:   "too-future-user",
+					},
+				}
+
+				tok := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+				tokenString, err := tok.SignedString([]byte(leewayCfg.SecretKey))
+				Expect(err).ToNot(HaveOccurred())
+
+				validated, err := leewayService.ValidateToken(tokenString)
+				Expect(err).To(HaveOccurred())
+				Expect(validated).To(BeNil())
+			})
+		})
+	})
 })

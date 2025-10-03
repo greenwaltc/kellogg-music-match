@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/greenwaltc/kellogg-music-match/backend/business"
+	"github.com/greenwaltc/kellogg-music-match/backend/logger"
 )
 
 // JWTMiddleware handles JWT authentication for protected routes
@@ -23,7 +24,10 @@ func NewJWTMiddleware(jwtService *business.JWTService) *JWTMiddleware {
 // contextKey is used for storing user info in request context
 type contextKey string
 
-const UserContextKey contextKey = "user"
+const (
+	UserContextKey contextKey = "user"        // Primary typed key
+	compatUserKey  contextKey = "user_compat" // Compatibility typed key (was plain string)
+)
 
 // UserContext represents user information stored in request context
 type UserContext struct {
@@ -68,7 +72,7 @@ func (m *JWTMiddleware) Middleware(next http.Handler) http.Handler {
 
 		// Extract the token
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-		tokenString = strings.TrimSpace(tokenString) // Handle extra spaces
+		tokenString = strings.TrimSpace(tokenString)
 
 		// Validate the token
 		claims, err := m.jwtService.ValidateToken(tokenString)
@@ -77,13 +81,16 @@ func (m *JWTMiddleware) Middleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Add user info to request context
-		userCtx := &UserContext{
-			UserID:   claims.UserID,
-			Username: claims.Username,
-			Email:    claims.Email,
+		if claims.UserID == "" {
+			http.Error(w, "Missing user_id claim", http.StatusUnauthorized)
+			return
 		}
+
+		userCtx := &UserContext{UserID: claims.UserID, Username: claims.Username, Email: claims.Email}
 		ctx := context.WithValue(r.Context(), UserContextKey, userCtx)
+		// Backward compatibility: also store under a separate compatibility string key so legacy code can transition.
+		ctx = context.WithValue(ctx, compatUserKey, userCtx)
+		ctx = context.WithValue(ctx, logger.ContextUserKey(), userCtx)
 
 		// Continue to the next handler
 		next.ServeHTTP(w, r.WithContext(ctx))
@@ -113,6 +120,20 @@ func isPublicEndpoint(path, method string) bool {
 
 // GetUserFromContext extracts user information from request context
 func GetUserFromContext(ctx context.Context) (*UserContext, bool) {
-	user, ok := ctx.Value(UserContextKey).(*UserContext)
-	return user, ok
+	if ctx == nil {
+		return nil, false
+	}
+	// Primary key
+	if user, ok := ctx.Value(UserContextKey).(*UserContext); ok && user != nil {
+		return user, true
+	}
+	// Compatibility typed key
+	if user, ok := ctx.Value(compatUserKey).(*UserContext); ok && user != nil {
+		return user, true
+	}
+	// Logger key
+	if user, ok := ctx.Value(logger.ContextUserKey()).(*UserContext); ok && user != nil {
+		return user, true
+	}
+	return nil, false
 }

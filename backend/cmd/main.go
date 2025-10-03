@@ -4,12 +4,13 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/greenwaltc/kellogg-music-match/backend/business"
 	"github.com/greenwaltc/kellogg-music-match/backend/business/concert"
 	"github.com/greenwaltc/kellogg-music-match/backend/config"
 	"github.com/greenwaltc/kellogg-music-match/backend/generated"
 	"github.com/greenwaltc/kellogg-music-match/backend/logger"
+	"github.com/greenwaltc/kellogg-music-match/backend/telemetry"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 // corsMiddleware handles CORS headers for cross-origin requests
@@ -63,6 +64,9 @@ func main() {
 		logger.L().Error("init user repository failed", "error", err)
 		panic(err)
 	}
+
+	// Initialize telemetry (tracing & metrics) early
+	telemetry.Init(cfg.Telemetry)
 
 	matchingEngine := business.NewMatchingEngine()
 
@@ -154,31 +158,14 @@ func main() {
 	jwtMiddleware := NewJWTMiddleware(jwtService)
 
 	// Wrap router with middleware layers (innermost to outermost)
-	// Compose middleware: tracing -> jwt -> router
-	tracing := tracingMiddleware()
-	protectedRouter := jwtMiddleware.Middleware(tracing(router))
+	// Compose middleware: otelhttp -> jwt -> router
+	otelWrapped := otelhttp.NewHandler(router, "http.server")
+	protectedRouter := jwtMiddleware.Middleware(otelWrapped)
 	corsRouter := corsMiddleware(cfg)(protectedRouter)
 
 	serverAddr := ":" + cfg.Server.Port
 	logger.L().Info("server listening", "addr", serverAddr, "cors.origins", cfg.CORS.AllowedOrigins)
 	if err := http.ListenAndServe(serverAddr, corsRouter); err != nil {
 		logger.L().Error("server crashed", "error", err)
-	}
-}
-
-// tracingMiddleware injects synthetic trace/span IDs for correlation until full OpenTelemetry integration.
-func tracingMiddleware() func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			traceID := r.Header.Get("X-Trace-ID")
-			if traceID == "" {
-				traceID = uuid.New().String()
-			}
-			spanID := uuid.New().String()
-			ctx := context.WithValue(r.Context(), any("traceId"), traceID)
-			ctx = context.WithValue(ctx, any("spanId"), spanID)
-			// attach to logger via FromCtx enrichment path extension (optional future)
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
 	}
 }

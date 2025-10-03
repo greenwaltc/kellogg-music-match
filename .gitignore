@@ -41,7 +41,6 @@ backend/generated/**/*
 
 # ---- Pulumi ----
 .pulumi/
-Pulumi.*.yaml
 # Keep Pulumi.yaml (project definition) but ignore stack state
 !Pulumi.yaml
 kellogg-music-match

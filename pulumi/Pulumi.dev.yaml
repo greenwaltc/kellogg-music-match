@@ -1,0 +1,162 @@
+# Stack configuration for the 'dev' stack of Kellogg Music Match
+# Copy/rename for other stacks (e.g., Pulumi.prod.yaml) and adjust values.
+# IMPORTANT: Do NOT commit real secrets in plain text. For any key listed in the
+# 'SECRETS' section below, run: pulumi config set <key> <value> --secret
+# and remove the placeholder here (or leave placeholder; CLI value takes precedence).
+# Example: pulumi config set --secret kellogg-music-match:dbPassword 'super-secret'
+
+config:
+  # ---------------------------------------------------------------------------
+  # Core Server / Application
+  # ---------------------------------------------------------------------------
+  kellogg-music-match:serverPort: "8080"
+  kellogg-music-match:debugEnabled: "false"
+  kellogg-music-match:ingressClass: "traefik"
+
+  # ---------------------------------------------------------------------------
+  # Database (either use discrete settings below OR provide databaseUrl override)
+  # ---------------------------------------------------------------------------
+  kellogg-music-match:dbHost: "postgres"
+  kellogg-music-match:dbPort: "5432"
+  kellogg-music-match:dbUser: "kellogg_user"
+  kellogg-music-match:dbPassword: "CHANGE_ME_DB_PASSWORD"          # SECRET
+  kellogg-music-match:dbName: "kellogg_music_match"
+  kellogg-music-match:dbSSLMode: "disable"
+  # Optional explicit URL (overrides discrete DB settings if set)
+  kellogg-music-match:databaseUrl: "postgres://kellogg_user:CHANGE_ME_DB_PASSWORD@postgres:5432/kellogg_music_match?sslmode=disable"
+
+  # ---------------------------------------------------------------------------
+  # CORS
+  # ---------------------------------------------------------------------------
+  kellogg-music-match:corsAllowedOrigins: "http://localhost:4200,http://kmm-ui.traefik.me,https://kmm-ui.traefik.me"
+  kellogg-music-match:corsAllowedMethods: "GET, POST, PUT, DELETE, OPTIONS"
+  kellogg-music-match:corsAllowedHeaders: "Content-Type, Authorization, X-User-Username"
+  kellogg-music-match:corsAllowCredentials: "true"
+
+  # ---------------------------------------------------------------------------
+  # Artist Constraints
+  # ---------------------------------------------------------------------------
+  kellogg-music-match:artistMinCount: "5"
+  kellogg-music-match:artistMaxCount: "20"
+  kellogg-music-match:artistMaxNameLength: "240"
+  kellogg-music-match:artistSearchMaxLength: "240"
+  kellogg-music-match:artistSearchLimit: "10"
+
+  # ---------------------------------------------------------------------------
+  # Ticketmaster API
+  # ---------------------------------------------------------------------------
+  kellogg-music-match:ticketmasterConsumerKey: "CHANGE_ME_TM_KEY"          # SECRET
+  kellogg-music-match:ticketmasterConsumerSecret: "CHANGE_ME_TM_SECRET"   # SECRET
+  kellogg-music-match:ticketmasterBaseUrl: "https://app.ticketmaster.com/discovery/v2"
+  kellogg-music-match:ticketmasterTimeout: "30"          # seconds
+  kellogg-music-match:ticketmasterMaxResults: "200"
+  kellogg-music-match:ticketmasterDefaultCity: "Chicago"
+  kellogg-music-match:ticketmasterDefaultState: "IL"
+  kellogg-music-match:ticketmasterDefaultCountry: "US"
+
+  # ---------------------------------------------------------------------------
+  # Email / Notifications
+  # ---------------------------------------------------------------------------
+  kellogg-music-match:emailEnabled: "true"
+  kellogg-music-match:emailProvider: "sendgrid"          # or smtp
+  kellogg-music-match:emailFromEmail: "support@kelloggmatch.com"
+  kellogg-music-match:emailFromName: "Kellogg Music Match"
+  kellogg-music-match:appBaseUrl: "https://kelloggmatch.com"
+  kellogg-music-match:sendgridApiKey: "CHANGE_ME_SENDGRID"                # SECRET
+  # SMTP fallback (used if provider=smtp)
+  kellogg-music-match:smtpHost: "smtp.gmail.com"
+  kellogg-music-match:smtpPort: "587"
+  kellogg-music-match:smtpUser: "CHANGE_ME_SMTP_USER"                     # SECRET (treat as secret if sensitive)
+  kellogg-music-match:smtpPass: "CHANGE_ME_SMTP_PASS"                     # SECRET
+
+  # ---------------------------------------------------------------------------
+  # Authentication / JWT
+  # ---------------------------------------------------------------------------
+  kellogg-music-match:jwtSecretKey: "CHANGE_ME_JWT_SECRET"                # SECRET
+  kellogg-music-match:jwtExpiryHours: "24"
+  kellogg-music-match:jwtRefreshHours: "720"
+
+  # ---------------------------------------------------------------------------
+  # Images (override for custom registries)
+  # ---------------------------------------------------------------------------
+  kellogg-music-match:backendImage: "kellogg-music-match-backend:latest"
+  kellogg-music-match:uiImage: "kellogg-music-match-ui:latest"
+  kellogg-music-match:postgresImage: "kellogg-music-match-postgres:latest"
+  kellogg-music-match:musicbrainzImage: "kellogg-music-match-musicbrainz:latest"
+  kellogg-music-match:flywayImage: "flyway/flyway:latest"
+
+  # ---------------------------------------------------------------------------
+  # Replicas
+  # ---------------------------------------------------------------------------
+  kellogg-music-match:backendReplicas: "2"
+  kellogg-music-match:uiReplicas: "2"
+  kellogg-music-match:otelCollectorReplicas: "1"
+
+  # ---------------------------------------------------------------------------
+  # Resource Requests & Limits
+  # ---------------------------------------------------------------------------
+  kellogg-music-match:backendCpuRequest: "100m"
+  kellogg-music-match:backendMemRequest: "128Mi"
+  kellogg-music-match:backendCpuLimit: "500m"
+  kellogg-music-match:backendMemLimit: "512Mi"
+
+  kellogg-music-match:uiCpuRequest: "50m"
+  kellogg-music-match:uiMemRequest: "64Mi"
+  kellogg-music-match:uiCpuLimit: "200m"
+  kellogg-music-match:uiMemLimit: "256Mi"
+
+  kellogg-music-match:postgresCpuRequest: "200m"
+  kellogg-music-match:postgresMemRequest: "512Mi"
+  kellogg-music-match:postgresCpuLimit: "3000m"
+  kellogg-music-match:postgresMemLimit: "2Gi"
+
+  kellogg-music-match:otelCollectorCpuRequest: "50m"
+  kellogg-music-match:otelCollectorMemRequest: "64Mi"
+  kellogg-music-match:otelCollectorCpuLimit: "500m"
+  kellogg-music-match:otelCollectorMemLimit: "256Mi"
+
+  # ---------------------------------------------------------------------------
+  # OpenTelemetry / Tracing
+  # ---------------------------------------------------------------------------
+  kellogg-music-match:tracingEnabled: "true"
+  kellogg-music-match:tracingExporter: "otlp"           # stdout|otlp
+  kellogg-music-match:otlpEndpoint: "http://otel-collector:4318"
+  kellogg-music-match:otelServiceName: "kmm-backend"
+  kellogg-music-match:otelServiceVersion: "1.0.0"
+  kellogg-music-match:otelResourceAttributes: "environment=dev,team=matching"
+  kellogg-music-match:otelTracesSampler: "parentbased_traceidratio"
+  kellogg-music-match:otelTracesSamplerArg: "0.10"
+  kellogg-music-match:otelCollectorImage: "otel/opentelemetry-collector:0.103.1"
+  # Optional full collector override (YAML string). Leave unset to use generated config.
+  # kellogg-music-match:otelCollectorConfig: |
+  #   receivers:
+  #     otlp:
+  #       protocols:
+  #         http:
+  #         grpc:
+  #   processors:
+  #     batch: {}
+  #   exporters:
+  #     logging: {}
+  #   service:
+  #     pipelines:
+  #       traces:
+  #         receivers: [otlp]
+  #         processors: [batch]
+  #         exporters: [logging]
+
+  # Enable Prometheus exporter in collector (also expose metrics port if you wire it)
+  kellogg-music-match:otelCollectorPrometheus: "false"
+  kellogg-music-match:otelCollectorPrometheusPort: "8888"
+
+  # ---------------------------------------------------------------------------
+  # OPTIONAL: Example future NetworkPolicy toggles (not yet implemented)
+  # ---------------------------------------------------------------------------
+  # kellogg-music-match:networkPolicyStrict: "false"
+
+# -----------------------------------------------------------------------------
+# SECRETS HANDLING REMINDER
+# For each key marked SECRET above, run pulumi config set --secret to store an
+# encrypted value in the stack instead of keeping the placeholder here.
+# Placeholders are safe defaults for local experimentation only.
+# -----------------------------------------------------------------------------

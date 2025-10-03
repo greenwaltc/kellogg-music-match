@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"os"
 	"sync"
+
+	"go.opentelemetry.io/otel/trace"
 )
 
 var (
@@ -78,6 +80,13 @@ func FromCtx(ctx context.Context) *slog.Logger {
 			if id := u.UserID(); id != "" {
 				lg = lg.With("userId", id)
 			}
+		}
+	}
+	// Enrich with trace/span if available
+	if span := trace.SpanFromContext(ctx); span != nil {
+		sc := span.SpanContext()
+		if sc.IsValid() {
+			lg = lg.With("traceId", sc.TraceID().String(), "spanId", sc.SpanID().String())
 		}
 	}
 	return lg

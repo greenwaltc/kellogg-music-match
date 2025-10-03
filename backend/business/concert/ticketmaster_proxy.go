@@ -9,6 +9,9 @@ import (
 	"time"
 
 	"github.com/greenwaltc/kellogg-music-match/backend/config"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
 
 type TicketmasterProxy struct {
@@ -86,6 +89,10 @@ func (p *TicketmasterProxy) FetchConcerts(ctx context.Context) (*TicketmasterRes
 
 // FetchConcertsWithPagination fetches concerts with pagination support
 func (p *TicketmasterProxy) FetchConcertsWithPagination(ctx context.Context, page int) (*TicketmasterResponse, error) {
+	tr := otel.Tracer("external.ticketmaster")
+	ctx, span := tr.Start(ctx, "FetchConcertsWithPagination")
+	span.SetAttributes(attribute.Int("app.page", page))
+	defer span.End()
 	// Calculate date range based on configuration (default 6 months)
 	now := time.Now()
 	months := p.config.DateRangeMonths
@@ -122,26 +129,37 @@ func (p *TicketmasterProxy) FetchConcertsWithPagination(ctx context.Context, pag
 	// Make the request
 	resp, err := p.httpClient.Do(req)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	// Check response status
 	if resp.StatusCode != http.StatusOK {
+		span.SetAttributes(attribute.Int("http.status_code", resp.StatusCode))
+		span.SetStatus(codes.Error, fmt.Sprintf("status %d", resp.StatusCode))
 		return nil, fmt.Errorf("API returned status %d", resp.StatusCode)
 	}
 
 	// Parse JSON response
 	var tmResponse TicketmasterResponse
 	if err := json.NewDecoder(resp.Body).Decode(&tmResponse); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
+	span.SetAttributes(attribute.Int("app.events", len(tmResponse.Embedded.Events)))
 
 	return &tmResponse, nil
 }
 
 // FetchConcertsByArtist fetches concerts for a specific artist in Chicago
 func (p *TicketmasterProxy) FetchConcertsByArtist(ctx context.Context, artistName string) (*TicketmasterResponse, error) {
+	tr := otel.Tracer("external.ticketmaster")
+	ctx, span := tr.Start(ctx, "FetchConcertsByArtist")
+	span.SetAttributes(attribute.String("app.artist", artistName))
+	defer span.End()
 	now := time.Now()
 	months := p.config.DateRangeMonths
 	if months <= 0 {
@@ -173,18 +191,25 @@ func (p *TicketmasterProxy) FetchConcertsByArtist(ctx context.Context, artistNam
 
 	resp, err := p.httpClient.Do(req)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		span.SetAttributes(attribute.Int("http.status_code", resp.StatusCode))
+		span.SetStatus(codes.Error, fmt.Sprintf("status %d", resp.StatusCode))
 		return nil, fmt.Errorf("API returned status %d", resp.StatusCode)
 	}
 
 	var tmResponse TicketmasterResponse
 	if err := json.NewDecoder(resp.Body).Decode(&tmResponse); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
+	span.SetAttributes(attribute.Int("app.events", len(tmResponse.Embedded.Events)))
 
 	return &tmResponse, nil
 }

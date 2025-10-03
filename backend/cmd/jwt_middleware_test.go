@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/greenwaltc/kellogg-music-match/backend/business"
 	"github.com/greenwaltc/kellogg-music-match/backend/config"
 	. "github.com/onsi/ginkgo/v2"
@@ -251,6 +252,34 @@ var _ = Describe("JWT Middleware", func() {
 				Expect(capturedUser).ToNot(BeNil())
 				Expect(capturedUser.Username).To(Equal("jwtuser")) // JWT user, not legacy
 				Expect(capturedUser.UserID).To(Equal(userID))
+				Expect(capturedUser.Email).To(Equal(email))
+			})
+		})
+
+		Context("when using legacy camelCase userId in token", func() {
+			It("should still populate UserID via fallback", func() {
+				userID := "123e4567-e89b-12d3-a456-426614174999"
+				username := "legacycamel"
+				email := "legacycamel@example.com"
+
+				mc := jwt.MapClaims{
+					"userId":   userID,
+					"username": username,
+					"email":    email,
+				}
+				tok := jwt.NewWithClaims(jwt.SigningMethodHS256, mc)
+				resigned, err := tok.SignedString([]byte("test-secret-key-for-middleware-testing"))
+				Expect(err).ToNot(HaveOccurred())
+
+				req := httptest.NewRequest("POST", "/findMusicMatches", nil)
+				req.Header.Set("Authorization", "Bearer "+resigned)
+				middleware.Middleware(nextHandler).ServeHTTP(recorder, req)
+
+				Expect(recorder.Code).To(Equal(http.StatusOK))
+				Expect(nextCalled).To(BeTrue())
+				Expect(capturedUser).ToNot(BeNil())
+				Expect(capturedUser.UserID).To(Equal(userID))
+				Expect(capturedUser.Username).To(Equal(username))
 				Expect(capturedUser.Email).To(Equal(email))
 			})
 		})

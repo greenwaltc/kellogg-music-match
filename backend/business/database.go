@@ -10,6 +10,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/greenwaltc/kellogg-music-match/backend/config"
 	sqlc "github.com/greenwaltc/kellogg-music-match/backend/db/sqlc"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -119,6 +122,14 @@ func (r *PostgreSQLUserRepository) Close() error {
 
 // CreateUser creates a new user in the database
 func (r *PostgreSQLUserRepository) CreateUser(ctx context.Context, id uuid.UUID, username, email, firstName, lastName, passwordHash, program string, graduationYear int32) (*sqlc.User, error) {
+	tr := otel.Tracer("repo.user")
+	ctx, span := tr.Start(ctx, "CreateUser")
+	span.SetAttributes(
+		attribute.String("db.system", "postgres"),
+		attribute.String("db.operation", "CreateUser"),
+		attribute.String("app.username", username),
+	)
+	defer span.End()
 	fmt.Printf("CreateUser called: ID=%s, Username=%s, Email=%s, Program=%s, GradYear=%d\n",
 		id.String(), username, email, program, graduationYear)
 
@@ -143,6 +154,8 @@ func (r *PostgreSQLUserRepository) CreateUser(ctx context.Context, id uuid.UUID,
 
 	user, err := r.queries.CreateUser(ctx, params)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		fmt.Printf("CreateUser database error: %v\n", err)
 		return nil, err
 	}
@@ -152,8 +165,14 @@ func (r *PostgreSQLUserRepository) CreateUser(ctx context.Context, id uuid.UUID,
 
 // GetUserByUsername retrieves a user by username
 func (r *PostgreSQLUserRepository) GetUserByUsername(ctx context.Context, username string) (*sqlc.User, error) {
+	tr := otel.Tracer("repo.user")
+	ctx, span := tr.Start(ctx, "GetUserByUsername")
+	span.SetAttributes(attribute.String("db.system", "postgres"), attribute.String("app.username", username))
+	defer span.End()
 	user, err := r.queries.GetUserByUsername(ctx, username)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 	return &user, nil
@@ -161,8 +180,14 @@ func (r *PostgreSQLUserRepository) GetUserByUsername(ctx context.Context, userna
 
 // GetUserByUsernameWithPassword retrieves a user by username with password for authentication
 func (r *PostgreSQLUserRepository) GetUserByUsernameWithPassword(ctx context.Context, username string) (*sqlc.User, error) {
+	tr := otel.Tracer("repo.user")
+	ctx, span := tr.Start(ctx, "GetUserByUsernameWithPassword")
+	span.SetAttributes(attribute.String("db.system", "postgres"), attribute.String("app.username", username))
+	defer span.End()
 	user, err := r.queries.GetUserByUsernameWithPassword(ctx, username)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 	return &user, nil
@@ -170,8 +195,14 @@ func (r *PostgreSQLUserRepository) GetUserByUsernameWithPassword(ctx context.Con
 
 // GetUserByEmail retrieves a user by email
 func (r *PostgreSQLUserRepository) GetUserByEmail(ctx context.Context, email string) (*sqlc.User, error) {
+	tr := otel.Tracer("repo.user")
+	ctx, span := tr.Start(ctx, "GetUserByEmail")
+	span.SetAttributes(attribute.String("db.system", "postgres"), attribute.String("app.email", email))
+	defer span.End()
 	user, err := r.queries.GetUserByEmail(ctx, email)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 	return &user, nil
@@ -179,8 +210,14 @@ func (r *PostgreSQLUserRepository) GetUserByEmail(ctx context.Context, email str
 
 // GetUserByID retrieves a user by ID
 func (r *PostgreSQLUserRepository) GetUserByID(ctx context.Context, id uuid.UUID) (*sqlc.User, error) {
+	tr := otel.Tracer("repo.user")
+	ctx, span := tr.Start(ctx, "GetUserByID")
+	span.SetAttributes(attribute.String("db.system", "postgres"), attribute.String("app.user_id", id.String()))
+	defer span.End()
 	user, err := r.queries.GetUserByID(ctx, id)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 	return &user, nil
@@ -188,23 +225,41 @@ func (r *PostgreSQLUserRepository) GetUserByID(ctx context.Context, id uuid.UUID
 
 // UserExistsByUsername checks if a user exists by username
 func (r *PostgreSQLUserRepository) UserExistsByUsername(ctx context.Context, username string) (bool, error) {
+	tr := otel.Tracer("repo.user")
+	ctx, span := tr.Start(ctx, "UserExistsByUsername")
+	span.SetAttributes(attribute.String("db.system", "postgres"), attribute.String("app.username", username))
+	defer span.End()
 	return r.queries.UserExistsByUsername(ctx, username)
 }
 
 // UserExistsByEmail checks if a user exists by email
 func (r *PostgreSQLUserRepository) UserExistsByEmail(ctx context.Context, email string) (bool, error) {
+	tr := otel.Tracer("repo.user")
+	ctx, span := tr.Start(ctx, "UserExistsByEmail")
+	span.SetAttributes(attribute.String("db.system", "postgres"), attribute.String("app.email", email))
+	defer span.End()
 	return r.queries.UserExistsByEmail(ctx, email)
 }
 
 // GetAllUsersWithArtists retrieves all users with their artists for matching
 func (r *PostgreSQLUserRepository) GetAllUsersWithArtists(ctx context.Context) ([]sqlc.GetUsersWithArtistsRow, error) {
+	tr := otel.Tracer("repo.user")
+	ctx, span := tr.Start(ctx, "GetAllUsersWithArtists")
+	span.SetAttributes(attribute.String("db.system", "postgres"))
+	defer span.End()
 	return r.queries.GetUsersWithArtists(ctx)
 }
 
 // CreateArtist creates or retrieves an artist by name
 func (r *PostgreSQLUserRepository) CreateArtist(ctx context.Context, name string) (*sqlc.Artist, error) {
+	tr := otel.Tracer("repo.artist")
+	ctx, span := tr.Start(ctx, "CreateArtist")
+	span.SetAttributes(attribute.String("db.system", "postgres"), attribute.String("app.artist", name))
+	defer span.End()
 	artist, err := r.queries.CreateArtist(ctx, name)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 	return &artist, nil
@@ -212,8 +267,14 @@ func (r *PostgreSQLUserRepository) CreateArtist(ctx context.Context, name string
 
 // GetArtistByName retrieves an artist by name
 func (r *PostgreSQLUserRepository) GetArtistByName(ctx context.Context, name string) (*sqlc.Artist, error) {
+	tr := otel.Tracer("repo.artist")
+	ctx, span := tr.Start(ctx, "GetArtistByName")
+	span.SetAttributes(attribute.String("db.system", "postgres"), attribute.String("app.artist", name))
+	defer span.End()
 	artist, err := r.queries.GetArtistByName(ctx, name)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 	return &artist, nil
@@ -221,6 +282,10 @@ func (r *PostgreSQLUserRepository) GetArtistByName(ctx context.Context, name str
 
 // SearchArtists performs fuzzy search for artists
 func (r *PostgreSQLUserRepository) SearchArtists(ctx context.Context, query string, limit int32) ([]sqlc.Artist, error) {
+	tr := otel.Tracer("repo.artist")
+	ctx, span := tr.Start(ctx, "SearchArtists")
+	span.SetAttributes(attribute.String("db.system", "postgres"), attribute.String("app.query", query), attribute.Int64("app.limit", int64(limit)))
+	defer span.End()
 	// Prepare fuzzy search patterns
 	fuzzyPattern := "%" + strings.ToLower(query) + "%"
 	exactQuery := strings.ToLower(query)
@@ -236,8 +301,14 @@ func (r *PostgreSQLUserRepository) SearchArtists(ctx context.Context, query stri
 
 // SetUserArtists sets the complete list of artists for a user
 func (r *PostgreSQLUserRepository) SetUserArtists(ctx context.Context, userID uuid.UUID, artistNames []string) error {
+	tr := otel.Tracer("repo.user")
+	ctx, span := tr.Start(ctx, "SetUserArtists")
+	span.SetAttributes(attribute.String("db.system", "postgres"), attribute.String("app.user_id", userID.String()), attribute.Int("app.count", len(artistNames)))
+	defer span.End()
 	// First clear existing associations
 	if err := r.queries.ClearUserArtists(ctx, userID); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return err
 	}
 
@@ -257,16 +328,28 @@ func (r *PostgreSQLUserRepository) SetUserArtists(ctx context.Context, userID uu
 
 // GetUserArtists retrieves all artists for a user
 func (r *PostgreSQLUserRepository) GetUserArtists(ctx context.Context, userID uuid.UUID) ([]sqlc.GetUserArtistsRow, error) {
+	tr := otel.Tracer("repo.user")
+	ctx, span := tr.Start(ctx, "GetUserArtists")
+	span.SetAttributes(attribute.String("db.system", "postgres"), attribute.String("app.user_id", userID.String()))
+	defer span.End()
 	return r.queries.GetUserArtists(ctx, userID)
 }
 
 // ClearUserArtists removes all artist associations for a user
 func (r *PostgreSQLUserRepository) ClearUserArtists(ctx context.Context, userID uuid.UUID) error {
+	tr := otel.Tracer("repo.user")
+	ctx, span := tr.Start(ctx, "ClearUserArtists")
+	span.SetAttributes(attribute.String("db.system", "postgres"), attribute.String("app.user_id", userID.String()))
+	defer span.End()
 	return r.queries.ClearUserArtists(ctx, userID)
 }
 
 // FindSimilarUsers finds users similar to the given username based on their artist preferences
 func (r *PostgreSQLUserRepository) FindSimilarUsers(ctx context.Context, username string) ([]sqlc.FindSimilarUsersRow, error) {
+	tr := otel.Tracer("repo.matching")
+	ctx, span := tr.Start(ctx, "FindSimilarUsers")
+	span.SetAttributes(attribute.String("db.system", "postgres"), attribute.String("app.username", username))
+	defer span.End()
 	// Using the Chamfer-based finder we created (ensure your queries.sql has it)
 	return r.queries.FindSimilarUsers(ctx, sqlc.FindSimilarUsersParams{
 		Username: username,
@@ -278,18 +361,28 @@ func (r *PostgreSQLUserRepository) FindSimilarUsers(ctx context.Context, usernam
 
 // Feedback operations
 func (r *PostgreSQLUserRepository) CreateFeedback(ctx context.Context, userID uuid.UUID, feedbackText string) (*sqlc.Feedback, error) {
+	tr := otel.Tracer("repo.feedback")
+	ctx, span := tr.Start(ctx, "CreateFeedback")
+	span.SetAttributes(attribute.String("db.system", "postgres"), attribute.String("app.user_id", userID.String()))
+	defer span.End()
 	params := sqlc.CreateFeedbackParams{
 		UserID:       userID,
 		FeedbackText: feedbackText,
 	}
 	feedback, err := r.queries.CreateFeedback(ctx, params)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 	return &feedback, nil
 }
 
 func (r *PostgreSQLUserRepository) GetFeedbackByUser(ctx context.Context, userID uuid.UUID) ([]sqlc.Feedback, error) {
+	tr := otel.Tracer("repo.feedback")
+	ctx, span := tr.Start(ctx, "GetFeedbackByUser")
+	span.SetAttributes(attribute.String("db.system", "postgres"), attribute.String("app.user_id", userID.String()))
+	defer span.End()
 	return r.queries.GetFeedbackByUser(ctx, userID)
 }
 
@@ -312,6 +405,10 @@ func NewPoolFromEnv() (*pgxpool.Pool, error) {
 
 // CreatePasswordResetToken creates a new password reset token
 func (r *PostgreSQLUserRepository) CreatePasswordResetToken(ctx context.Context, userID uuid.UUID, token string, expiresAt time.Time) (sqlc.PasswordResetToken, error) {
+	tr := otel.Tracer("repo.password")
+	ctx, span := tr.Start(ctx, "CreatePasswordResetToken")
+	span.SetAttributes(attribute.String("db.system", "postgres"), attribute.String("app.user_id", userID.String()))
+	defer span.End()
 	return r.queries.CreatePasswordResetToken(ctx, sqlc.CreatePasswordResetTokenParams{
 		UserID:    userID,
 		Token:     token,
@@ -321,26 +418,46 @@ func (r *PostgreSQLUserRepository) CreatePasswordResetToken(ctx context.Context,
 
 // GetPasswordResetToken retrieves a password reset token if valid
 func (r *PostgreSQLUserRepository) GetPasswordResetToken(ctx context.Context, token string) (sqlc.PasswordResetToken, error) {
+	tr := otel.Tracer("repo.password")
+	ctx, span := tr.Start(ctx, "GetPasswordResetToken")
+	span.SetAttributes(attribute.String("db.system", "postgres"), attribute.String("app.token", token))
+	defer span.End()
 	return r.queries.GetPasswordResetToken(ctx, token)
 }
 
 // MarkPasswordResetTokenAsUsed marks a token as used
 func (r *PostgreSQLUserRepository) MarkPasswordResetTokenAsUsed(ctx context.Context, token string) error {
+	tr := otel.Tracer("repo.password")
+	ctx, span := tr.Start(ctx, "MarkPasswordResetTokenAsUsed")
+	span.SetAttributes(attribute.String("db.system", "postgres"), attribute.String("app.token", token))
+	defer span.End()
 	return r.queries.MarkPasswordResetTokenAsUsed(ctx, token)
 }
 
 // DeleteExpiredPasswordResetTokens removes expired tokens
 func (r *PostgreSQLUserRepository) DeleteExpiredPasswordResetTokens(ctx context.Context) error {
+	tr := otel.Tracer("repo.password")
+	ctx, span := tr.Start(ctx, "DeleteExpiredPasswordResetTokens")
+	span.SetAttributes(attribute.String("db.system", "postgres"))
+	defer span.End()
 	return r.queries.DeleteExpiredPasswordResetTokens(ctx)
 }
 
 // DeleteUserPasswordResetTokens removes all reset tokens for a user
 func (r *PostgreSQLUserRepository) DeleteUserPasswordResetTokens(ctx context.Context, userID uuid.UUID) error {
+	tr := otel.Tracer("repo.password")
+	ctx, span := tr.Start(ctx, "DeleteUserPasswordResetTokens")
+	span.SetAttributes(attribute.String("db.system", "postgres"), attribute.String("app.user_id", userID.String()))
+	defer span.End()
 	return r.queries.DeleteUserPasswordResetTokens(ctx, userID)
 }
 
 // UpdateUserPassword updates a user's password
 func (r *PostgreSQLUserRepository) UpdateUserPassword(ctx context.Context, userID uuid.UUID, passwordHash string) (sqlc.UpdateUserPasswordRow, error) {
+	tr := otel.Tracer("repo.password")
+	ctx, span := tr.Start(ctx, "UpdateUserPassword")
+	span.SetAttributes(attribute.String("db.system", "postgres"), attribute.String("app.user_id", userID.String()))
+	defer span.End()
 	return r.queries.UpdateUserPassword(ctx, sqlc.UpdateUserPasswordParams{
 		ID:           userID,
 		PasswordHash: passwordHash,

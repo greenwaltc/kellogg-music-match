@@ -2,12 +2,6 @@
 
 A professional full-stack music taste matching application designed for Kellogg students, featuring Go backend with Ticketmaster integration, Angular frontend, PostgreSQL database with scientific PWO distance metric, and automated infrastructure deployment.
 
-## 🏗️ Architecture Overview
-
-```
-kellogg-music-match/
-├── backend/              # Go backend with OpenAPI generation & Ticketmaster API
-├── ui/                  # Angular frontend application  
 ├── pulumi/              # Infrastructure as Code (Pulumi)
 ├── database/            # Flyway migrations and configuration
 ├── scripts/             # Deployment and utility scripts

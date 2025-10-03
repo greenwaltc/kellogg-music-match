@@ -14,6 +14,7 @@ type Config struct {
 	Artist       ArtistConfig
 	Ticketmaster TicketmasterConfig
 	Debug        DebugConfig
+	Telemetry    TelemetryConfig
 	JWT          JWTConfig
 	Email        EmailConfig
 }
@@ -68,6 +69,15 @@ type DebugConfig struct {
 	Enabled bool
 }
 
+// TelemetryConfig controls tracing/metrics exporters
+type TelemetryConfig struct {
+	Enabled        bool   // master toggle
+	Exporter       string // "stdout" (default) or "otlp"
+	OTLPEndpoint   string // e.g. http://otel-collector:4318
+	ServiceName    string // override service name
+	ServiceVersion string // override service version
+}
+
 // EmailConfig holds email service configuration
 type EmailConfig struct {
 	Provider  string // "sendgrid", "ses", "smtp"
@@ -83,9 +93,10 @@ type EmailConfig struct {
 
 // JWTConfig holds JWT-related configuration
 type JWTConfig struct {
-	SecretKey    string
-	ExpiryHours  int
-	RefreshHours int
+	SecretKey     string
+	ExpiryHours   int
+	RefreshHours  int
+	LeewaySeconds int // allowed clock skew (nbf/iat/exp) in seconds
 }
 
 // Load creates a new Config instance from environment variables
@@ -132,10 +143,18 @@ func Load() *Config {
 		Debug: DebugConfig{
 			Enabled: getEnvBoolWithDefault("DEBUG_ENABLED", false),
 		},
+		Telemetry: TelemetryConfig{
+			Enabled:        getEnvBoolWithDefault("TRACING_ENABLED", true),
+			Exporter:       getEnvWithDefault("TRACING_EXPORTER", "stdout"),
+			OTLPEndpoint:   getEnvWithDefault("OTEL_EXPORTER_OTLP_ENDPOINT", ""),
+			ServiceName:    getEnvWithDefault("OTEL_SERVICE_NAME", "kmm-backend"),
+			ServiceVersion: getEnvWithDefault("OTEL_SERVICE_VERSION", "1.0.0"),
+		},
 		JWT: JWTConfig{
-			SecretKey:    getEnvWithDefault("JWT_SECRET_KEY", "your-secret-key-change-in-production"),
-			ExpiryHours:  getEnvIntWithDefault("JWT_EXPIRY_HOURS", 24),
-			RefreshHours: getEnvIntWithDefault("JWT_REFRESH_HOURS", 168), // 7 days
+			SecretKey:     getEnvWithDefault("JWT_SECRET_KEY", "your-secret-key-change-in-production"),
+			ExpiryHours:   getEnvIntWithDefault("JWT_EXPIRY_HOURS", 24),
+			RefreshHours:  getEnvIntWithDefault("JWT_REFRESH_HOURS", 168), // 7 days
+			LeewaySeconds: getEnvIntWithDefault("JWT_LEEWAY_SECONDS", 120),
 		},
 		Email: EmailConfig{
 			Provider:  getEnvWithDefault("EMAIL_PROVIDER", "sendgrid"),

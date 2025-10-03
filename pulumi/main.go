@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"strings"
 
@@ -14,6 +15,124 @@ import (
 
 func main() {
 	pulumi.Run(func(ctx *pulumi.Context) error {
+		// Helper accessors for Pulumi config (string-based for env vars)
+		pulumiCfg := config.New(ctx, "")
+		get := func(key, def string) pulumi.StringInput {
+			if v := pulumiCfg.Get(key); v != "" {
+				return pulumi.String(v)
+			}
+			return pulumi.String(def)
+		}
+		getInt := func(key string, def int) int {
+			if v := pulumiCfg.GetInt(key); v != 0 {
+				return v
+			}
+			return def
+		}
+		getBoolStr := func(key string, def bool) pulumi.StringInput {
+			if v := pulumiCfg.GetBool(key); v {
+				return pulumi.String("true")
+			} else if pulumiCfg.Get(key) != "" {
+				return pulumi.String("false")
+			}
+			if def {
+				return pulumi.String("true")
+			}
+			return pulumi.String("false")
+		}
+
+		// Config-derived variables (defaults preserve existing hard-coded values)
+		serverPort := get("serverPort", "8080")
+		dbHost := get("dbHost", "postgres")
+		dbPort := get("dbPort", "5432")
+		dbUser := get("dbUser", "kellogg_user")
+		dbPassword := get("dbPassword", "kellogg_secure_pass_2024")
+		dbName := get("dbName", "kellogg_music_match")
+		dbSSLMode := get("dbSSLMode", "disable")
+		corsAllowedOrigins := get("corsAllowedOrigins", "http://localhost:4200,http://kmm-ui.traefik.me,https://kmm-ui.traefik.me")
+		corsAllowedMethods := get("corsAllowedMethods", "GET, POST, PUT, DELETE, OPTIONS")
+		corsAllowedHeaders := get("corsAllowedHeaders", "Content-Type, Authorization, X-User-Username")
+		corsAllowCredentials := getBoolStr("corsAllowCredentials", true)
+		artistMinCount := get("artistMinCount", "5")
+		artistMaxCount := get("artistMaxCount", "20")
+		artistMaxNameLength := get("artistMaxNameLength", "240")
+		artistSearchMaxLength := get("artistSearchMaxLength", "240")
+		artistSearchLimit := get("artistSearchLimit", "10")
+		debugEnabled := getBoolStr("debugEnabled", false)
+		tmKey := get("ticketmasterConsumerKey", "3RVuRqbo6iLpQj0iEG6UUAZiWa2Z5Y0O")
+		tmSecret := get("ticketmasterConsumerSecret", "EzfZFlmQwTHXIrsb")
+		tmBaseURL := get("ticketmasterBaseUrl", "https://app.ticketmaster.com/discovery/v2")
+		tmTimeout := get("ticketmasterTimeout", "30")
+		tmMaxResults := get("ticketmasterMaxResults", "200")
+		tmCity := get("ticketmasterDefaultCity", "Chicago")
+		tmState := get("ticketmasterDefaultState", "IL")
+		tmCountry := get("ticketmasterDefaultCountry", "US")
+		emailEnabled := getBoolStr("emailEnabled", true)
+		emailProvider := get("emailProvider", "sendgrid")
+		emailFromEmail := get("emailFromEmail", "support@kelloggmatch.com")
+		emailFromName := get("emailFromName", "Kellogg Music Match")
+		appBaseURL := get("appBaseUrl", "https://kelloggmatch.com")
+		sendgridAPIKey := get("sendgridApiKey", "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")
+		smtpHost := get("smtpHost", "smtp.gmail.com")
+		smtpPort := get("smtpPort", "587")
+		smtpUser := get("smtpUser", "dummy-user@gmail.com")
+		smtpPass := get("smtpPass", "dummy-password")
+		jwtSecret := get("jwtSecretKey", "your-secret-key-here-change-in-production")
+		jwtExpiry := get("jwtExpiryHours", "24")
+		jwtRefresh := get("jwtRefreshHours", "720")
+		legacyPort := serverPort
+		databaseURL := get("databaseUrl", "postgres://kellogg_user:kellogg_secure_pass_2024@postgres:5432/kellogg_music_match?sslmode=disable")
+		backendReplicas := getInt("backendReplicas", 2)
+		uiReplicas := getInt("uiReplicas", 2)
+		backendImage := get("backendImage", "kellogg-music-match-backend:latest")
+		uiImage := get("uiImage", "kellogg-music-match-ui:latest")
+		postgresImage := get("postgresImage", "kellogg-music-match-postgres:latest")
+		musicbrainzImage := get("musicbrainzImage", "kellogg-music-match-musicbrainz:latest")
+		flywayImage := get("flywayImage", "flyway/flyway:latest")
+		tracingEnabled := getBoolStr("tracingEnabled", true)
+		tracingExporter := get("tracingExporter", "otlp")
+		otlpEndpoint := get("otlpEndpoint", "http://otel-collector:4318")
+		otelServiceName := get("otelServiceName", "kmm-backend")
+		otelServiceVersion := get("otelServiceVersion", "1.0.0")
+		otelResourceAttributes := get("otelResourceAttributes", "environment=dev,team=matching")
+		otelTracesSampler := get("otelTracesSampler", "parentbased_traceidratio")
+		otelTracesSamplerArg := get("otelTracesSamplerArg", "0.10")
+		collectorImage := get("otelCollectorImage", "otel/opentelemetry-collector:0.103.1")
+		collectorReplicas := getInt("otelCollectorReplicas", 1)
+		collectorConfigOverride := pulumiCfg.Get("otelCollectorConfig")
+		promEnabled := pulumiCfg.GetBool("otelCollectorPrometheus")
+		collectorPromPort := getInt("otelCollectorPrometheusPort", 8888)
+		backendCPUReq := get("backendCpuRequest", "100m")
+		backendMemReq := get("backendMemRequest", "128Mi")
+		backendCPULimit := get("backendCpuLimit", "500m")
+		backendMemLimit := get("backendMemLimit", "512Mi")
+		collectorCPUReq := get("otelCollectorCpuRequest", "50m")
+		collectorMemReq := get("otelCollectorMemRequest", "64Mi")
+		collectorCPULimit := get("otelCollectorCpuLimit", "500m")
+		collectorMemLimit := get("otelCollectorMemLimit", "256Mi")
+		postgresCPUReq := get("postgresCpuRequest", "200m")
+		postgresMemReq := get("postgresMemRequest", "512Mi")
+		postgresCPULimit := get("postgresCpuLimit", "3000m")
+		postgresMemLimit := get("postgresMemLimit", "2Gi")
+		uiCPUReq := get("uiCpuRequest", "50m")
+		uiMemReq := get("uiMemRequest", "64Mi")
+		uiCPULimit := get("uiCpuLimit", "200m")
+		uiMemLimit := get("uiMemLimit", "256Mi")
+
+		baseCollector := "receivers:\n  otlp:\n    protocols:\n      http:\n        endpoint: 0.0.0.0:4318\n      grpc:\nprocessors:\n  batch: {}\nexporters:\n  logging: {}\n"
+		if promEnabled {
+			baseCollector += fmt.Sprintf("  prometheus:\n    endpoint: 0.0.0.0:%d\n", collectorPromPort)
+		}
+		baseCollector += "service:\n  pipelines:\n    traces:\n      receivers: [otlp]\n      processors: [batch]\n      exporters: [logging"
+		if promEnabled {
+			baseCollector += ",prometheus"
+		}
+		baseCollector += "]\n"
+		collectorConfigContent := baseCollector
+		if collectorConfigOverride != "" {
+			collectorConfigContent = collectorConfigOverride
+		}
+
 		// Read Flyway configuration file
 		flywayConfig, err := os.ReadFile("../database/flyway.conf")
 		if err != nil {
@@ -248,6 +367,30 @@ echo "🎉 MusicBrainz data loading completed"`),
 		}
 
 		// Create backend deployment with enhanced database integration
+		// First, create a Secret for backend-sensitive configuration values.
+		backendSecret, err := corev1.NewSecret(ctx, "backend-secret", &corev1.SecretArgs{
+			Metadata: &metav1.ObjectMetaArgs{
+				Name:      pulumi.String("backend-secret"),
+				Namespace: namespace.Metadata.Name(),
+				Labels: pulumi.StringMap{
+					"app":       pulumi.String("kmm"),
+					"component": pulumi.String("backend"),
+				},
+			},
+			StringData: pulumi.StringMap{
+				"JWT_SECRET_KEY":               jwtSecret,
+				"TICKETMASTER_CONSUMER_KEY":    tmKey,
+				"TICKETMASTER_CONSUMER_SECRET": tmSecret,
+				"SENDGRID_API_KEY":             sendgridAPIKey,
+				"SMTP_USER":                    smtpUser,
+				"SMTP_PASS":                    smtpPass,
+				"DB_PASSWORD":                  dbPassword,
+			},
+		})
+		if err != nil {
+			return err
+		}
+
 		backendDeployment, err := appsv1.NewDeployment(ctx, "backend-deployment", &appsv1.DeploymentArgs{
 			Metadata: &metav1.ObjectMetaArgs{
 				Name:      pulumi.String("kmm-backend"),
@@ -258,7 +401,7 @@ echo "🎉 MusicBrainz data loading completed"`),
 				},
 			},
 			Spec: &appsv1.DeploymentSpecArgs{
-				Replicas: pulumi.Int(2),
+				Replicas: pulumi.Int(backendReplicas),
 				Selector: &metav1.LabelSelectorArgs{
 					MatchLabels: pulumi.StringMap{
 						"app":       pulumi.String("kmm"),
@@ -286,7 +429,7 @@ echo "🎉 MusicBrainz data loading completed"`),
 							},
 							&corev1.ContainerArgs{
 								Name:  pulumi.String("flyway-migrate"),
-								Image: pulumi.String("flyway/flyway:latest"),
+								Image: flywayImage,
 								Command: pulumi.StringArray{
 									pulumi.String("flyway"),
 									pulumi.String("migrate"),
@@ -320,7 +463,7 @@ echo "🎉 MusicBrainz data loading completed"`),
 							},
 							&corev1.ContainerArgs{
 								Name:            pulumi.String("load-musicbrainz-data"),
-								Image:           pulumi.String("kellogg-music-match-musicbrainz:latest"),
+								Image:           musicbrainzImage,
 								ImagePullPolicy: pulumi.String("Never"),
 								Command: pulumi.StringArray{
 									pulumi.String("bash"),
@@ -344,7 +487,7 @@ echo "🎉 MusicBrainz data loading completed"`),
 						Containers: corev1.ContainerArray{
 							&corev1.ContainerArgs{
 								Name:            pulumi.String("backend"),
-								Image:           pulumi.String("kellogg-music-match-backend:latest"),
+								Image:           backendImage,
 								ImagePullPolicy: pulumi.String("Never"),
 								Ports: corev1.ContainerPortArray{
 									&corev1.ContainerPortArgs{
@@ -354,186 +497,69 @@ echo "🎉 MusicBrainz data loading completed"`),
 								},
 								Env: corev1.EnvVarArray{
 									// Server Configuration
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("SERVER_PORT"),
-										Value: pulumi.String("8080"),
-									},
+									&corev1.EnvVarArgs{Name: pulumi.String("SERVER_PORT"), Value: serverPort},
 									// Database Configuration
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("DB_HOST"),
-										Value: pulumi.String("postgres"),
-									},
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("DB_PORT"),
-										Value: pulumi.String("5432"),
-									},
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("DB_USER"),
-										Value: pulumi.String("kellogg_user"),
-									},
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("DB_PASSWORD"),
-										Value: pulumi.String("kellogg_secure_pass_2024"),
-									},
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("DB_NAME"),
-										Value: pulumi.String("kellogg_music_match"),
-									},
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("DB_SSLMODE"),
-										Value: pulumi.String("disable"),
-									},
+									&corev1.EnvVarArgs{Name: pulumi.String("DB_HOST"), Value: dbHost},
+									&corev1.EnvVarArgs{Name: pulumi.String("DB_PORT"), Value: dbPort},
+									&corev1.EnvVarArgs{Name: pulumi.String("DB_USER"), Value: dbUser},
+									&corev1.EnvVarArgs{Name: pulumi.String("DB_PASSWORD"), ValueFrom: &corev1.EnvVarSourceArgs{SecretKeyRef: &corev1.SecretKeySelectorArgs{Name: backendSecret.Metadata.Name(), Key: pulumi.String("DB_PASSWORD")}}},
+									&corev1.EnvVarArgs{Name: pulumi.String("DB_NAME"), Value: dbName},
+									&corev1.EnvVarArgs{Name: pulumi.String("DB_SSLMODE"), Value: dbSSLMode},
 									// CORS Configuration
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("CORS_ALLOWED_ORIGINS"),
-										Value: pulumi.String("http://localhost:4200,http://kmm-ui.traefik.me,https://kmm-ui.traefik.me"),
-									},
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("CORS_ALLOWED_METHODS"),
-										Value: pulumi.String("GET, POST, PUT, DELETE, OPTIONS"),
-									},
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("CORS_ALLOWED_HEADERS"),
-										Value: pulumi.String("Content-Type, Authorization, X-User-Username"),
-									},
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("CORS_ALLOW_CREDENTIALS"),
-										Value: pulumi.String("true"),
-									},
+									&corev1.EnvVarArgs{Name: pulumi.String("CORS_ALLOWED_ORIGINS"), Value: corsAllowedOrigins},
+									&corev1.EnvVarArgs{Name: pulumi.String("CORS_ALLOWED_METHODS"), Value: corsAllowedMethods},
+									&corev1.EnvVarArgs{Name: pulumi.String("CORS_ALLOWED_HEADERS"), Value: corsAllowedHeaders},
+									&corev1.EnvVarArgs{Name: pulumi.String("CORS_ALLOW_CREDENTIALS"), Value: corsAllowCredentials},
 									// Artist Configuration
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("ARTIST_MIN_COUNT"),
-										Value: pulumi.String("5"),
-									},
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("ARTIST_MAX_COUNT"),
-										Value: pulumi.String("20"),
-									},
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("ARTIST_MAX_NAME_LENGTH"),
-										Value: pulumi.String("240"),
-									},
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("ARTIST_SEARCH_MAX_LENGTH"),
-										Value: pulumi.String("240"),
-									},
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("ARTIST_SEARCH_LIMIT"),
-										Value: pulumi.String("10"),
-									},
+									&corev1.EnvVarArgs{Name: pulumi.String("ARTIST_MIN_COUNT"), Value: artistMinCount},
+									&corev1.EnvVarArgs{Name: pulumi.String("ARTIST_MAX_COUNT"), Value: artistMaxCount},
+									&corev1.EnvVarArgs{Name: pulumi.String("ARTIST_MAX_NAME_LENGTH"), Value: artistMaxNameLength},
+									&corev1.EnvVarArgs{Name: pulumi.String("ARTIST_SEARCH_MAX_LENGTH"), Value: artistSearchMaxLength},
+									&corev1.EnvVarArgs{Name: pulumi.String("ARTIST_SEARCH_LIMIT"), Value: artistSearchLimit},
 									// Debug Configuration
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("DEBUG_ENABLED"),
-										Value: pulumi.String("false"),
-									},
+									&corev1.EnvVarArgs{Name: pulumi.String("DEBUG_ENABLED"), Value: debugEnabled},
 									// Ticketmaster API Configuration
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("TICKETMASTER_CONSUMER_KEY"),
-										Value: pulumi.String("3RVuRqbo6iLpQj0iEG6UUAZiWa2Z5Y0O"),
-									},
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("TICKETMASTER_CONSUMER_SECRET"),
-										Value: pulumi.String("EzfZFlmQwTHXIrsb"),
-									},
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("TICKETMASTER_BASE_URL"),
-										Value: pulumi.String("https://app.ticketmaster.com/discovery/v2"),
-									},
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("TICKETMASTER_TIMEOUT"),
-										Value: pulumi.String("30"),
-									},
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("TICKETMASTER_MAX_RESULTS"),
-										Value: pulumi.String("200"),
-									},
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("TICKETMASTER_DEFAULT_CITY"),
-										Value: pulumi.String("Chicago"),
-									},
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("TICKETMASTER_DEFAULT_STATE"),
-										Value: pulumi.String("IL"),
-									},
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("TICKETMASTER_DEFAULT_COUNTRY"),
-										Value: pulumi.String("US"),
-									},
+									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_CONSUMER_KEY"), ValueFrom: &corev1.EnvVarSourceArgs{SecretKeyRef: &corev1.SecretKeySelectorArgs{Name: backendSecret.Metadata.Name(), Key: pulumi.String("TICKETMASTER_CONSUMER_KEY")}}},
+									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_CONSUMER_SECRET"), ValueFrom: &corev1.EnvVarSourceArgs{SecretKeyRef: &corev1.SecretKeySelectorArgs{Name: backendSecret.Metadata.Name(), Key: pulumi.String("TICKETMASTER_CONSUMER_SECRET")}}},
+									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_BASE_URL"), Value: tmBaseURL},
+									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_TIMEOUT"), Value: tmTimeout},
+									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_MAX_RESULTS"), Value: tmMaxResults},
+									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_DEFAULT_CITY"), Value: tmCity},
+									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_DEFAULT_STATE"), Value: tmState},
+									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_DEFAULT_COUNTRY"), Value: tmCountry},
 									// Email Configuration
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("EMAIL_ENABLED"),
-										Value: pulumi.String("true"),
-									},
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("EMAIL_PROVIDER"),
-										Value: pulumi.String("sendgrid"),
-									},
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("EMAIL_FROM_EMAIL"),
-										Value: pulumi.String("support@kelloggmatch.com"),
-									},
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("EMAIL_FROM_NAME"),
-										Value: pulumi.String("Kellogg Music Match"),
-									},
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("APP_BASE_URL"),
-										Value: pulumi.String("https://kelloggmatch.com"),
-									},
+									&corev1.EnvVarArgs{Name: pulumi.String("EMAIL_ENABLED"), Value: emailEnabled},
+									&corev1.EnvVarArgs{Name: pulumi.String("EMAIL_PROVIDER"), Value: emailProvider},
+									&corev1.EnvVarArgs{Name: pulumi.String("EMAIL_FROM_EMAIL"), Value: emailFromEmail},
+									&corev1.EnvVarArgs{Name: pulumi.String("EMAIL_FROM_NAME"), Value: emailFromName},
+									&corev1.EnvVarArgs{Name: pulumi.String("APP_BASE_URL"), Value: appBaseURL},
 									// SendGrid Configuration (will be set when service is configured)
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("SENDGRID_API_KEY"),
-										Value: pulumi.String("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"),
-									},
+									&corev1.EnvVarArgs{Name: pulumi.String("SENDGRID_API_KEY"), ValueFrom: &corev1.EnvVarSourceArgs{SecretKeyRef: &corev1.SecretKeySelectorArgs{Name: backendSecret.Metadata.Name(), Key: pulumi.String("SENDGRID_API_KEY")}}},
 									// SMTP Configuration (alternative to SendGrid)
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("SMTP_HOST"),
-										Value: pulumi.String("smtp.gmail.com"),
-									},
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("SMTP_PORT"),
-										Value: pulumi.String("587"),
-									},
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("SMTP_USER"),
-										Value: pulumi.String("dummy-user@gmail.com"),
-									},
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("SMTP_PASS"),
-										Value: pulumi.String("dummy-password"),
-									},
+									&corev1.EnvVarArgs{Name: pulumi.String("SMTP_HOST"), Value: smtpHost},
+									&corev1.EnvVarArgs{Name: pulumi.String("SMTP_PORT"), Value: smtpPort},
+									&corev1.EnvVarArgs{Name: pulumi.String("SMTP_USER"), ValueFrom: &corev1.EnvVarSourceArgs{SecretKeyRef: &corev1.SecretKeySelectorArgs{Name: backendSecret.Metadata.Name(), Key: pulumi.String("SMTP_USER")}}},
+									&corev1.EnvVarArgs{Name: pulumi.String("SMTP_PASS"), ValueFrom: &corev1.EnvVarSourceArgs{SecretKeyRef: &corev1.SecretKeySelectorArgs{Name: backendSecret.Metadata.Name(), Key: pulumi.String("SMTP_PASS")}}},
 									// JWT Configuration
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("JWT_SECRET_KEY"),
-										Value: pulumi.String("your-secret-key-here-change-in-production"),
-									},
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("JWT_EXPIRY_HOURS"),
-										Value: pulumi.String("24"),
-									},
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("JWT_REFRESH_HOURS"),
-										Value: pulumi.String("720"),
-									},
+									&corev1.EnvVarArgs{Name: pulumi.String("JWT_SECRET_KEY"), ValueFrom: &corev1.EnvVarSourceArgs{SecretKeyRef: &corev1.SecretKeySelectorArgs{Name: backendSecret.Metadata.Name(), Key: pulumi.String("JWT_SECRET_KEY")}}},
+									&corev1.EnvVarArgs{Name: pulumi.String("JWT_EXPIRY_HOURS"), Value: jwtExpiry},
+									&corev1.EnvVarArgs{Name: pulumi.String("JWT_REFRESH_HOURS"), Value: jwtRefresh},
+									// Telemetry / Tracing Configuration
+									&corev1.EnvVarArgs{Name: pulumi.String("TRACING_ENABLED"), Value: tracingEnabled},
+									&corev1.EnvVarArgs{Name: pulumi.String("TRACING_EXPORTER"), Value: tracingExporter},
+									&corev1.EnvVarArgs{Name: pulumi.String("OTEL_EXPORTER_OTLP_ENDPOINT"), Value: otlpEndpoint},
+									&corev1.EnvVarArgs{Name: pulumi.String("OTEL_SERVICE_NAME"), Value: otelServiceName},
+									&corev1.EnvVarArgs{Name: pulumi.String("OTEL_SERVICE_VERSION"), Value: otelServiceVersion},
+									&corev1.EnvVarArgs{Name: pulumi.String("OTEL_RESOURCE_ATTRIBUTES"), Value: otelResourceAttributes},
+									&corev1.EnvVarArgs{Name: pulumi.String("OTEL_TRACES_SAMPLER"), Value: otelTracesSampler},
+									&corev1.EnvVarArgs{Name: pulumi.String("OTEL_TRACES_SAMPLER_ARG"), Value: otelTracesSamplerArg},
 									// Legacy environment variables for backward compatibility
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("PORT"),
-										Value: pulumi.String("8080"),
-									},
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("DATABASE_URL"),
-										Value: pulumi.String("postgres://kellogg_user:kellogg_secure_pass_2024@postgres:5432/kellogg_music_match?sslmode=disable"),
-									},
+									&corev1.EnvVarArgs{Name: pulumi.String("PORT"), Value: legacyPort},
+									&corev1.EnvVarArgs{Name: pulumi.String("DATABASE_URL"), Value: databaseURL},
 								},
 								Resources: &corev1.ResourceRequirementsArgs{
-									Requests: pulumi.StringMap{
-										"cpu":    pulumi.String("100m"),
-										"memory": pulumi.String("128Mi"),
-									},
-									Limits: pulumi.StringMap{
-										"cpu":    pulumi.String("500m"),
-										"memory": pulumi.String("512Mi"),
-									},
+									Requests: pulumi.StringMap{"cpu": backendCPUReq, "memory": backendMemReq},
+									Limits:   pulumi.StringMap{"cpu": backendCPULimit, "memory": backendMemLimit},
 								},
 								LivenessProbe: &corev1.ProbeArgs{
 									HttpGet: &corev1.HTTPGetActionArgs{
@@ -624,7 +650,7 @@ echo "🎉 MusicBrainz data loading completed"`),
 				},
 			},
 			Spec: &appsv1.DeploymentSpecArgs{
-				Replicas: pulumi.Int(2),
+				Replicas: pulumi.Int(uiReplicas),
 				Selector: &metav1.LabelSelectorArgs{
 					MatchLabels: pulumi.StringMap{
 						"app":       pulumi.String("kmm"),
@@ -643,7 +669,7 @@ echo "🎉 MusicBrainz data loading completed"`),
 						Containers: corev1.ContainerArray{
 							&corev1.ContainerArgs{
 								Name:            pulumi.String("ui"),
-								Image:           pulumi.String("kellogg-music-match-ui:latest"),
+								Image:           uiImage,
 								ImagePullPolicy: pulumi.String("Never"),
 								Ports: corev1.ContainerPortArray{
 									&corev1.ContainerPortArgs{
@@ -652,14 +678,8 @@ echo "🎉 MusicBrainz data loading completed"`),
 									},
 								},
 								Resources: &corev1.ResourceRequirementsArgs{
-									Requests: pulumi.StringMap{
-										"cpu":    pulumi.String("50m"),
-										"memory": pulumi.String("64Mi"),
-									},
-									Limits: pulumi.StringMap{
-										"cpu":    pulumi.String("200m"),
-										"memory": pulumi.String("256Mi"),
-									},
+									Requests: pulumi.StringMap{"cpu": uiCPUReq, "memory": uiMemReq},
+									Limits:   pulumi.StringMap{"cpu": uiCPULimit, "memory": uiMemLimit},
 								},
 								LivenessProbe: &corev1.ProbeArgs{
 									HttpGet: &corev1.HTTPGetActionArgs{
@@ -876,7 +896,7 @@ echo "🎉 MusicBrainz data loading completed"`),
 						Containers: corev1.ContainerArray{
 							&corev1.ContainerArgs{
 								Name:            pulumi.String("postgres"),
-								Image:           pulumi.String("kellogg-music-match-postgres:latest"),
+								Image:           postgresImage,
 								ImagePullPolicy: pulumi.String("Never"),
 								Ports: corev1.ContainerPortArray{
 									&corev1.ContainerPortArgs{
@@ -903,14 +923,8 @@ echo "🎉 MusicBrainz data loading completed"`),
 									},
 								},
 								Resources: &corev1.ResourceRequirementsArgs{
-									Requests: pulumi.StringMap{
-										"cpu":    pulumi.String("200m"),
-										"memory": pulumi.String("512Mi"),
-									},
-									Limits: pulumi.StringMap{
-										"cpu":    pulumi.String("3000m"),
-										"memory": pulumi.String("2Gi"),
-									},
+									Requests: pulumi.StringMap{"cpu": postgresCPUReq, "memory": postgresMemReq},
+									Limits:   pulumi.StringMap{"cpu": postgresCPULimit, "memory": postgresMemLimit},
 								},
 								LivenessProbe: &corev1.ProbeArgs{
 									Exec: &corev1.ExecActionArgs{
@@ -1020,6 +1034,75 @@ echo "🎉 MusicBrainz data loading completed"`),
 			return err
 		}
 
+		// OpenTelemetry Collector (ConfigMap + Deployment + Service) for OTLP ingestion
+		collectorConfigMap, err := corev1.NewConfigMap(ctx, "otel-collector-config", &corev1.ConfigMapArgs{
+			Metadata: &metav1.ObjectMetaArgs{
+				Name:      pulumi.String("otel-collector-config"),
+				Namespace: namespace.Metadata.Name(),
+				Labels:    pulumi.StringMap{"app": pulumi.String("kmm"), "component": pulumi.String("otel-collector")},
+			},
+			Data: pulumi.StringMap{"collector.yaml": pulumi.String(collectorConfigContent)},
+		})
+		if err != nil {
+			return err
+		}
+
+		collectorDeployment, err := appsv1.NewDeployment(ctx, "otel-collector", &appsv1.DeploymentArgs{
+			Metadata: &metav1.ObjectMetaArgs{
+				Name:      pulumi.String("otel-collector"),
+				Namespace: namespace.Metadata.Name(),
+				Labels:    pulumi.StringMap{"app": pulumi.String("kmm"), "component": pulumi.String("otel-collector")},
+			},
+			Spec: &appsv1.DeploymentSpecArgs{
+				Replicas: pulumi.Int(collectorReplicas),
+				Selector: &metav1.LabelSelectorArgs{MatchLabels: pulumi.StringMap{"app": pulumi.String("kmm"), "component": pulumi.String("otel-collector")}},
+				Template: &corev1.PodTemplateSpecArgs{
+					Metadata: &metav1.ObjectMetaArgs{Labels: pulumi.StringMap{"app": pulumi.String("kmm"), "component": pulumi.String("otel-collector")}},
+					Spec: &corev1.PodSpecArgs{
+						ServiceAccountName: serviceAccount.Metadata.Name(),
+						Containers: corev1.ContainerArray{
+							&corev1.ContainerArgs{
+								Name:  pulumi.String("otel-collector"),
+								Image: collectorImage,
+								Args:  pulumi.StringArray{pulumi.String("--config=/conf/collector.yaml")},
+								Ports: corev1.ContainerPortArray{
+									&corev1.ContainerPortArgs{ContainerPort: pulumi.Int(4318), Name: pulumi.String("otlp-http")},
+									&corev1.ContainerPortArgs{ContainerPort: pulumi.Int(4317), Name: pulumi.String("otlp-grpc")},
+								},
+								VolumeMounts: corev1.VolumeMountArray{
+									&corev1.VolumeMountArgs{Name: pulumi.String("otel-config"), MountPath: pulumi.String("/conf")},
+								},
+								Resources:      &corev1.ResourceRequirementsArgs{Requests: pulumi.StringMap{"cpu": collectorCPUReq, "memory": collectorMemReq}, Limits: pulumi.StringMap{"cpu": collectorCPULimit, "memory": collectorMemLimit}},
+								LivenessProbe:  &corev1.ProbeArgs{HttpGet: &corev1.HTTPGetActionArgs{Path: pulumi.String("/healthz"), Port: pulumi.String("otlp-http")}, InitialDelaySeconds: pulumi.Int(15), PeriodSeconds: pulumi.Int(30)},
+								ReadinessProbe: &corev1.ProbeArgs{HttpGet: &corev1.HTTPGetActionArgs{Path: pulumi.String("/healthz"), Port: pulumi.String("otlp-http")}, InitialDelaySeconds: pulumi.Int(5), PeriodSeconds: pulumi.Int(15)},
+							},
+						},
+						Volumes: corev1.VolumeArray{
+							&corev1.VolumeArgs{Name: pulumi.String("otel-config"), ConfigMap: &corev1.ConfigMapVolumeSourceArgs{Name: collectorConfigMap.Metadata.Name()}},
+						},
+					},
+				},
+			},
+		})
+		if err != nil {
+			return err
+		}
+
+		collectorService, err := corev1.NewService(ctx, "otel-collector-svc", &corev1.ServiceArgs{
+			Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String("otel-collector"), Namespace: namespace.Metadata.Name(), Labels: pulumi.StringMap{"app": pulumi.String("kmm"), "component": pulumi.String("otel-collector")}},
+			Spec: &corev1.ServiceSpecArgs{
+				Type: pulumi.String("ClusterIP"),
+				Ports: corev1.ServicePortArray{
+					&corev1.ServicePortArgs{Name: pulumi.String("otlp-http"), Port: pulumi.Int(4318), TargetPort: pulumi.String("otlp-http")},
+					&corev1.ServicePortArgs{Name: pulumi.String("otlp-grpc"), Port: pulumi.Int(4317), TargetPort: pulumi.String("otlp-grpc")},
+				},
+				Selector: pulumi.StringMap{"app": pulumi.String("kmm"), "component": pulumi.String("otel-collector")},
+			},
+		})
+		if err != nil {
+			return err
+		}
+
 		// Export useful information for Kellogg Music Match deployment
 		ctx.Export("namespaceName", namespace.Metadata.Name())
 		ctx.Export("serviceAccountName", serviceAccount.Metadata.Name())
@@ -1031,6 +1114,8 @@ echo "🎉 MusicBrainz data loading completed"`),
 		ctx.Export("postgresStatefulSetName", pgStatefulSet.Metadata.Name())
 		ctx.Export("postgresServiceName", pgService.Metadata.Name())
 		ctx.Export("postgresSecretName", pgSecret.Metadata.Name())
+		ctx.Export("otelCollectorDeployment", collectorDeployment.Metadata.Name())
+		ctx.Export("otelCollectorService", collectorService.Metadata.Name())
 
 		// Export application URLs for easy access
 		ctx.Export("uiUrl", pulumi.String("http://kmm-ui.traefik.me"))

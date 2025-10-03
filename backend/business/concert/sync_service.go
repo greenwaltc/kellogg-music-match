@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/greenwaltc/kellogg-music-match/backend/logger"
-
 	"github.com/greenwaltc/kellogg-music-match/backend/config"
+	"github.com/greenwaltc/kellogg-music-match/backend/logger"
+	"github.com/greenwaltc/kellogg-music-match/backend/telemetry"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
 
 // SyncService handles periodic synchronization of concert data from external APIs
@@ -81,9 +84,15 @@ func (s *SyncService) syncLoop(ctx context.Context) {
 // syncEvents performs the actual synchronization of concert data
 func (s *SyncService) syncEvents(ctx context.Context) error {
 	logger.FromCtx(ctx).Info("sync cycle begin")
+	tracer := otel.Tracer("concert.sync")
+	ctx, span := tracer.Start(ctx, "syncEvents")
+	defer span.End()
 
 	// Check provider health
 	if err := s.eventProvider.IsHealthy(ctx); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		telemetry.SyncCycleCounter.WithLabelValues("provider_unhealthy").Inc()
 		return fmt.Errorf("event provider is not healthy: %w", err)
 	}
 
@@ -110,6 +119,9 @@ func (s *SyncService) syncEvents(ctx context.Context) error {
 		// Get events from the provider
 		result, err := s.eventProvider.SearchEvents(ctx, criteria)
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+			telemetry.SyncCycleCounter.WithLabelValues("search_error").Inc()
 			return fmt.Errorf("failed to search events: %w", err)
 		}
 
@@ -128,6 +140,7 @@ func (s *SyncService) syncEvents(ctx context.Context) error {
 		}
 
 		logger.FromCtx(ctx).Info("page synced", "count", len(result.Events), "page", page)
+		span.SetAttributes(attribute.Int("page", page), attribute.Int("events_on_page", len(result.Events)))
 
 		// Check if we have more pages
 		if !result.HasMore || page >= result.TotalPages {
@@ -155,6 +168,9 @@ func (s *SyncService) syncEvents(ctx context.Context) error {
 	}
 
 	logger.FromCtx(ctx).Info("sync cycle complete", "totalSynced", totalSynced)
+	telemetry.SyncEventsCounter.Add(float64(totalSynced))
+	telemetry.SyncCycleCounter.WithLabelValues("success").Inc()
+	span.SetAttributes(attribute.Int("totalSynced", totalSynced))
 	return nil
 }
 
