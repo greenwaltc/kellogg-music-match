@@ -15,7 +15,7 @@
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "importHelpers": true,
-    "types": ["node"],
+  "types": ["node", "jasmine"],
     "lib": ["ES2022", "DOM"]
   },
   "angularCompilerOptions": {

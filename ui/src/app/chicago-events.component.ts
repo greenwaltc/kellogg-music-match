@@ -2,6 +2,7 @@ import { Component, OnInit, OnDestroy, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
+import { ConcertInterestService } from './concert-interest.service';
 import { Subject, BehaviorSubject, combineLatest } from 'rxjs';
 import { debounceTime, distinctUntilChanged, switchMap, takeUntil, catchError } from 'rxjs/operators';
 import { of } from 'rxjs';
@@ -165,6 +166,15 @@ interface ChicagoEventsResponse {
                 <div class="debug-info" style="font-size: 0.7rem; color: var(--color-text-muted); margin-top: 0.5rem;" *ngIf="false">
                   URL: {{event.ticketUrl}}
                 </div>
+              </div>
+
+              <!-- Interest Actions -->
+              <div class="interest-actions" style="margin-top:0.5rem; display:flex; gap:0.25rem; flex-wrap:wrap;">
+                <button type="button" class="interest-btn" (click)="setInterest(event.id, 'INTERESTED')" title="Mark Interested">★</button>
+                <button type="button" class="interest-btn" (click)="setInterest(event.id, 'GOING')" title="Mark Going">✅</button>
+                <button type="button" class="interest-btn" (click)="setInterest(event.id, 'LOOKING_FOR_GROUP')" title="Looking For Group">👥</button>
+                <button type="button" class="interest-btn" (click)="removeInterest(event.id)" title="Clear Interest">✖</button>
+                <span class="interest-meta" *ngIf="event.goingUserIds?.length" style="font-size:0.7rem; color:var(--color-text-muted);">Going: {{event.goingUserIds?.length || 0}}</span>
               </div>
             </div>
           </div>
@@ -584,7 +594,7 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy {
   
   private apiBaseUrl: string;
 
-  constructor(private http: HttpClient) {
+  constructor(private http: HttpClient, private interest: ConcertInterestService) {
     this.apiBaseUrl = window.__kmmConfig?.apiBaseUrl || 'http://localhost:8080';
   }
 
@@ -718,6 +728,51 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy {
 
   trackByEventId(index: number, event: ChicagoEvent): string {
     return event.id;
+  }
+
+  setInterest(eventId: string, interestType: 'INTERESTED' | 'GOING' | 'LOOKING_FOR_GROUP') {
+    const idx = this.events.findIndex(e => e.id === eventId);
+    if (idx === -1) return;
+    const previous = { ...this.events[idx] };
+    // Optimistic mutation: add current (placeholder) user id? We'll reflect by increment length only if arrays present
+    // Since we don't have the user id in the client (UUID hidden), we just refresh later; no local array push
+    this.events[idx] = { ...this.events[idx] }; // trigger change detection
+    this.interest.setInterest(eventId, interestType).subscribe({
+      next: () => this.refreshEventInterest(eventId),
+      error: err => {
+        console.warn('Failed to set interest', err);
+        this.events[idx] = previous; // rollback
+      }
+    });
+  }
+
+  removeInterest(eventId: string) {
+    const idx = this.events.findIndex(e => e.id === eventId);
+    if (idx === -1) return;
+    const previous = { ...this.events[idx] };
+    this.events[idx] = { ...this.events[idx] }; // optimistic noop
+    this.interest.removeInterest(eventId).subscribe({
+      next: () => this.refreshEventInterest(eventId),
+      error: err => {
+        console.warn('Failed to remove interest', err);
+        this.events[idx] = previous;
+      }
+    });
+  }
+
+  private refreshEventInterest(eventId: string) {
+    const params = new URLSearchParams({ limit: this.pageSize.toString(), offset: '0' });
+    if (this.searchQuery.trim()) params.append('artistName', this.searchQuery.trim());
+    this.http.get<ChicagoEventsResponse>(`${this.apiBaseUrl}/chicago/events?${params}`)
+      .pipe(catchError(() => of(null)))
+      .subscribe(resp => {
+        if (!resp) return;
+        const updated = resp.events.find(e => e.id === eventId);
+        if (updated) {
+          const idx = this.events.findIndex(e => e.id === eventId);
+          if (idx >= 0) this.events[idx] = { ...this.events[idx], ...updated };
+        }
+      });
   }
 
   formatDate(dateString: string, format: 'day' | 'month' | 'time'): string {

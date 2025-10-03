@@ -2,13 +2,14 @@ package main
 
 import (
 	"context"
-	"log"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/greenwaltc/kellogg-music-match/backend/business"
 	"github.com/greenwaltc/kellogg-music-match/backend/business/concert"
 	"github.com/greenwaltc/kellogg-music-match/backend/config"
 	"github.com/greenwaltc/kellogg-music-match/backend/generated"
+	"github.com/greenwaltc/kellogg-music-match/backend/logger"
 )
 
 // corsMiddleware handles CORS headers for cross-origin requests
@@ -50,7 +51,8 @@ func corsMiddleware(cfg *config.Config) func(http.Handler) http.Handler {
 }
 
 func main() {
-	log.Printf("Server started")
+	logger.Init()
+	logger.L().Info("server starting")
 
 	// Load configuration from environment variables
 	cfg := config.Load()
@@ -58,7 +60,8 @@ func main() {
 	// Initialize database components
 	userRepo, err := business.NewUserRepositoryWithConfig(&cfg.Database)
 	if err != nil {
-		log.Fatalf("Failed to initialize user repository: %v", err)
+		logger.L().Error("init user repository failed", "error", err)
+		panic(err)
 	}
 
 	matchingEngine := business.NewMatchingEngine()
@@ -85,20 +88,20 @@ func main() {
 	// Try to initialize concert service with Ticketmaster API
 	tempConcertAPIService := business.NewConcertAPIService(cfg)
 	if err := tempConcertAPIService.ValidateConfiguration(context.Background()); err != nil {
-		log.Printf("Warning: Concert service configuration invalid: %v", err)
-		log.Printf("Concert features will be disabled")
+		logger.L().Warn("concert service invalid config", "error", err)
+		logger.L().Info("concert features disabled")
 		concertAPIService = tempConcertAPIService // Use basic service without repository
 	} else {
-		log.Printf("Concert service initialized with Ticketmaster API")
+		logger.L().Info("concert service initialized")
 
 		// Initialize concert repository
 		concertRepo, err := concert.NewPostgreSQLRepository(&cfg.Database)
 		if err != nil {
-			log.Printf("Warning: Failed to initialize concert repository: %v", err)
-			log.Printf("Concert sync will be disabled")
+			logger.L().Warn("concert repository init failed", "error", err)
+			logger.L().Info("concert sync disabled")
 			concertAPIService = tempConcertAPIService // Use basic service without repository
 		} else {
-			log.Printf("Concert repository initialized successfully")
+			logger.L().Info("concert repository initialized")
 
 			// Create Ticketmaster event provider
 			eventProvider := concert.NewTicketmasterAdapter(&cfg.Ticketmaster)
@@ -112,20 +115,20 @@ func main() {
 			// Start the sync service in a separate goroutine
 			go func() {
 				if err := concertSyncService.Start(context.Background()); err != nil {
-					log.Printf("Error starting concert sync service: %v", err)
+					logger.L().Error("concert sync start failed", "error", err)
 				}
 			}()
 
-			log.Printf("Concert sync service started - will sync every 24 hours")
+			logger.L().Info("concert sync scheduled", "intervalHours", 24)
 
 			// Ensure graceful shutdown of sync service
 			defer func() {
 				if concertSyncService != nil {
-					log.Printf("Shutting down concert sync service...")
+					logger.L().Info("concert sync shutdown")
 					concertSyncService.Stop()
 				}
 				if concertRepo != nil {
-					log.Printf("Closing concert repository connection...")
+					logger.L().Info("concert repository closing")
 					concertRepo.Close()
 				}
 			}()
@@ -151,10 +154,31 @@ func main() {
 	jwtMiddleware := NewJWTMiddleware(jwtService)
 
 	// Wrap router with middleware layers (innermost to outermost)
-	protectedRouter := jwtMiddleware.Middleware(router)
+	// Compose middleware: tracing -> jwt -> router
+	tracing := tracingMiddleware()
+	protectedRouter := jwtMiddleware.Middleware(tracing(router))
 	corsRouter := corsMiddleware(cfg)(protectedRouter)
 
 	serverAddr := ":" + cfg.Server.Port
-	log.Printf("Server listening on %s with CORS enabled for origins: %v", serverAddr, cfg.CORS.AllowedOrigins)
-	log.Fatal(http.ListenAndServe(serverAddr, corsRouter))
+	logger.L().Info("server listening", "addr", serverAddr, "cors.origins", cfg.CORS.AllowedOrigins)
+	if err := http.ListenAndServe(serverAddr, corsRouter); err != nil {
+		logger.L().Error("server crashed", "error", err)
+	}
+}
+
+// tracingMiddleware injects synthetic trace/span IDs for correlation until full OpenTelemetry integration.
+func tracingMiddleware() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			traceID := r.Header.Get("X-Trace-ID")
+			if traceID == "" {
+				traceID = uuid.New().String()
+			}
+			spanID := uuid.New().String()
+			ctx := context.WithValue(r.Context(), any("traceId"), traceID)
+			ctx = context.WithValue(ctx, any("spanId"), spanID)
+			// attach to logger via FromCtx enrichment path extension (optional future)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
 }

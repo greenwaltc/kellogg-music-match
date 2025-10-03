@@ -40,8 +40,7 @@ var _ = Describe("Concert Synchronization", func() {
 		}
 
 		mockProvider = NewMockEventProvider()
-		mr := NewMockRepository()
-		mockRepo = mr.(*MockRepository)
+		mockRepo = NewMockRepository()
 		syncService = concert.NewSyncService(mockProvider, mockRepo, cfg)
 	})
 
@@ -454,8 +453,8 @@ func (m *MockRepository) GetEventsForArtist(ctx context.Context, artistName, cit
 	return []*concert.Event{}, nil
 }
 
-func (m *MockRepository) GetUpcomingEventsInCity(ctx context.Context, city string, limit int) ([]*Event, error) {
-	return []*Event{}, nil
+func (m *MockRepository) GetUpcomingEventsInCity(ctx context.Context, city string, limit int) ([]*concert.Event, error) {
+	return []*concert.Event{}, nil
 }
 
 func (m *MockRepository) UpsertVenue(ctx context.Context, venue *concert.Venue) error {
@@ -471,6 +470,20 @@ func (m *MockRepository) GetEventArtists(ctx context.Context, eventID string) ([
 }
 
 func (m *MockRepository) AssociateEventWithArtist(ctx context.Context, eventID, artistID, role string) error {
+	return nil
+}
+
+// Added to satisfy updated Repository interface
+func (m *MockRepository) GetChicagoEvents(ctx context.Context, artistName *string, limit int32, offset int32) ([]*concert.Event, error) {
+	return []*concert.Event{}, nil
+}
+func (m *MockRepository) GetChicagoEventsCount(ctx context.Context, artistName *string) (int64, error) {
+	return 0, nil
+}
+func (m *MockRepository) UpsertUserInterest(ctx context.Context, userID string, eventID string, status string) error {
+	return nil
+}
+func (m *MockRepository) RemoveUserInterest(ctx context.Context, userID string, eventID string) error {
 	return nil
 }
 

@@ -1,6 +1,7 @@
 import { Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../environments/environment';
+import { ApiBaseService } from './api-base.service';
 import { AuthService } from './auth.service';
 
 export interface MatchUser { 
@@ -23,10 +24,12 @@ export interface Artist {
 export class MatchService {
   matches = signal<MatchUser[] | null>(null);
   loading = signal(false);
-  private apiBase = window.__kmmConfig?.apiBaseUrl || environment.apiBaseUrl;
+  private apiBase: string;
   private lastFetchedForUser: string | null = null;
 
-  constructor(private http: HttpClient, private auth: AuthService) {}
+  constructor(private http: HttpClient, private auth: AuthService, private api: ApiBaseService) {
+    this.apiBase = this.api.baseUrl;
+  }
 
   set(matches: MatchUser[]): void { 
     this.matches.set(matches); 

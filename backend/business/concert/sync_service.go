@@ -3,8 +3,9 @@ package concert
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
+
+	"github.com/greenwaltc/kellogg-music-match/backend/logger"
 
 	"github.com/greenwaltc/kellogg-music-match/backend/config"
 )
@@ -16,6 +17,7 @@ type SyncService struct {
 	config        *config.Config
 	stopChan      chan struct{}
 	ticker        *time.Ticker
+	stopped       bool
 }
 
 // NewSyncService creates a new concert sync service
@@ -31,11 +33,11 @@ func NewSyncService(provider EventProvider, repo Repository, cfg *config.Config)
 // Start begins the synchronization process
 // It performs an initial sync and then schedules periodic syncs every 24 hours
 func (s *SyncService) Start(ctx context.Context) error {
-	log.Printf("Starting concert sync service...")
+	logger.FromCtx(ctx).Info("sync starting")
 
 	// Perform initial sync
 	if err := s.syncEvents(ctx); err != nil {
-		log.Printf("Error during initial sync: %v", err)
+		logger.FromCtx(ctx).Error("sync initial failed", "error", err)
 		// Don't fail startup on sync error, just log it
 	}
 
@@ -43,17 +45,21 @@ func (s *SyncService) Start(ctx context.Context) error {
 	s.ticker = time.NewTicker(24 * time.Hour)
 	go s.syncLoop(ctx)
 
-	log.Printf("Concert sync service started successfully")
+	logger.FromCtx(ctx).Info("sync started")
 	return nil
 }
 
 // Stop gracefully shuts down the sync service
 func (s *SyncService) Stop() {
+	if s.stopped {
+		return
+	}
+	s.stopped = true
 	if s.ticker != nil {
 		s.ticker.Stop()
 	}
 	close(s.stopChan)
-	log.Printf("Concert sync service stopped")
+	logger.FromCtx(context.Background()).Info("sync stopped")
 }
 
 // syncLoop runs the periodic synchronization
@@ -66,7 +72,7 @@ func (s *SyncService) syncLoop(ctx context.Context) {
 			return
 		case <-s.ticker.C:
 			if err := s.syncEvents(ctx); err != nil {
-				log.Printf("Error during scheduled sync: %v", err)
+				logger.FromCtx(ctx).Error("sync scheduled failed", "error", err)
 			}
 		}
 	}
@@ -74,7 +80,7 @@ func (s *SyncService) syncLoop(ctx context.Context) {
 
 // syncEvents performs the actual synchronization of concert data
 func (s *SyncService) syncEvents(ctx context.Context) error {
-	log.Printf("Starting concert data synchronization...")
+	logger.FromCtx(ctx).Info("sync cycle begin")
 
 	// Check provider health
 	if err := s.eventProvider.IsHealthy(ctx); err != nil {
@@ -99,7 +105,7 @@ func (s *SyncService) syncEvents(ctx context.Context) error {
 	for {
 		criteria.Page = page
 
-		log.Printf("Fetching events page %d...", page)
+		logger.FromCtx(ctx).Debug("sync fetching page", "page", page)
 
 		// Get events from the provider
 		result, err := s.eventProvider.SearchEvents(ctx, criteria)
@@ -108,20 +114,20 @@ func (s *SyncService) syncEvents(ctx context.Context) error {
 		}
 
 		if len(result.Events) == 0 {
-			log.Printf("No more events to sync")
+			logger.FromCtx(ctx).Info("sync no more events")
 			break
 		}
 
 		// Sync each event to the database
 		for _, event := range result.Events {
 			if err := s.repository.UpsertEvent(ctx, &event); err != nil {
-				log.Printf("Error upserting event %s (%s): %v", event.Name, event.ID, err)
+				logger.FromCtx(ctx).Warn("event upsert failed", "eventId", event.ID, "name", event.Name, "error", err)
 				continue // Continue with other events
 			}
 			totalSynced++
 		}
 
-		log.Printf("Synced %d events from page %d", len(result.Events), page)
+		logger.FromCtx(ctx).Info("page synced", "count", len(result.Events), "page", page)
 
 		// Check if we have more pages
 		if !result.HasMore || page >= result.TotalPages {
@@ -142,13 +148,13 @@ func (s *SyncService) syncEvents(ctx context.Context) error {
 	// Clean up old events (remove events that have passed)
 	cutoffDate := time.Now()
 	if err := s.repository.DeleteOldEvents(ctx, cutoffDate); err != nil {
-		log.Printf("Error cleaning up old events: %v", err)
+		logger.FromCtx(ctx).Warn("cleanup old events failed", "error", err)
 		// Don't fail sync on cleanup error
 	} else {
-		log.Printf("Cleaned up past events older than %s", cutoffDate.Format("2006-01-02 15:04:05"))
+		logger.FromCtx(ctx).Debug("cleanup old events success", "cutoff", cutoffDate.Format(time.RFC3339))
 	}
 
-	log.Printf("Concert sync completed. Total events synced: %d", totalSynced)
+	logger.FromCtx(ctx).Info("sync cycle complete", "totalSynced", totalSynced)
 	return nil
 }
 
@@ -179,6 +185,6 @@ type SyncStatus struct {
 
 // ManualSync triggers a manual synchronization (useful for testing/admin)
 func (s *SyncService) ManualSync(ctx context.Context) error {
-	log.Printf("Manual concert sync requested")
+	logger.FromCtx(ctx).Info("manual sync requested")
 	return s.syncEvents(ctx)
 }

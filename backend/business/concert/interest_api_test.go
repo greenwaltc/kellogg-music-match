@@ -12,10 +12,20 @@ import (
 	"github.com/google/uuid"
 	"github.com/greenwaltc/kellogg-music-match/backend/business"
 	"github.com/greenwaltc/kellogg-music-match/backend/business/concert"
+	"github.com/greenwaltc/kellogg-music-match/backend/business/testutil"
 	"github.com/greenwaltc/kellogg-music-match/backend/config"
 	"github.com/greenwaltc/kellogg-music-match/backend/generated"
 	"github.com/stretchr/testify/require"
 )
+
+// simulate jwt middleware user context key/shape
+type userContextKeyType string
+
+const userCtxKey userContextKeyType = "user"
+
+type userContextMirror struct{ UserID, Username, Email string }
+
+func (u *userContextMirror) GetUserID() string { return u.UserID }
 
 // stubEventProvider minimal implementation for API wiring; not used in interest tests beyond interface satisfaction
 type stubEventProvider struct{}
@@ -61,8 +71,8 @@ func TestInterestEndpoints(t *testing.T) {
 	body := map[string]string{"interestType": "INTERESTED"}
 	payload, _ := json.Marshal(body)
 	req := httptest.NewRequest(http.MethodPost, "/concerts/"+eventID+"/interest", bytes.NewReader(payload))
+	req = req.WithContext(testutil.WithUser(req.Context(), userID))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-User-Username", userID)
 	rr := httptest.NewRecorder()
 	router.ServeHTTP(rr, req)
 	require.Equal(t, http.StatusNoContent, rr.Code, "expected 204 on set interest")
@@ -71,8 +81,8 @@ func TestInterestEndpoints(t *testing.T) {
 	body["interestType"] = "GOING"
 	payload, _ = json.Marshal(body)
 	req2 := httptest.NewRequest(http.MethodPost, "/concerts/"+eventID+"/interest", bytes.NewReader(payload))
+	req2 = req2.WithContext(testutil.WithUser(req2.Context(), userID))
 	req2.Header.Set("Content-Type", "application/json")
-	req2.Header.Set("X-User-Username", userID)
 	rr2 := httptest.NewRecorder()
 	router.ServeHTTP(rr2, req2)
 	require.Equal(t, http.StatusNoContent, rr2.Code)
@@ -89,7 +99,7 @@ func TestInterestEndpoints(t *testing.T) {
 
 	// 4. Delete interest
 	req4 := httptest.NewRequest(http.MethodDelete, "/concerts/"+eventID+"/interest", nil)
-	req4.Header.Set("X-User-Username", userID)
+	req4 = req4.WithContext(testutil.WithUser(req4.Context(), userID))
 	rr4 := httptest.NewRecorder()
 	router.ServeHTTP(rr4, req4)
 	require.Equal(t, http.StatusNoContent, rr4.Code)
@@ -98,8 +108,8 @@ func TestInterestEndpoints(t *testing.T) {
 	bad := map[string]string{"interestType": "INVALID"}
 	badPayload, _ := json.Marshal(bad)
 	req5 := httptest.NewRequest(http.MethodPost, "/concerts/"+eventID+"/interest", bytes.NewReader(badPayload))
+	req5 = req5.WithContext(testutil.WithUser(req5.Context(), userID))
 	req5.Header.Set("Content-Type", "application/json")
-	req5.Header.Set("X-User-Username", userID)
 	rr5 := httptest.NewRecorder()
 	router.ServeHTTP(rr5, req5)
 	require.Equal(t, http.StatusBadRequest, rr5.Code)
@@ -122,15 +132,44 @@ func TestRemoveInterestIdempotent(t *testing.T) {
 
 	// First delete (no existing interest)
 	req := httptest.NewRequest(http.MethodDelete, "/concerts/"+eventID+"/interest", nil)
-	req.Header.Set("X-User-Username", userID)
+	req = req.WithContext(testutil.WithUser(req.Context(), userID))
 	rr := httptest.NewRecorder()
 	router.ServeHTTP(rr, req)
 	require.Equal(t, http.StatusNoContent, rr.Code)
 
 	// Second delete (still none)
 	req2 := httptest.NewRequest(http.MethodDelete, "/concerts/"+eventID+"/interest", nil)
-	req2.Header.Set("X-User-Username", userID)
+	req2 = req2.WithContext(testutil.WithUser(req2.Context(), userID))
 	rr2 := httptest.NewRecorder()
 	router.ServeHTTP(rr2, req2)
 	require.Equal(t, http.StatusNoContent, rr2.Code)
+}
+
+// TestInterestEndpointsUnauthorized ensures endpoints return 401 without JWT context
+func TestInterestEndpointsUnauthorized(t *testing.T) {
+	repo := concert.NewMockRepository()
+	provider := &stubEventProvider{}
+	cfg := &config.Config{Ticketmaster: config.TicketmasterConfig{DefaultCity: "Chicago", DefaultState: "IL", DefaultCountry: "US"}}
+	apiService := business.NewConcertAPIServiceWithRepository(provider, repo, cfg)
+	controller := generated.NewConcertsAPIController(apiService)
+	router := generated.NewRouter(controller)
+
+	// Seed event
+	evt := &concert.Event{ID: "evt-unauth", Name: "No Auth Event", Date: time.Now().Add(2 * time.Hour), Venue: concert.Venue{ID: "v1", Name: "Venue", Address: concert.Address{City: "Chicago", Country: "US"}}, Status: "onsale"}
+	require.NoError(t, repo.UpsertEvent(context.Background(), evt))
+
+	// Attempt to set interest WITHOUT any JWT-derived context or legacy header
+	body := map[string]string{"interestType": "INTERESTED"}
+	payload, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPost, "/concerts/"+evt.ID+"/interest", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	router.ServeHTTP(rr, req)
+	require.Equal(t, http.StatusUnauthorized, rr.Code, "expected 401 when JWT missing")
+
+	// Attempt delete as well
+	delReq := httptest.NewRequest(http.MethodDelete, "/concerts/"+evt.ID+"/interest", nil)
+	rr2 := httptest.NewRecorder()
+	router.ServeHTTP(rr2, delReq)
+	require.Equal(t, http.StatusUnauthorized, rr2.Code)
 }

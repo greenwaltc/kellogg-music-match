@@ -84,7 +84,8 @@ paths:
           required: true
           schema:
             type: string
-          description: Authenticated username
+          deprecated: true
+          description: LEGACY user identifier header (deprecated; JWT claims now authoritative and this header will be removed).
       requestBody:
         required: true
         content:
@@ -221,10 +222,11 @@ paths:
         - name: X-User-Username
           in: header
           required: true
-          description: Username of the authenticated user submitting feedback
           schema:
             type: string
             example: "student123"
+          deprecated: true
+          description: LEGACY user identifier header (deprecated; JWT claims now authoritative and this header will be removed).
       requestBody:
         required: true
         content:
@@ -534,12 +536,11 @@ paths:
         - name: X-User-Username
           in: header
           required: false
-          description: |
-            Optional username to associate the submitted artists with a registered user.
-            If provided, the user's artist preferences will be updated with the submitted list.
           schema:
             type: string
           example: "student123"
+          deprecated: true
+          description: LEGACY user identifier header (deprecated; JWT claims now authoritative and this header will be removed).
       requestBody:
         required: true
         content:

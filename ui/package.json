@@ -6,7 +6,8 @@
     "start": "ng serve --open",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "lint": "eslint ./src --ext .ts"
+    "lint": "eslint ./src --ext .ts",
+    "test": "ng test --watch=false --browsers=ChromeHeadless"
   },
   "dependencies": {
     "@angular/animations": "^17.3.0",
@@ -27,6 +28,13 @@
     "@angular/cli": "^17.3.0",
     "@angular/compiler-cli": "^17.3.0",
     "@types/node": "^20.11.19",
+    "@types/jasmine": "~5.1.0",
+    "jasmine-core": "~5.1.0",
+    "karma": "~6.4.3",
+    "karma-chrome-launcher": "~3.2.0",
+    "karma-jasmine": "~5.1.0",
+    "karma-jasmine-html-reporter": "~2.1.0",
+    "karma-coverage": "~2.2.0",
     "typescript": "~5.3.3",
     "eslint": "^8.56.0",
     "@typescript-eslint/eslint-plugin": "^6.19.1",

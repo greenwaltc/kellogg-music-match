@@ -9,7 +9,48 @@ import (
 	"github.com/greenwaltc/kellogg-music-match/backend/business/concert"
 	"github.com/greenwaltc/kellogg-music-match/backend/config"
 	"github.com/greenwaltc/kellogg-music-match/backend/generated"
+	"github.com/greenwaltc/kellogg-music-match/backend/logger"
 )
+
+// duplicate of jwt middleware user context key/shape (avoid import cycle with main package)
+type userContextKeyType string
+
+const userCtxKey userContextKeyType = "user"
+
+type userContextMirror struct {
+	UserID   string
+	Username string
+	Email    string
+}
+
+func getUserIDFromContext(ctx context.Context) string {
+	if v := ctx.Value(userCtxKey); v != nil {
+		if uc, ok := v.(*userContextMirror); ok && uc != nil {
+			return uc.UserID
+		}
+		// attempt dynamic field access via interface casting patterns
+		if m, ok := v.(interface{ GetUserID() string }); ok {
+			return m.GetUserID()
+		}
+		// fallback reflection-free: try struct assertion to original type name if present
+		if generic, ok := v.(interface{ GetId() string }); ok {
+			return generic.GetId()
+		}
+	}
+	// Also allow plain string key for tests / external packages
+	if v := ctx.Value("user"); v != nil {
+		if uc, ok := v.(*userContextMirror); ok && uc != nil {
+			return uc.UserID
+		}
+		if m, ok := v.(interface{ GetUserID() string }); ok {
+			return m.GetUserID()
+		}
+		if generic, ok := v.(interface{ GetId() string }); ok {
+			return generic.GetId()
+		}
+	}
+	return ""
+}
 
 // ConcertAPIService handles concert API operations
 type ConcertAPIService struct {
@@ -230,7 +271,13 @@ func (s *ConcertAPIService) GetChicagoEvents(ctx context.Context, artistName str
 }
 
 // SetEventInterest sets/updates the authenticated user's interest for an event
-func (s *ConcertAPIService) SetEventInterest(ctx context.Context, eventId string, xUserUsername string, request generated.SetEventInterestRequest) (generated.ImplResponse, error) {
+func (s *ConcertAPIService) SetEventInterest(ctx context.Context, eventId string, _ string, request generated.SetEventInterestRequest) (generated.ImplResponse, error) {
+	// Derive user from JWT middleware context; ignore legacy header param for identity; second param deprecated
+	userID := getUserIDFromContext(ctx)
+	if userID == "" {
+		logger.FromCtx(ctx).Warn("interest unauthorized", "eventId", eventId, "op", "set")
+		return generated.Response(http.StatusUnauthorized, generated.ErrorResponse{Message: "authentication required"}), nil
+	}
 	if s.concertService == nil || s.concertService.repository == nil {
 		return generated.Response(http.StatusServiceUnavailable, generated.ErrorResponse{Message: "concert repository unavailable"}), nil
 	}
@@ -238,28 +285,36 @@ func (s *ConcertAPIService) SetEventInterest(ctx context.Context, eventId string
 		return generated.Response(http.StatusBadRequest, generated.ErrorResponse{Message: "eventId and interestType required"}), nil
 	}
 	status := string(request.InterestType)
-	// Validate
 	switch status {
 	case "INTERESTED", "GOING", "LOOKING_FOR_GROUP":
 	default:
 		return generated.Response(http.StatusBadRequest, generated.ErrorResponse{Message: "invalid status"}), nil
 	}
-	if err := s.concertService.repository.UpsertUserInterest(ctx, xUserUsername, eventId, status); err != nil {
+	if err := s.concertService.repository.UpsertUserInterest(ctx, userID, eventId, status); err != nil {
+		logger.FromCtx(ctx).Error("interest set failed", "userId", userID, "eventId", eventId, "status", status, "error", err)
 		return generated.Response(http.StatusInternalServerError, generated.ErrorResponse{Message: fmt.Sprintf("failed to set interest: %v", err)}), nil
 	}
+	logger.FromCtx(ctx).Info("interest set", "userId", userID, "eventId", eventId, "status", status)
 	return generated.Response(http.StatusNoContent, nil), nil
 }
 
 // RemoveEventInterest removes the authenticated user's interest for an event
-func (s *ConcertAPIService) RemoveEventInterest(ctx context.Context, eventId string, xUserUsername string) (generated.ImplResponse, error) {
+func (s *ConcertAPIService) RemoveEventInterest(ctx context.Context, eventId string, _ string) (generated.ImplResponse, error) {
+	userID := getUserIDFromContext(ctx)
+	if userID == "" {
+		logger.FromCtx(ctx).Warn("interest unauthorized", "eventId", eventId, "op", "remove")
+		return generated.Response(http.StatusUnauthorized, generated.ErrorResponse{Message: "authentication required"}), nil
+	}
 	if s.concertService == nil || s.concertService.repository == nil {
 		return generated.Response(http.StatusServiceUnavailable, generated.ErrorResponse{Message: "concert repository unavailable"}), nil
 	}
 	if eventId == "" {
 		return generated.Response(http.StatusBadRequest, generated.ErrorResponse{Message: "eventId required"}), nil
 	}
-	if err := s.concertService.repository.RemoveUserInterest(ctx, xUserUsername, eventId); err != nil {
+	if err := s.concertService.repository.RemoveUserInterest(ctx, userID, eventId); err != nil {
+		logger.FromCtx(ctx).Error("interest remove failed", "userId", userID, "eventId", eventId, "error", err)
 		return generated.Response(http.StatusInternalServerError, generated.ErrorResponse{Message: fmt.Sprintf("failed to remove interest: %v", err)}), nil
 	}
+	logger.FromCtx(ctx).Info("interest removed", "userId", userID, "eventId", eventId)
 	return generated.Response(http.StatusNoContent, nil), nil
 }

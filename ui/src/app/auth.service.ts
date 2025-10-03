@@ -2,6 +2,7 @@ import { Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { tap } from 'rxjs/operators';
 import { environment } from '../environments/environment';
+import { ApiBaseService } from './api-base.service';
 
 export interface User { 
   id?: string;
@@ -53,7 +54,7 @@ export class AuthService {
   loading = signal(false);
   error = signal<string | null>(null);
 
-  constructor(private http: HttpClient) {
+  constructor(private http: HttpClient, private api: ApiBaseService) {
     this.restore();
   }
 
@@ -160,10 +161,7 @@ export class AuthService {
     );
   }
 
-  private url(path: string): string {
-    const apiUrl = window.__kmmConfig?.apiBaseUrl || environment.apiBaseUrl;
-    return `${apiUrl}${path}`;
-  }
+  private url(path: string): string { return this.api.url(path); }
 
   private extractError(err: any): string {
     if (!err) return 'Unknown error';

@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { environment } from '../environments/environment';
+import { ApiBaseService } from './api-base.service';
 
 export type EventInterestType = 'INTERESTED' | 'GOING' | 'LOOKING_FOR_GROUP';
 
@@ -10,26 +10,14 @@ export interface SetEventInterestRequest {
 
 @Injectable({ providedIn: 'root' })
 export class ConcertInterestService {
-  private apiBase = window.__kmmConfig?.apiBaseUrl || environment.apiBaseUrl;
-
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private api: ApiBaseService) {}
 
   setInterest(eventId: string, interestType: EventInterestType) {
     const body: SetEventInterestRequest = { interestType };
-    return this.http.post<void>(`${this.apiBase}/concerts/${encodeURIComponent(eventId)}/interest`, body, {
-      headers: { 'X-User-Username': this.getUserIdentifier() }
-    });
+    return this.http.post<void>(`${this.api.url('/concerts/')}${encodeURIComponent(eventId)}/interest`, body);
   }
 
   removeInterest(eventId: string) {
-    return this.http.delete<void>(`${this.apiBase}/concerts/${encodeURIComponent(eventId)}/interest`, {
-      headers: { 'X-User-Username': this.getUserIdentifier() }
-    });
-  }
-
-  // Placeholder: actual user identity strategy can change (e.g., use auth token claims)
-  private getUserIdentifier(): string {
-    // Attempt to pull from local storage or a global user object later
-    return localStorage.getItem('kmm_username') || 'anonymous-user';
+    return this.http.delete<void>(`${this.api.url('/concerts/')}${encodeURIComponent(eventId)}/interest`);
   }
 }
