@@ -11,6 +11,7 @@ import { RoadmapComponent } from './app/roadmap.component';
 import { ChicagoEventsComponent } from './app/chicago-events.component';
 import { authGuard } from './app/auth.guard';
 import { jwtInterceptor } from './app/jwt.interceptor';
+import { loginRedirectGuard } from './app/login-redirect.guard';
 
 declare global {
   interface Window {
@@ -19,7 +20,7 @@ declare global {
 }
 
 const routes: Routes = [
-  { path: '', component: LoginComponent },
+  { path: '', component: LoginComponent, canActivate: [loginRedirectGuard] },
   { path: 'artists', component: ArtistsComponent, canActivate: [authGuard] },
   { path: 'matches', component: MatchesComponent, canActivate: [authGuard] },
   { path: 'feedback', component: FeedbackComponent, canActivate: [authGuard] },

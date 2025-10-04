@@ -90,3 +90,8 @@ button { cursor: pointer; transition: background .25s ease, color .25s ease, bor
 .load-more-button:disabled { opacity:.6; cursor:not-allowed; }
 .loading-more { display:flex; align-items:center; justify-content:center; gap:1rem; padding:2rem; color:var(--color-text-muted); }
 @media (max-width:768px){ .chicago-events-container{padding:1rem 1rem 5rem;} .page-header h1{font-size:1.75rem;} .events-grid{grid-template-columns:1fr; gap:1rem;} .event-content{padding:1rem; padding-right:75px;} .date-badge{min-width:50px; font-size:.8rem; top:10px; right:10px;} .search-section{padding:1rem;} }
+
+/* Login pre-auth shimmer (moved from login.component to stay under style budget) */
+.pre-auth-shimmer { position:relative; overflow:hidden; min-height:3rem; }
+.pre-auth-shimmer::after { content:""; position:absolute; inset:0; background:linear-gradient(110deg,rgba(255,255,255,0) 0%,rgba(255,255,255,.25) 40%,rgba(255,255,255,0) 80%); animation: shimmer 1.4s infinite; }
+@keyframes shimmer { from { transform:translateX(-100%); } to { transform:translateX(100%); } }

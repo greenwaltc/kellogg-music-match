@@ -129,6 +129,16 @@ export class AuthService {
     localStorage.removeItem('kmm_token');
   }
 
+  /**
+   * Determine the natural landing route for an authenticated user.
+   * If the user has configured favorite artists, send them to matches; otherwise to Chicago events.
+   */
+  postAuthLanding(): string {
+    const u = this.user();
+    if (u?.artists && u.artists.length > 0) return '/matches';
+    return '/chicago-events';
+  }
+
   forgotPassword(email: string) {
     this.loading.set(true);
     this.error.set(null);

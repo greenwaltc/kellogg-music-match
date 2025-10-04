@@ -325,5 +325,5 @@ export class MatchesComponent {
     effect(() => { if (!this.matches.matches()) { /* could redirect */ } });
     this.matches.fetchIfReady();
   }
-  back(): void { this.router.navigateByUrl('/artists'); }
+  back(): void { this.router.navigateByUrl('/chicago-events'); }
 }

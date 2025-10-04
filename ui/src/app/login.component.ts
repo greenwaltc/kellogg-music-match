@@ -616,6 +616,8 @@ interface LoginFormShape {
       letter-spacing: 0.02em; 
     }
     
+  /* (Shimmer styles moved to global styles.css to keep inline bundle under budget) */
+    
     @media (max-width: 600px) { 
       .auth-section {
         padding: 1rem;
@@ -808,8 +810,7 @@ export class LoginComponent {
       this.auth.register(registerData).subscribe({
         next: () => {
           this.matches.fetchIfReady();
-          const hasArtists = !!this.auth.user()?.artists?.length;
-          this.router.navigateByUrl(hasArtists ? '/matches' : '/artists');
+          this.router.navigateByUrl(this.auth.postAuthLanding());
         }
       });
     } else {
@@ -821,8 +822,7 @@ export class LoginComponent {
       this.auth.login(loginData).subscribe({
         next: () => {
           this.matches.fetchIfReady();
-          const hasArtists = !!this.auth.user()?.artists?.length;
-          this.router.navigateByUrl(hasArtists ? '/matches' : '/artists');
+          this.router.navigateByUrl(this.auth.postAuthLanding());
         }
       });
     }
