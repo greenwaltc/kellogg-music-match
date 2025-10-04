@@ -228,6 +228,50 @@ func (r *PostgreSQLRepository) GetChicagoEvents(ctx context.Context, artistName 
 		event.GoingUserIDs = row.GoingUserIds
 		event.LookingForGroupUserIDs = row.LookingForGroupUserIds
 
+		// Enrich user name lists (best-effort; ignore per-user failures) if there are any IDs.
+		if len(event.InterestedUserIDs) > 0 || len(event.GoingUserIDs) > 0 || len(event.LookingForGroupUserIDs) > 0 {
+			unique := map[string]struct{}{}
+			for _, id := range event.InterestedUserIDs {
+				unique[id] = struct{}{}
+			}
+			for _, id := range event.GoingUserIDs {
+				unique[id] = struct{}{}
+			}
+			for _, id := range event.LookingForGroupUserIDs {
+				unique[id] = struct{}{}
+			}
+			idToName := map[string]string{}
+			for uid := range unique {
+				parsed, err := uuid.Parse(uid)
+				if err != nil {
+					continue
+				}
+				u, err := r.queries.GetUserByID(ctx, parsed)
+				if err != nil {
+					continue
+				}
+				full := strings.TrimSpace(u.FirstName + " " + u.LastName)
+				if full != "" {
+					idToName[uid] = full
+				}
+			}
+			for _, id := range event.InterestedUserIDs {
+				if name, ok := idToName[id]; ok {
+					event.InterestedUsers = append(event.InterestedUsers, name)
+				}
+			}
+			for _, id := range event.GoingUserIDs {
+				if name, ok := idToName[id]; ok {
+					event.GoingUsers = append(event.GoingUsers, name)
+				}
+			}
+			for _, id := range event.LookingForGroupUserIDs {
+				if name, ok := idToName[id]; ok {
+					event.LookingForGroupUsers = append(event.LookingForGroupUsers, name)
+				}
+			}
+		}
+
 		// Parse aggregated artists JSON
 		if row.ArtistsJson != nil {
 			parsedArtists, err := parseArtistsJSON(row.ArtistsJson)

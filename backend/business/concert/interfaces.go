@@ -22,6 +22,10 @@ type Event struct {
 	InterestedUserIDs      []string `json:"interestedUserIds,omitempty"`
 	GoingUserIDs           []string `json:"goingUserIds,omitempty"`
 	LookingForGroupUserIDs []string `json:"lookingForGroupUserIds,omitempty"`
+	// Denormalized user full names (First Last) for presentation
+	InterestedUsers      []string `json:"interestedUsers,omitempty"`
+	GoingUsers           []string `json:"goingUsers,omitempty"`
+	LookingForGroupUsers []string `json:"lookingForGroupUsers,omitempty"`
 }
 
 // Venue represents a concert venue

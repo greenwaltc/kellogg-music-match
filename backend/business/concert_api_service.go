@@ -230,13 +230,22 @@ func (s *ConcertAPIService) convertToAPIConcert(event concert.Event) generated.C
 
 	// Include user interest aggregates if present
 	if len(event.InterestedUserIDs) > 0 {
-		concert.InterestedUserIds = event.InterestedUserIDs
+		concert.InterestedUserIds = event.InterestedUserIDs // deprecated retention
 	}
 	if len(event.GoingUserIDs) > 0 {
-		concert.GoingUserIds = event.GoingUserIDs
+		concert.GoingUserIds = event.GoingUserIDs // deprecated retention
 	}
 	if len(event.LookingForGroupUserIDs) > 0 {
-		concert.LookingForGroupUserIds = event.LookingForGroupUserIDs
+		concert.LookingForGroupUserIds = event.LookingForGroupUserIDs // deprecated retention
+	}
+	if len(event.InterestedUsers) > 0 {
+		concert.InterestedUsers = event.InterestedUsers
+	}
+	if len(event.GoingUsers) > 0 {
+		concert.GoingUsers = event.GoingUsers
+	}
+	if len(event.LookingForGroupUsers) > 0 {
+		concert.LookingForGroupUsers = event.LookingForGroupUsers
 	}
 
 	// Only include price range if it has values

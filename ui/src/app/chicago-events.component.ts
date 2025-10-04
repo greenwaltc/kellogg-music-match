@@ -32,9 +32,14 @@ interface ChicagoEvent {
   };
   ticketUrl?: string;
   // Backend aggregated user interest buckets (new fields)
+  // Deprecated ID arrays (still accepted for backward compatibility)
   interestedUserIds?: string[];
   goingUserIds?: string[];
   lookingForGroupUserIds?: string[];
+  // New full name arrays
+  interestedUsers?: string[];
+  goingUsers?: string[];
+  lookingForGroupUsers?: string[];
 }
 
 interface ChicagoEventsResponse {
@@ -174,7 +179,9 @@ interface ChicagoEventsResponse {
                 <button type="button" class="interest-btn" (click)="setInterest(event.id, 'GOING')" title="Mark Going">✅</button>
                 <button type="button" class="interest-btn" (click)="setInterest(event.id, 'LOOKING_FOR_GROUP')" title="Looking For Group">👥</button>
                 <button type="button" class="interest-btn" (click)="removeInterest(event.id)" title="Clear Interest">✖</button>
-                <span class="interest-meta" *ngIf="event.goingUserIds?.length" style="font-size:0.7rem; color:var(--color-text-muted);">Going: {{event.goingUserIds?.length || 0}}</span>
+                <span class="interest-meta" *ngIf="(event.goingUsers?.length || event.goingUserIds?.length)" style="font-size:0.7rem; color:var(--color-text-muted);">
+                  Going: {{ (event.goingUsers?.length || event.goingUserIds?.length || 0) }}
+                </span>
               </div>
             </div>
           </div>

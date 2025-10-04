@@ -1114,23 +1114,41 @@ components:
           description: URL to purchase tickets
           example: "https://www.ticketmaster.com/event/123"
         interestedUserIds:
+          deprecated: true
           type: array
-          description: User IDs with INTERESTED status
+          description: (Deprecated) User IDs with INTERESTED status – replaced by interestedUsers
           items:
             type: string
-          example: ["550e8400-e29b-41d4-a716-446655440000"]
+        interestedUsers:
+          type: array
+          description: Full names (First Last) of users with INTERESTED status
+          items:
+            type: string
+          example: ["Alice Johnson"]
         goingUserIds:
+          deprecated: true
           type: array
-          description: User IDs with GOING status
+          description: (Deprecated) User IDs with GOING status – replaced by goingUsers
           items:
             type: string
-          example: ["550e8400-e29b-41d4-a716-446655440111"]
+        goingUsers:
+          type: array
+          description: Full names (First Last) of users with GOING status
+          items:
+            type: string
+          example: ["Bob Smith"]
         lookingForGroupUserIds:
+          deprecated: true
           type: array
-          description: User IDs with LOOKING_FOR_GROUP status
+          description: (Deprecated) User IDs with LOOKING_FOR_GROUP status – replaced by lookingForGroupUsers
           items:
             type: string
-          example: ["550e8400-e29b-41d4-a716-446655440222"]
+        lookingForGroupUsers:
+          type: array
+          description: Full names (First Last) of users with LOOKING_FOR_GROUP status
+          items:
+            type: string
+          example: ["Carol Davis"]
       required:
         - id
         - name
