@@ -173,6 +173,50 @@ func TestConcertAPIService_GetChicagoEvents(t *testing.T) {
 	})
 }
 
+func TestConcertAPIService_GetChicagoEventById(t *testing.T) {
+	mockRepo := concert.NewMockRepository()
+	mockProvider := &TestEventProvider{}
+	ctx := context.Background()
+
+	evt := &concert.Event{
+		ID:        "chicago-xyz",
+		Name:      "Indie Night",
+		Date:      time.Now().Add(5 * time.Hour),
+		Venue:     concert.Venue{ID: "venue-x", Name: "Small Bar", Address: concert.Address{City: "Chicago", Country: "US"}},
+		Artists:   []concert.Artist{{ID: "artist-x", Name: "Indie Star", Genres: []string{"Indie"}}},
+		Status:    "onsale",
+		TicketURL: "https://example.com/tickets/xyz",
+	}
+	require.NoError(t, mockRepo.UpsertEvent(ctx, evt))
+
+	cfg := &config.Config{}
+	service := NewConcertAPIServiceWithRepository(mockProvider, mockRepo, cfg)
+
+	t.Run("Success", func(t *testing.T) {
+		resp, err := service.GetChicagoEventById(ctx, "chicago-xyz")
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, resp.Code)
+		body, ok := resp.Body.(generated.Concert)
+		require.True(t, ok)
+		assert.Equal(t, "Indie Night", body.Name)
+		assert.Equal(t, "chicago-xyz", body.Id)
+		assert.Equal(t, "Small Bar", body.Venue.Name)
+		assert.Len(t, body.Artists, 1)
+	})
+
+	t.Run("NotFound", func(t *testing.T) {
+		resp, err := service.GetChicagoEventById(ctx, "nope")
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusNotFound, resp.Code)
+	})
+
+	t.Run("BadRequest", func(t *testing.T) {
+		resp, err := service.GetChicagoEventById(ctx, "")
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusBadRequest, resp.Code)
+	})
+}
+
 // TestEventProvider is a mock implementation for testing
 type TestEventProvider struct{}
 

@@ -12,6 +12,37 @@ import (
 	"github.com/greenwaltc/kellogg-music-match/backend/logger"
 )
 
+// setMyInterest inspects deprecated user ID buckets to derive the caller's current interest.
+// This avoids scanning name arrays (which hold display names only) and keeps logic consistent
+// while we maintain deprecated *_UserIds fields for backward compatibility.
+func setMyInterest(userID string, evt *concert.Event) {
+	if evt == nil || userID == "" {
+		return
+	}
+	for _, id := range evt.InterestedUserIDs {
+		if id == userID {
+			status := "INTERESTED"
+			evt.MyInterest = &status
+			return
+		}
+	}
+	for _, id := range evt.GoingUserIDs {
+		if id == userID {
+			status := "GOING"
+			evt.MyInterest = &status
+			return
+		}
+	}
+	for _, id := range evt.LookingForGroupUserIDs {
+		if id == userID {
+			status := "LOOKING_FOR_GROUP"
+			evt.MyInterest = &status
+			return
+		}
+	}
+	evt.MyInterest = nil
+}
+
 // duplicate of jwt middleware user context key/shape (avoid import cycle with main package)
 type userContextKeyType string
 
@@ -257,7 +288,17 @@ func (s *ConcertAPIService) convertToAPIConcert(event concert.Event) generated.C
 	if event.TicketURL != "" {
 		concert.TicketUrl = event.TicketURL
 	}
+	// Include interest buckets (legacy + new)
+	concert.InterestedUserIds = event.InterestedUserIDs
+	concert.GoingUserIds = event.GoingUserIDs
+	concert.LookingForGroupUserIds = event.LookingForGroupUserIDs
+	concert.InterestedUsers = event.InterestedUsers
+	concert.GoingUsers = event.GoingUsers
+	concert.LookingForGroupUsers = event.LookingForGroupUsers
 
+	if event.MyInterest != nil {
+		concert.MyInterest = event.MyInterest
+	}
 	return concert
 }
 
@@ -276,9 +317,13 @@ func (s *ConcertAPIService) GetChicagoEvents(ctx context.Context, artistName str
 		}), nil
 	}
 
-	// Convert events to API format
+	// Convert events to API format with per-user interest derivation
+	userID := getUserIDFromContext(ctx)
 	apiEvents := make([]generated.Concert, 0, len(events))
 	for _, event := range events {
+		if userID != "" {
+			setMyInterest(userID, event)
+		}
 		apiEvents = append(apiEvents, s.convertToAPIConcert(*event))
 	}
 
@@ -292,6 +337,29 @@ func (s *ConcertAPIService) GetChicagoEvents(ctx context.Context, artistName str
 	}
 
 	return generated.Response(http.StatusOK, result), nil
+}
+
+// GetChicagoEventById retrieves a single Chicago event by ID with interest enrichment
+func (s *ConcertAPIService) GetChicagoEventById(ctx context.Context, eventId string) (generated.ImplResponse, error) {
+	if eventId == "" {
+		return generated.Response(http.StatusBadRequest, generated.ErrorResponse{Message: "eventId required"}), nil
+	}
+	if s.concertService == nil || s.concertService.repository == nil {
+		return generated.Response(http.StatusServiceUnavailable, generated.ErrorResponse{Message: "concert repository unavailable"}), nil
+	}
+	evt, err := s.concertService.repository.GetChicagoEventByID(ctx, eventId)
+	if err != nil {
+		if err == concert.ErrEventNotFound {
+			return generated.Response(http.StatusNotFound, generated.ErrorResponse{Message: "event not found"}), nil
+		}
+		return generated.Response(http.StatusInternalServerError, generated.ErrorResponse{Message: fmt.Sprintf("failed to fetch event: %v", err)}), nil
+	}
+	userID := getUserIDFromContext(ctx)
+	if userID != "" {
+		setMyInterest(userID, evt)
+	}
+	api := s.convertToAPIConcert(*evt)
+	return generated.Response(http.StatusOK, api), nil
 }
 
 // SetEventInterest sets/updates the authenticated user's interest for an event

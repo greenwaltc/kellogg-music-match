@@ -26,6 +26,8 @@ type Event struct {
 	InterestedUsers      []string `json:"interestedUsers,omitempty"`
 	GoingUsers           []string `json:"goingUsers,omitempty"`
 	LookingForGroupUsers []string `json:"lookingForGroupUsers,omitempty"`
+	// Derived: current authenticated user's interest (set by service layer when context user present)
+	MyInterest *string `json:"myInterest,omitempty"`
 }
 
 // Venue represents a concert venue

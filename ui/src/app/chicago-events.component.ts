@@ -1,8 +1,10 @@
 import { Component, OnInit, OnDestroy, HostListener } from '@angular/core';
+import { trigger, state, style, transition, animate } from '@angular/animations';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { ConcertInterestService } from './concert-interest.service';
+import { AuthService } from './auth.service';
 import { Subject, BehaviorSubject, combineLatest } from 'rxjs';
 import { debounceTime, distinctUntilChanged, switchMap, takeUntil, catchError } from 'rxjs/operators';
 import { of } from 'rxjs';
@@ -40,6 +42,7 @@ interface ChicagoEvent {
   interestedUsers?: string[];
   goingUsers?: string[];
   lookingForGroupUsers?: string[];
+  myInterest?: 'INTERESTED' | 'GOING' | 'LOOKING_FOR_GROUP';
 }
 
 interface ChicagoEventsResponse {
@@ -52,6 +55,13 @@ interface ChicagoEventsResponse {
   selector: 'app-chicago-events',
   standalone: true,
   imports: [CommonModule, FormsModule],
+  animations: [
+    trigger('expandCollapse', [
+      state('collapsed', style({ height: '0px', opacity: 0, padding: '0 0.5rem', overflow: 'hidden' })),
+      state('expanded', style({ height: '*', opacity: 1, padding: '0.6rem 0.65rem 0.7rem', overflow: 'hidden' })),
+      transition('collapsed <=> expanded', animate('220ms cubic-bezier(0.4, 0.0, 0.2, 1)')),
+    ])
+  ],
   template: `
     <div class="chicago-events-container">
       <div class="page-header">
@@ -174,14 +184,39 @@ interface ChicagoEventsResponse {
               </div>
 
               <!-- Interest Actions -->
-              <div class="interest-actions" style="margin-top:0.5rem; display:flex; gap:0.25rem; flex-wrap:wrap;">
-                <button type="button" class="interest-btn" (click)="setInterest(event.id, 'INTERESTED')" title="Mark Interested">★</button>
-                <button type="button" class="interest-btn" (click)="setInterest(event.id, 'GOING')" title="Mark Going">✅</button>
-                <button type="button" class="interest-btn" (click)="setInterest(event.id, 'LOOKING_FOR_GROUP')" title="Looking For Group">👥</button>
-                <button type="button" class="interest-btn" (click)="removeInterest(event.id)" title="Clear Interest">✖</button>
-                <span class="interest-meta" *ngIf="(event.goingUsers?.length || event.goingUserIds?.length)" style="font-size:0.7rem; color:var(--color-text-muted);">
-                  Going: {{ (event.goingUsers?.length || event.goingUserIds?.length || 0) }}
-                </span>
+              <div class="interest-actions">
+                <div class="interest-buttons">
+                  <button type="button" class="interest-btn" [class.active]="event.myInterest==='INTERESTED'" (click)="setInterest(event.id, 'INTERESTED')" title="Mark as Interested" aria-label="Mark as Interested">★ Interested ({{totalInterested(event)}})</button>
+                  <button type="button" class="interest-btn" [class.active]="event.myInterest==='GOING'" (click)="setInterest(event.id, 'GOING')" title="Mark as Going" aria-label="Mark as Going">✅ Going ({{totalGoing(event)}})</button>
+                  <button type="button" class="interest-btn" [class.active]="event.myInterest==='LOOKING_FOR_GROUP'" (click)="setInterest(event.id, 'LOOKING_FOR_GROUP')" title="Looking For Group" aria-label="Looking For Group">👥 Looking for Group ({{totalLFG(event)}})</button>
+                  <button type="button" class="interest-btn danger" [class.active]="!event.myInterest" (click)="removeInterest(event.id)" title="Clear My Interest" aria-label="Clear My Interest">✖ Clear</button>
+                  <button type="button" class="toggle-attendees inline" *ngIf="hasAnyInterest(event)" (click)="toggleInterestList(event)">
+                    {{ isInterestExpanded(event.id) ? 'Hide' : 'View' }} Attendees
+                    <span class="chevron">{{ isInterestExpanded(event.id) ? '▴' : '▾' }}</span>
+                  </button>
+                </div>
+                <div class="interest-attendees" [@expandCollapse]="isInterestExpanded(event.id) ? 'expanded' : 'collapsed'" *ngIf="isInterestExpanded(event.id)">
+                  <div *ngIf="loadingAttendeesFor === event.id" class="loading-attendees">Loading attendees...</div>
+                  <div *ngIf="!loadingAttendeesFor && !hasAnyInterest(event)" class="empty-attendees">No interest recorded yet.</div>
+                  <div *ngIf="!loadingAttendeesFor && totalInterested(event) > 0" class="interest-category">
+                    <div class="category-title">Interested</div>
+                    <div class="names-list">
+                      <span *ngFor="let name of (event.interestedUsers || [])" class="user-name">{{name}}</span>
+                    </div>
+                  </div>
+                  <div *ngIf="!loadingAttendeesFor && totalGoing(event) > 0" class="interest-category">
+                    <div class="category-title">Going</div>
+                    <div class="names-list">
+                      <span *ngFor="let name of (event.goingUsers || [])" class="user-name">{{name}}</span>
+                    </div>
+                  </div>
+                  <div *ngIf="!loadingAttendeesFor && totalLFG(event) > 0" class="interest-category">
+                    <div class="category-title">Looking for Group</div>
+                    <div class="names-list">
+                      <span *ngFor="let name of (event.lookingForGroupUsers || [])" class="user-name">{{name}}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -207,383 +242,7 @@ interface ChicagoEventsResponse {
       </div>
     </div>
   `,
-  styles: [`
-    .chicago-events-container {
-      max-width: 960px;
-      margin: 0 auto;
-      padding: 2rem 1rem 5rem;
-    }
-
-    .page-header {
-      text-align: center;
-      margin-bottom: 2rem;
-    }
-
-    .page-header h1 {
-      margin: 0 0 0.5rem 0;
-      font-size: 2rem;
-      font-weight: 700;
-      background: var(--color-gradient);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .subtitle {
-      margin: 0;
-      color: var(--color-text-muted);
-      font-size: 1rem;
-    }
-
-    .search-section {
-      background: var(--color-surface);
-      border: 1px solid var(--color-border);
-      border-radius: 12px;
-      padding: 1.5rem;
-      margin-bottom: 2rem;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    }
-
-    .search-input-wrapper {
-      position: relative;
-      max-width: 500px;
-      margin: 0 auto;
-    }
-
-    .search-input {
-      width: 100%;
-      padding: 0.65rem 0.75rem 0.65rem 2.5rem;
-      border: 1px solid var(--color-border);
-      border-radius: 8px;
-      background: var(--color-input-bg);
-      color: var(--color-text);
-      font-size: 0.95rem;
-      outline: none;
-      transition: all 0.25s ease;
-      box-sizing: border-box;
-    }
-
-    .search-input:focus {
-      outline: 2px solid var(--color-accent);
-      border-color: var(--color-accent);
-    }
-
-    .search-input:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-
-    .search-icon {
-      position: absolute;
-      left: 0.75rem;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 1rem;
-      color: var(--color-text-muted);
-    }
-
-    .search-info {
-      text-align: center;
-      margin-top: 1rem;
-      color: var(--color-text-muted);
-      font-size: 0.9rem;
-    }
-
-    .results-count {
-      font-weight: 600;
-      color: var(--color-accent);
-    }
-
-    .filter-info {
-      margin-left: 0.5rem;
-    }
-
-    .loading-state, .error-state, .no-results {
-      text-align: center;
-      padding: 3rem 2rem;
-      background: var(--color-surface);
-      border: 1px solid var(--color-border);
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    }
-
-    .loading-spinner {
-      width: 50px;
-      height: 50px;
-      border: 4px solid var(--color-border);
-      border-top: 4px solid var(--color-accent);
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin: 0 auto 1rem auto;
-    }
-
-    .loading-spinner.small {
-      width: 30px;
-      height: 30px;
-      border-width: 3px;
-    }
-
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-
-    .error-state {
-      color: var(--color-error);
-    }
-
-    .error-state h3 {
-      color: var(--color-text);
-      margin-bottom: 0.5rem;
-    }
-
-    .error-icon {
-      font-size: 3rem;
-      margin-bottom: 1rem;
-    }
-
-    .retry-button {
-      background: var(--color-accent);
-      color: #fff;
-      border: none;
-      padding: 0.6rem 1rem;
-      border-radius: 8px;
-      font-size: 0.9rem;
-      font-weight: 600;
-      cursor: pointer;
-      margin-top: 1rem;
-      transition: background 0.25s ease;
-    }
-
-    .retry-button:hover {
-      opacity: 0.9;
-    }
-
-    .no-results-icon {
-      font-size: 4rem;
-      margin-bottom: 1rem;
-    }
-
-    .no-results h3 {
-      color: var(--color-text);
-      margin-bottom: 0.5rem;
-    }
-
-    .events-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-      gap: 1.5rem;
-      margin-bottom: 2rem;
-    }
-
-    .event-card {
-      background: var(--color-surface);
-      border: 1px solid var(--color-border);
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-      overflow: hidden;
-      transition: all 0.2s ease;
-      position: relative;
-    }
-
-    .event-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-    }
-
-    .event-card.highlighted {
-      border-color: var(--color-accent);
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-    }
-
-    .date-badge {
-      position: absolute;
-      top: 15px;
-      right: 15px;
-      background: var(--color-gradient);
-      color: white;
-      padding: 8px;
-      border-radius: 8px;
-      text-align: center;
-      min-width: 60px;
-      font-size: 0.85rem;
-      font-weight: 600;
-      z-index: 1;
-    }
-
-    .date-day {
-      font-size: 1.2rem;
-      font-weight: 700;
-    }
-
-    .date-month {
-      font-size: 0.8rem;
-      text-transform: uppercase;
-      margin-top: 2px;
-    }
-
-    .event-content {
-      padding: 20px;
-      padding-right: 90px;
-    }
-
-    .event-header {
-      margin-bottom: 1rem;
-    }
-
-    .event-title {
-      font-size: 1.25rem;
-      font-weight: 600;
-      color: var(--color-text);
-      margin: 0 0 0.5rem 0;
-      line-height: 1.3;
-    }
-
-    .event-time {
-      color: var(--color-text-muted);
-      font-size: 0.9rem;
-      font-weight: 500;
-    }
-
-    .venue-info {
-      margin-bottom: 1rem;
-    }
-
-    .venue-name {
-      font-weight: 600;
-      color: var(--color-text);
-      margin-bottom: 0.3rem;
-    }
-
-    .venue-address {
-      color: var(--color-text-muted);
-      font-size: 0.85rem;
-    }
-
-    .artists-section {
-      margin-bottom: 1rem;
-    }
-
-    .artists-list {
-      margin-bottom: 0.5rem;
-    }
-
-    .artist-name {
-      font-weight: 600;
-      color: var(--color-text);
-    }
-
-    .artist-name.highlighted-artist {
-      background: var(--color-gradient);
-      color: white;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-weight: 700;
-    }
-
-    .genres {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-    }
-
-    .genre-tag {
-      background: var(--color-border);
-      color: var(--color-text-muted);
-      padding: 4px 8px;
-      border-radius: 12px;
-      font-size: 0.8rem;
-      font-weight: 500;
-    }
-
-    .ticket-section {
-      margin-top: 1rem;
-    }
-
-    .ticket-button {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      background: var(--color-accent);
-      color: white;
-      padding: 0.6rem 1rem;
-      border-radius: 8px;
-      text-decoration: none;
-      font-weight: 600;
-      font-size: 0.9rem;
-      transition: all 0.25s ease;
-    }
-
-    .ticket-button:hover {
-      opacity: 0.9;
-      transform: translateY(-1px);
-    }
-
-    .load-more-section {
-      text-align: center;
-      margin: 2rem 0;
-    }
-
-    .load-more-button {
-      background: var(--color-accent);
-      color: white;
-      border: none;
-      padding: 0.6rem 1rem;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 0.9rem;
-      font-weight: 600;
-      transition: all 0.25s ease;
-    }
-
-    .load-more-button:hover:not(:disabled) {
-      opacity: 0.9;
-    }
-
-    .load-more-button:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-
-    .loading-more {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 1rem;
-      padding: 2rem;
-      color: var(--color-text-muted);
-    }
-
-    @media (max-width: 768px) {
-      .chicago-events-container {
-        padding: 1rem 1rem 5rem;
-      }
-      
-      .page-header h1 {
-        font-size: 1.75rem;
-      }
-      
-      .events-grid {
-        grid-template-columns: 1fr;
-        gap: 1rem;
-      }
-      
-      .event-content {
-        padding: 1rem;
-        padding-right: 75px;
-      }
-      
-      .date-badge {
-        min-width: 50px;
-        font-size: 0.8rem;
-        top: 10px;
-        right: 10px;
-      }
-
-      .search-section {
-        padding: 1rem;
-      }
-    }
-  `]
+  styles: [``] // Styles moved to global styles.css to stay under component budget
 })
 export class ChicagoEventsComponent implements OnInit, OnDestroy {
   events: ChicagoEvent[] = [];
@@ -593,6 +252,12 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy {
   hasMore = false;
   totalCount = 0;
   error: string | null = null;
+  private expandedInterestEvents = new Set<string>();
+  // For single-expanded mode & lazy load state
+  private singleExpandedEventId: string | null = null;
+  loadingAttendeesFor: string | null = null;
+  private toggleCooldown = false;
+  private lastExpandedEventId: string | null = null;
   
   private destroy$ = new Subject<void>();
   private searchSubject = new BehaviorSubject<string>('');
@@ -601,7 +266,7 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy {
   
   private apiBaseUrl: string;
 
-  constructor(private http: HttpClient, private interest: ConcertInterestService) {
+  constructor(private http: HttpClient, private interest: ConcertInterestService, private auth: AuthService) {
     this.apiBaseUrl = window.__kmmConfig?.apiBaseUrl || 'http://localhost:8080';
   }
 
@@ -740,12 +405,14 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy {
   setInterest(eventId: string, interestType: 'INTERESTED' | 'GOING' | 'LOOKING_FOR_GROUP') {
     const idx = this.events.findIndex(e => e.id === eventId);
     if (idx === -1) return;
-    const previous = { ...this.events[idx] };
-    // Optimistic mutation: add current (placeholder) user id? We'll reflect by increment length only if arrays present
-    // Since we don't have the user id in the client (UUID hidden), we just refresh later; no local array push
-    this.events[idx] = { ...this.events[idx] }; // trigger change detection
+    const previous = deepCloneEvent(this.events[idx]);
+    const user = this.auth.user();
+    if (user?.id || (user?.firstName && user?.lastName)) {
+      const fullName = `${user.firstName} ${user.lastName}`.trim();
+      this.events[idx] = this.applyLocalInterest(this.events[idx], user.id, fullName, interestType);
+    }
     this.interest.setInterest(eventId, interestType).subscribe({
-      next: () => this.refreshEventInterest(eventId),
+      next: () => this.refreshEventInterest(eventId, () => this.reexpandIfNeeded(eventId)),
       error: err => {
         console.warn('Failed to set interest', err);
         this.events[idx] = previous; // rollback
@@ -756,10 +423,14 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy {
   removeInterest(eventId: string) {
     const idx = this.events.findIndex(e => e.id === eventId);
     if (idx === -1) return;
-    const previous = { ...this.events[idx] };
-    this.events[idx] = { ...this.events[idx] }; // optimistic noop
+    const previous = deepCloneEvent(this.events[idx]);
+    const user = this.auth.user();
+    if (user?.id || (user?.firstName && user?.lastName)) {
+      const fullName = `${user.firstName} ${user.lastName}`.trim();
+      this.events[idx] = this.applyLocalInterest(this.events[idx], user.id, fullName, null);
+    }
     this.interest.removeInterest(eventId).subscribe({
-      next: () => this.refreshEventInterest(eventId),
+      next: () => this.refreshEventInterest(eventId, () => this.reexpandIfNeeded(eventId)),
       error: err => {
         console.warn('Failed to remove interest', err);
         this.events[idx] = previous;
@@ -767,7 +438,7 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy {
     });
   }
 
-  private refreshEventInterest(eventId: string) {
+  private refreshEventInterest(eventId: string, done?: () => void) {
     const params = new URLSearchParams({ limit: this.pageSize.toString(), offset: '0' });
     if (this.searchQuery.trim()) params.append('artistName', this.searchQuery.trim());
     this.http.get<ChicagoEventsResponse>(`${this.apiBaseUrl}/chicago/events?${params}`)
@@ -779,6 +450,7 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy {
           const idx = this.events.findIndex(e => e.id === eventId);
           if (idx >= 0) this.events[idx] = { ...this.events[idx], ...updated };
         }
+        if (done) done();
       });
   }
 
@@ -824,4 +496,104 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy {
     const query = this.searchQuery.toLowerCase();
     return artistName.toLowerCase().includes(query);
   }
+
+  // Interest helper methods for new UI
+  hasAnyInterest(event: ChicagoEvent): boolean {
+    return this.totalInterested(event) + this.totalGoing(event) + this.totalLFG(event) > 0;
+  }
+
+  totalInterested(event: ChicagoEvent): number {
+    return (event.interestedUsers?.length ?? event.interestedUserIds?.length ?? 0);
+  }
+
+  totalGoing(event: ChicagoEvent): number {
+    return (event.goingUsers?.length ?? event.goingUserIds?.length ?? 0);
+  }
+
+  totalLFG(event: ChicagoEvent): number {
+    return (event.lookingForGroupUsers?.length ?? event.lookingForGroupUserIds?.length ?? 0);
+  }
+
+  // Updated: single expansion & lazy load via dedicated endpoint with debounce
+  toggleInterestList(event: ChicagoEvent) {
+    const eventId = event.id;
+    if (this.toggleCooldown) return;
+    this.toggleCooldown = true;
+    setTimeout(() => { this.toggleCooldown = false; }, 300);
+
+    if (this.singleExpandedEventId === eventId) {
+      this.singleExpandedEventId = null;
+      return;
+    }
+    this.singleExpandedEventId = eventId;
+    this.lastExpandedEventId = eventId;
+    this.loadingAttendeesFor = eventId;
+    this.http.get<ChicagoEvent>(`${this.apiBaseUrl}/chicago/events/${eventId}`)
+      .pipe(catchError(err => { console.warn('single event fetch failed', err); return of(null); }))
+      .subscribe(resp => {
+        if (resp) {
+          const idx = this.events.findIndex(e => e.id === eventId);
+          if (idx >= 0) this.events[idx] = { ...this.events[idx], ...resp };
+        }
+        this.loadingAttendeesFor = null;
+      });
+  }
+
+  isInterestExpanded(eventId: string): boolean {
+    return this.singleExpandedEventId === eventId;
+  }
+
+  private reexpandIfNeeded(eventId: string) {
+    if (this.lastExpandedEventId === eventId && this.singleExpandedEventId === eventId) {
+      // keep expanded
+    }
+  }
 }
+
+// Helper to deep clone an event (limited fields relevant to mutation)
+function deepCloneEvent(e: ChicagoEvent): ChicagoEvent {
+  return JSON.parse(JSON.stringify(e));
+}
+
+// Extend component prototype via declaration merging for helper method
+// (Kept inside same file to avoid creating separate utils.)
+export interface ChicagoEventsComponent {
+  applyLocalInterest(event: ChicagoEvent, userId: string | undefined, fullName: string | undefined, status: 'INTERESTED' | 'GOING' | 'LOOKING_FOR_GROUP' | null): ChicagoEvent;
+}
+
+ChicagoEventsComponent.prototype.applyLocalInterest = function(event: ChicagoEvent, userId: string | undefined, fullName: string | undefined, status: 'INTERESTED' | 'GOING' | 'LOOKING_FOR_GROUP' | null): ChicagoEvent {
+  // Clone to avoid mutating original references unexpectedly
+  const updated: ChicagoEvent = { ...event };
+  const removeId = (arr?: string[]) => (userId ? (arr || []).filter(v => v !== userId) : (arr || []));
+  const removeName = (arr?: string[]) => (fullName ? (arr || []).filter(v => v !== fullName) : (arr || []));
+
+  // Always remove from all buckets to enforce exclusivity
+  updated.interestedUserIds = removeId(updated.interestedUserIds);
+  updated.goingUserIds = removeId(updated.goingUserIds);
+  updated.lookingForGroupUserIds = removeId(updated.lookingForGroupUserIds);
+  updated.interestedUsers = removeName(updated.interestedUsers);
+  updated.goingUsers = removeName(updated.goingUsers);
+  updated.lookingForGroupUsers = removeName(updated.lookingForGroupUsers);
+
+  if (status) {
+    // Add to the chosen bucket
+    switch (status) {
+      case 'INTERESTED':
+        if (userId) updated.interestedUserIds = [...(updated.interestedUserIds || []), userId];
+        if (fullName) updated.interestedUsers = [...(updated.interestedUsers || []), fullName];
+        break;
+      case 'GOING':
+        if (userId) updated.goingUserIds = [...(updated.goingUserIds || []), userId];
+        if (fullName) updated.goingUsers = [...(updated.goingUsers || []), fullName];
+        break;
+      case 'LOOKING_FOR_GROUP':
+        if (userId) updated.lookingForGroupUserIds = [...(updated.lookingForGroupUserIds || []), userId];
+        if (fullName) updated.lookingForGroupUsers = [...(updated.lookingForGroupUsers || []), fullName];
+        break;
+    }
+    (updated as any).myInterest = status;
+  } else {
+    delete (updated as any).myInterest;
+  }
+  return updated;
+};

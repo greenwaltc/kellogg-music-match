@@ -799,6 +799,40 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /chicago/events/{eventId}:
+    get:
+      tags:
+        - Concerts
+      summary: Get a single Chicago event by ID (with interest enrichment)
+      description: Retrieve a single Chicago event from the local database including aggregated interest user name buckets.
+      operationId: getChicagoEventById
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          description: Event identifier
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Event retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Concert'
+        '404':
+          description: Event not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
 components:
   schemas:
     User:
@@ -1149,6 +1183,10 @@ components:
           items:
             type: string
           example: ["Carol Davis"]
+        myInterest:
+          type: string
+          nullable: true
+          description: The authenticated user's current interest status for this event (one of INTERESTED, GOING, LOOKING_FOR_GROUP) or null if none.
       required:
         - id
         - name

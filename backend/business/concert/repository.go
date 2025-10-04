@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -24,6 +25,7 @@ type Repository interface {
 	IsHealthy(ctx context.Context) error
 	GetChicagoEvents(ctx context.Context, artistName *string, limit int32, offset int32) ([]*Event, error)
 	GetChicagoEventsCount(ctx context.Context, artistName *string) (int64, error)
+	GetChicagoEventByID(ctx context.Context, id string) (*Event, error)
 	// User interest operations
 	UpsertUserInterest(ctx context.Context, userID string, eventID string, status string) error
 	RemoveUserInterest(ctx context.Context, userID string, eventID string) error
@@ -33,6 +35,9 @@ type Repository interface {
 type PostgreSQLRepository struct {
 	db      *pgxpool.Pool
 	queries *database.Queries
+	// simple in-memory cache for userID -> full name
+	userNameCache   map[string]string
+	userNameCacheMu sync.RWMutex
 }
 
 // NewPostgreSQLRepository creates a new PostgreSQL repository
@@ -49,8 +54,9 @@ func NewPostgreSQLRepository(cfg *config.DatabaseConfig) (*PostgreSQLRepository,
 	}
 
 	return &PostgreSQLRepository{
-		db:      pool,
-		queries: database.New(pool),
+		db:            pool,
+		queries:       database.New(pool),
+		userNameCache: make(map[string]string),
 	}, nil
 }
 
@@ -228,49 +234,8 @@ func (r *PostgreSQLRepository) GetChicagoEvents(ctx context.Context, artistName 
 		event.GoingUserIDs = row.GoingUserIds
 		event.LookingForGroupUserIDs = row.LookingForGroupUserIds
 
-		// Enrich user name lists (best-effort; ignore per-user failures) if there are any IDs.
-		if len(event.InterestedUserIDs) > 0 || len(event.GoingUserIDs) > 0 || len(event.LookingForGroupUserIDs) > 0 {
-			unique := map[string]struct{}{}
-			for _, id := range event.InterestedUserIDs {
-				unique[id] = struct{}{}
-			}
-			for _, id := range event.GoingUserIDs {
-				unique[id] = struct{}{}
-			}
-			for _, id := range event.LookingForGroupUserIDs {
-				unique[id] = struct{}{}
-			}
-			idToName := map[string]string{}
-			for uid := range unique {
-				parsed, err := uuid.Parse(uid)
-				if err != nil {
-					continue
-				}
-				u, err := r.queries.GetUserByID(ctx, parsed)
-				if err != nil {
-					continue
-				}
-				full := strings.TrimSpace(u.FirstName + " " + u.LastName)
-				if full != "" {
-					idToName[uid] = full
-				}
-			}
-			for _, id := range event.InterestedUserIDs {
-				if name, ok := idToName[id]; ok {
-					event.InterestedUsers = append(event.InterestedUsers, name)
-				}
-			}
-			for _, id := range event.GoingUserIDs {
-				if name, ok := idToName[id]; ok {
-					event.GoingUsers = append(event.GoingUsers, name)
-				}
-			}
-			for _, id := range event.LookingForGroupUserIDs {
-				if name, ok := idToName[id]; ok {
-					event.LookingForGroupUsers = append(event.LookingForGroupUsers, name)
-				}
-			}
-		}
+		// Enrich via helper (best-effort)
+		_ = r.enrichEventUserNames(ctx, event)
 
 		// Parse aggregated artists JSON
 		if row.ArtistsJson != nil {
@@ -301,6 +266,147 @@ func (r *PostgreSQLRepository) GetChicagoEventsCount(ctx context.Context, artist
 	}
 
 	return count, nil
+}
+
+// GetChicagoEventByID fetches a single Chicago event and enriches interest user names.
+func (r *PostgreSQLRepository) GetChicagoEventByID(ctx context.Context, id string) (*Event, error) {
+	if id == "" {
+		return nil, fmt.Errorf("empty id")
+	}
+	// Reuse existing list query with limit 1 filtering by artistName empty then filter in code (simpler short-term)
+	params := database.GetChicagoEventsWithArtistSearchParams{ArtistName: "", LimitCount: 1, OffsetCount: 0}
+	rows, err := r.queries.GetChicagoEventsWithArtistSearch(ctx, params)
+	if err != nil {
+		return nil, fmt.Errorf("query failed: %w", err)
+	}
+	for _, row := range rows {
+		if row.ID != id { // ensure match
+			continue
+		}
+		// Build event
+		evt := &Event{
+			ID:             row.ID,
+			Name:           row.Name,
+			Date:           row.EventDate.Time,
+			Status:         row.Status,
+			TicketURL:      row.TicketUrl.String,
+			Description:    row.Description.String,
+			AgeRestriction: row.AgeRestriction.String,
+			Genres:         row.Genres,
+			Venue:          Venue{ID: row.VenueID.String, Name: row.VenueName.String, Address: Address{Street: row.VenueStreet.String, City: row.VenueCity.String, State: row.VenueState.String, Country: row.VenueCountry.String, Postal: row.VenuePostal.String}, Capacity: int(row.VenueCapacity.Int32)},
+		}
+		minPrice := numericToFloat(row.PriceMin)
+		maxPrice := numericToFloat(row.PriceMax)
+		if minPrice > 0 || maxPrice > 0 || row.PriceCurrency.String != "" {
+			evt.PriceRange = PriceRange{Min: minPrice, Max: maxPrice, Currency: row.PriceCurrency.String}
+		}
+		evt.InterestedUserIDs = row.InterestedUserIds
+		evt.GoingUserIDs = row.GoingUserIds
+		evt.LookingForGroupUserIDs = row.LookingForGroupUserIds
+		if row.ArtistsJson != nil {
+			artists, _ := parseArtistsJSON(row.ArtistsJson)
+			evt.Artists = artists
+		}
+		_ = r.enrichEventUserNames(ctx, evt)
+		return evt, nil
+	}
+	return nil, ErrEventNotFound
+}
+
+// enrichEventUserNames populates the *Users slices using cached names; batched lookup for misses.
+func (r *PostgreSQLRepository) enrichEventUserNames(ctx context.Context, evt *Event) error {
+	if evt == nil {
+		return nil
+	}
+	// Collect unique user IDs
+	unique := make(map[string]struct{})
+	add := func(ids []string) {
+		for _, id := range ids {
+			if id != "" {
+				unique[id] = struct{}{}
+			}
+		}
+	}
+	add(evt.InterestedUserIDs)
+	add(evt.GoingUserIDs)
+	add(evt.LookingForGroupUserIDs)
+	if len(unique) == 0 {
+		return nil
+	}
+	// Determine which IDs are missing from cache
+	missing := []uuid.UUID{}
+	missingStr := []string{}
+	r.userNameCacheMu.RLock()
+	for id := range unique {
+		if _, ok := r.userNameCache[id]; !ok {
+			if parsed, err := uuid.Parse(id); err == nil {
+				missing = append(missing, parsed)
+				missingStr = append(missingStr, id)
+			}
+		}
+	}
+	r.userNameCacheMu.RUnlock()
+
+	// Batch fetch missing (if any)
+	if len(missing) > 0 {
+		rows, err := r.db.Query(ctx, "SELECT id, first_name, last_name FROM users WHERE id = ANY($1)", missing)
+		if err == nil {
+			defer rows.Close()
+			newCache := make(map[string]string)
+			for rows.Next() {
+				var id uuid.UUID
+				var first, last string
+				if scanErr := rows.Scan(&id, &first, &last); scanErr == nil {
+					full := strings.TrimSpace(first + " " + last)
+					if full != "" {
+						newCache[id.String()] = full
+					}
+				}
+			}
+			if rows.Err() == nil {
+				// Merge into cache
+				if len(newCache) > 0 {
+					r.userNameCacheMu.Lock()
+					for k, v := range newCache {
+						r.userNameCache[k] = v
+					}
+					r.userNameCacheMu.Unlock()
+				}
+			}
+		}
+		// Fallback: if batch failed, attempt individual queries (best-effort)
+		if err != nil {
+			for i, uuidVal := range missing {
+				u, qErr := r.queries.GetUserByID(ctx, uuidVal)
+				if qErr != nil {
+					continue
+				}
+				full := strings.TrimSpace(u.FirstName + " " + u.LastName)
+				if full != "" {
+					r.userNameCacheMu.Lock()
+					r.userNameCache[missingStr[i]] = full
+					r.userNameCacheMu.Unlock()
+				}
+			}
+		}
+	}
+
+	// Build name slices from cache
+	build := func(ids []string) []string {
+		out := []string{}
+		r.userNameCacheMu.RLock()
+		defer r.userNameCacheMu.RUnlock()
+		for _, id := range ids {
+			if name, ok := r.userNameCache[id]; ok {
+				out = append(out, name)
+			}
+		}
+		return out
+	}
+	evt.InterestedUsers = build(evt.InterestedUserIDs)
+	evt.GoingUsers = build(evt.GoingUserIDs)
+	evt.LookingForGroupUsers = build(evt.LookingForGroupUserIDs)
+	return nil
 }
 
 // Close closes the database connection pool
@@ -416,6 +522,13 @@ func (m *MockRepository) GetChicagoEventsCount(ctx context.Context, artistName *
 		count++
 	}
 	return count, nil
+}
+
+func (m *MockRepository) GetChicagoEventByID(ctx context.Context, id string) (*Event, error) {
+	if evt, ok := m.events[id]; ok {
+		return evt, nil
+	}
+	return nil, ErrEventNotFound
 }
 
 // UpsertUserInterest records or updates a user's interest for an event in the mock repo.

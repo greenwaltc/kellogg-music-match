@@ -487,6 +487,11 @@ func (m *MockRepository) RemoveUserInterest(ctx context.Context, userID string, 
 	return nil
 }
 
+// Satisfy updated Repository interface (Chicago single event fetch)
+func (m *MockRepository) GetChicagoEventByID(ctx context.Context, id string) (*concert.Event, error) {
+	return nil, concert.ErrEventNotFound
+}
+
 // Custom errors for testing
 var (
 	ErrProviderUnhealthy = fmt.Errorf("provider is unhealthy")
