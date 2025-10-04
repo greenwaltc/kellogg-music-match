@@ -579,25 +579,17 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
   }
 
   onTicketClick(event: Event, ticketUrl: string) {
-    console.log('Ticket button clicked:', ticketUrl);
-    
-    // Try to open in new tab/window
+    // Ensure only ONE navigation: prevent default anchor behavior (which would also open due to target _blank)
+    if (event && typeof event.preventDefault === 'function') event.preventDefault();
     try {
-      const newWindow = window.open(ticketUrl, '_blank', 'noopener,noreferrer');
-      
-      if (!newWindow) {
-        // Popup was blocked, show a message or fallback
-        console.warn('Popup blocked. Fallback: navigating in same tab');
-        // Prevent default anchor behavior and navigate manually
-        event.preventDefault();
+      const w = window.open(ticketUrl, '_blank', 'noopener,noreferrer');
+      if (!w) {
+        // Popup blocked; graceful fallback to same-tab navigation
         window.location.href = ticketUrl;
-      } else {
-        console.log('Successfully opened ticket URL in new window');
-        // Let the default anchor behavior work as well
       }
-    } catch (error) {
-      console.error('Error opening ticket URL:', error);
-      // Fallback: let the default anchor behavior handle it
+    } catch {
+      // As a last resort navigate in current tab
+      window.location.href = ticketUrl;
     }
   }
 
