@@ -19,11 +19,11 @@ config:
   kellogg-music-match:dbHost: "postgres"
   kellogg-music-match:dbPort: "5432"
   kellogg-music-match:dbUser: "kellogg_user"
-  kellogg-music-match:dbPassword: "CHANGE_ME_DB_PASSWORD"          # SECRET
+  # (dbPassword removed – set via: pulumi config set --secret kellogg-music-match:dbPassword <value>)
   kellogg-music-match:dbName: "kellogg_music_match"
   kellogg-music-match:dbSSLMode: "disable"
   # Optional explicit URL (overrides discrete DB settings if set)
-  kellogg-music-match:databaseUrl: "postgres://kellogg_user:CHANGE_ME_DB_PASSWORD@postgres:5432/kellogg_music_match?sslmode=disable"
+  # (databaseUrl removed because it embeds credentials – prefer discrete vars; if needed set with --secret)
 
   # ---------------------------------------------------------------------------
   # CORS
@@ -45,8 +45,7 @@ config:
   # ---------------------------------------------------------------------------
   # Ticketmaster API
   # ---------------------------------------------------------------------------
-  kellogg-music-match:ticketmasterConsumerKey: "CHANGE_ME_TM_KEY"          # SECRET
-  kellogg-music-match:ticketmasterConsumerSecret: "CHANGE_ME_TM_SECRET"   # SECRET
+  # (ticketmasterConsumerKey / ticketmasterConsumerSecret removed – set both with --secret)
   kellogg-music-match:ticketmasterBaseUrl: "https://app.ticketmaster.com/discovery/v2"
   kellogg-music-match:ticketmasterTimeout: "30"          # seconds
   kellogg-music-match:ticketmasterMaxResults: "200"
@@ -62,17 +61,16 @@ config:
   kellogg-music-match:emailFromEmail: "support@kelloggmatch.com"
   kellogg-music-match:emailFromName: "Kellogg Music Match"
   kellogg-music-match:appBaseUrl: "https://kelloggmatch.com"
-  kellogg-music-match:sendgridApiKey: "CHANGE_ME_SENDGRID"                # SECRET
+  # (sendgridApiKey removed – set via: pulumi config set --secret kellogg-music-match:sendgridApiKey <value>)
   # SMTP fallback (used if provider=smtp)
   kellogg-music-match:smtpHost: "smtp.gmail.com"
   kellogg-music-match:smtpPort: "587"
-  kellogg-music-match:smtpUser: "CHANGE_ME_SMTP_USER"                     # SECRET (treat as secret if sensitive)
-  kellogg-music-match:smtpPass: "CHANGE_ME_SMTP_PASS"                     # SECRET
+  # (smtpUser / smtpPass removed – set with --secret if SMTP provider used)
 
   # ---------------------------------------------------------------------------
   # Authentication / JWT
   # ---------------------------------------------------------------------------
-  kellogg-music-match:jwtSecretKey: "CHANGE_ME_JWT_SECRET"                # SECRET
+  # (jwtSecretKey removed – set via: pulumi config set --secret kellogg-music-match:jwtSecretKey <value>)
   kellogg-music-match:jwtExpiryHours: "24"
   kellogg-music-match:jwtRefreshHours: "720"
 

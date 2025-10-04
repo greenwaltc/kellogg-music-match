@@ -17,7 +17,7 @@ config:
   kellogg-music-match:dbHost: "postgres"                    # Or managed endpoint
   kellogg-music-match:dbPort: "5432"
   kellogg-music-match:dbUser: "kmm_app"                     # Least-privilege user
-  kellogg-music-match:dbPassword: "REPLACE_DB_PASSWORD"     # SECRET (set via CLI)
+  # (dbPassword removed – set with: pulumi config set --secret kellogg-music-match:dbPassword <value>)
   kellogg-music-match:dbName: "kellogg_music_match"
   kellogg-music-match:dbSSLMode: "require"                  # Enforce TLS in prod
   # If using a managed DB provide a full URL (omit if using discrete vars)
@@ -43,8 +43,7 @@ config:
   # ---------------------------------------------------------------------------
   # Ticketmaster API (production credentials stored as secrets)
   # ---------------------------------------------------------------------------
-  kellogg-music-match:ticketmasterConsumerKey: "REPLACE_TM_KEY"         # SECRET
-  kellogg-music-match:ticketmasterConsumerSecret: "REPLACE_TM_SECRET"  # SECRET
+  # (ticketmasterConsumerKey / ticketmasterConsumerSecret removed – set both with --secret)
   kellogg-music-match:ticketmasterBaseUrl: "https://app.ticketmaster.com/discovery/v2"
   kellogg-music-match:ticketmasterTimeout: "30"
   kellogg-music-match:ticketmasterMaxResults: "200"
@@ -60,16 +59,16 @@ config:
   kellogg-music-match:emailFromEmail: "support@kelloggmatch.com"
   kellogg-music-match:emailFromName: "Kellogg Music Match"
   kellogg-music-match:appBaseUrl: "https://app.kelloggmatch.com"
-  kellogg-music-match:sendgridApiKey: "REPLACE_SENDGRID"                 # SECRET
+  # (sendgridApiKey removed – set via: pulumi config set --secret kellogg-music-match:sendgridApiKey <value>)
   kellogg-music-match:smtpHost: "smtp.sendgrid.net"                     # If using SMTP fallback
   kellogg-music-match:smtpPort: "587"
   kellogg-music-match:smtpUser: "apikey"                                # Typical for SendGrid SMTP
-  kellogg-music-match:smtpPass: "REPLACE_SMTP_PASS"                     # SECRET
+  # (smtpPass removed – set with --secret if SMTP credentials required)
 
   # ---------------------------------------------------------------------------
   # Authentication / JWT
   # ---------------------------------------------------------------------------
-  kellogg-music-match:jwtSecretKey: "REPLACE_JWT_SECRET"                 # SECRET (high entropy)
+  # (jwtSecretKey removed – set via: pulumi config set --secret kellogg-music-match:jwtSecretKey <value>)
   kellogg-music-match:jwtExpiryHours: "24"                               # Access token lifetime
   kellogg-music-match:jwtRefreshHours: "720"                             # Refresh token lifetime
 
