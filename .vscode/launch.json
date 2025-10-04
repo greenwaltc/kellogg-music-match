@@ -1,0 +1,19 @@
+    {
+        "version": "0.2.0",
+        "configurations": [
+            {
+                "name": "Connect to Go container (Delve)",
+                "type": "go",
+                "request": "attach",
+                "mode": "remote",
+                "remotePath": "/app", // Path to code as compiled inside container
+                "port": 2345,
+                "host": "127.0.0.1",
+                "program": "${workspaceFolder}/backend",
+                "substitutePath": [
+                    { "from": "${workspaceFolder}/backend", "to": "/app" },
+                    { "from": "/app", "to": "${workspaceFolder}/backend" }
+                ]
+            }
+        ]
+    }

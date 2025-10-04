@@ -1,0 +1,12 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        DEBUG: "true"
+    environment:
+      DEBUG: "true"
+    ports:
+      - "2345:2345"  # Delve debug port
+    command: [] # use entrypoint default

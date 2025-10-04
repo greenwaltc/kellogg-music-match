@@ -73,7 +73,11 @@ services:
     restart: "no"  # Only run once to load data
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        DEBUG: "false"
     image: kellogg-music-match-backend:latest
     container_name: kmm-backend
     environment:
@@ -84,7 +88,7 @@ services:
       DB_USER: kellogg_user
       DB_PASSWORD: kellogg_secure_pass_2024
       DB_SSLMODE: disable
-      DEBUG_ENABLED: "true"
+      DEBUG_ENABLED: "false"
       # Ticketmaster API configuration
       TICKETMASTER_CONSUMER_KEY: 3RVuRqbo6iLpQj0iEG6UUAZiWa2Z5Y0O
       TICKETMASTER_CONSUMER_SECRET: EzfZFlmQwTHXIrsb

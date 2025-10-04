@@ -23,6 +23,7 @@ help:
 	@echo ""
 	@echo "🐳 Docker:"
 	@echo "  make docker-run     Start all services"
+	@echo "  make docker-run-debug  Start all services with backend debug"
 	@echo "  make docker-stop    Stop all services"
 	@echo "  make docker-logs    Show container logs"
 	@echo "  make docker-clean   Clean containers and images"
@@ -108,6 +109,14 @@ docker-run: ## Start all services with Docker Compose
 	@echo "✅ Docker services started!"
 	@echo "🌐 Frontend: http://localhost:4200"
 	@echo "🔧 Backend: http://localhost:8080"
+
+docker-run-debug: ## Start services with backend in Delve debug mode
+	@echo "🐞 Starting Docker services (debug backend)..."
+	docker compose -f docker-compose.yml -f docker-compose.debug.yml up -d --build
+	@echo "✅ Services started in debug mode"
+	@echo "🌐 Frontend: http://localhost:4200"
+	@echo "🔧 Backend: http://localhost:8080"
+	@echo "🪲 Delve:    127.0.0.1:2345"
 
 docker-stop: ## Stop Docker services
 	@echo "🛑 Stopping Docker services..."
