@@ -36,6 +36,12 @@ type UserContext struct {
 	Email    string
 }
 
+// GetUserID returns the user's ID (implements interface expected by business layer helper)
+func (u *UserContext) GetUserID() string { return u.UserID }
+
+// GetId provides a secondary alias for compatibility with generic identity access patterns
+func (u *UserContext) GetId() string { return u.UserID }
+
 // Middleware function that validates JWT tokens
 func (m *JWTMiddleware) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -56,6 +62,8 @@ func (m *JWTMiddleware) Middleware(next http.Handler) http.Handler {
 					Username: username,
 				}
 				ctx := context.WithValue(r.Context(), UserContextKey, userCtx)
+				// Bridge: also store under plain string key used by business layer fallback (avoids import cycle key-type mismatch)
+				ctx = context.WithValue(ctx, "user", userCtx)
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
@@ -88,8 +96,11 @@ func (m *JWTMiddleware) Middleware(next http.Handler) http.Handler {
 
 		userCtx := &UserContext{UserID: claims.UserID, Username: claims.Username, Email: claims.Email}
 		ctx := context.WithValue(r.Context(), UserContextKey, userCtx)
-		// Backward compatibility: also store under a separate compatibility string key so legacy code can transition.
+		// Backward compatibility: also store under a separate compatibility typed key.
 		ctx = context.WithValue(ctx, compatUserKey, userCtx)
+		// Bridge for business layer (which duplicates a differently-typed key and also looks for plain string "user").
+		ctx = context.WithValue(ctx, "user", userCtx)
+		// Logger key for structured logging correlation
 		ctx = context.WithValue(ctx, logger.ContextUserKey(), userCtx)
 
 		// Continue to the next handler

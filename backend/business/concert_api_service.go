@@ -24,31 +24,46 @@ type userContextMirror struct {
 }
 
 func getUserIDFromContext(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	// 1. Typed business key variant
 	if v := ctx.Value(userCtxKey); v != nil {
-		if uc, ok := v.(*userContextMirror); ok && uc != nil {
-			return uc.UserID
-		}
-		// attempt dynamic field access via interface casting patterns
-		if m, ok := v.(interface{ GetUserID() string }); ok {
-			return m.GetUserID()
-		}
-		// fallback reflection-free: try struct assertion to original type name if present
-		if generic, ok := v.(interface{ GetId() string }); ok {
-			return generic.GetId()
+		switch val := v.(type) {
+		case *userContextMirror:
+			if val != nil && val.UserID != "" {
+				return val.UserID
+			}
+		case interface{ GetUserID() string }:
+			if id := val.GetUserID(); id != "" {
+				return id
+			}
+		case interface{ GetId() string }:
+			if id := val.GetId(); id != "" {
+				return id
+			}
 		}
 	}
-	// Also allow plain string key for tests / external packages
+	// 2. Plain string key (set by middleware bridge)
 	if v := ctx.Value("user"); v != nil {
-		if uc, ok := v.(*userContextMirror); ok && uc != nil {
-			return uc.UserID
-		}
-		if m, ok := v.(interface{ GetUserID() string }); ok {
-			return m.GetUserID()
-		}
-		if generic, ok := v.(interface{ GetId() string }); ok {
-			return generic.GetId()
+		switch val := v.(type) {
+		case *userContextMirror:
+			if val != nil && val.UserID != "" {
+				return val.UserID
+			}
+		case interface{ GetUserID() string }:
+			if id := val.GetUserID(); id != "" {
+				return id
+			}
+		case interface{ GetId() string }:
+			if id := val.GetId(); id != "" {
+				return id
+			}
 		}
 	}
+	// 3. Logger-attached context key (avoid import cycle by string compare on key name)
+	//    We cannot import logger here; rely on known key retrieval at runtime if present.
+	//    (If needed we could expose a lightweight identity interface shared across packages.)
 	return ""
 }
 
