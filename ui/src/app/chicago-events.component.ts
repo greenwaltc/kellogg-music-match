@@ -1,12 +1,12 @@
-import { Component, OnInit, OnDestroy, HostListener } from '@angular/core';
+import { Component, OnInit, OnDestroy, HostListener, ViewChild, ElementRef, AfterViewInit, ViewChildren, QueryList } from '@angular/core';
 import { trigger, state, style, transition, animate } from '@angular/animations';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { ConcertInterestService } from './concert-interest.service';
 import { AuthService } from './auth.service';
-import { Subject, BehaviorSubject, combineLatest } from 'rxjs';
-import { debounceTime, distinctUntilChanged, switchMap, takeUntil, catchError } from 'rxjs/operators';
+import { Subject } from 'rxjs';
+import { takeUntil, catchError } from 'rxjs/operators';
 import { of } from 'rxjs';
 
 interface ChicagoEvent {
@@ -73,26 +73,58 @@ interface ChicagoEventsResponse {
       <div class="search-section">
         <div class="search-input-wrapper">
           <input 
+            #searchBox
             type="text" 
             [(ngModel)]="searchQuery" 
             (ngModelChange)="onSearchChange($event)"
             placeholder="Search by artist name..."
-            class="search-input"
+            class="search-input" [class.loading]="searchLoading"
             [disabled]="isLoading && events.length === 0"
+            (keyup.enter)="handleEnterSearch()"
+            autocomplete="off"
           >
           <span class="search-icon">🔍</span>
+          <button 
+            *ngIf="searchQuery" 
+            type="button" 
+            (click)="clearSearch()" 
+            aria-label="Clear search" 
+            class="inline-clear-btn"
+            [disabled]="searchLoading"
+          >×</button>
+        </div>
+        <div style="margin-top:0.75rem; text-align:center; display:flex; justify-content:center; gap:.5rem; flex-wrap:wrap;">
+          <button class="retry-button" (click)="performSearch()" [disabled]="!searchQuery.trim() || searchLoading || isLoadingMore" style="min-width:110px; position:relative;">
+            <span *ngIf="!searchLoading">Search</span>
+            <span *ngIf="searchLoading" style="display:inline-flex; align-items:center; gap:.4rem;">
+              <span class="loading-spinner small" style="width:18px; height:18px; border-width:2px; margin:0;"></span> Searching
+            </span>
+          </button>
+          <button class="retry-button" style="background:var(--color-border); color:var(--color-text);" (click)="clearSearch()" [disabled]="searchLoading || (!activeSearchQuery && !searchQuery)">Clear</button>
         </div>
         
         <div class="search-info" *ngIf="totalCount > 0">
           <span class="results-count">{{totalCount}} events found</span>
-          <span class="filter-info" *ngIf="searchQuery">for "{{searchQuery}}"</span>
+          <span class="filter-info" *ngIf="activeSearchQuery"> for "{{activeSearchQuery}}"</span>
+        </div>
+        <div *ngIf="!searchLoading && searchQuery.trim() && searchQuery.trim() !== activeSearchQuery" style="text-align:center; margin-top:.35rem; font-size:.7rem; color:var(--color-text-muted);">
+          Press Enter or Search to update results
         </div>
       </div>
 
       <!-- Loading State -->
-      <div *ngIf="isLoading && events.length === 0" class="loading-state">
-        <div class="loading-spinner"></div>
-        <p>Loading Chicago events...</p>
+      <div *ngIf="showInitialSkeletons" class="loading-skeletons">
+        <div class="skeleton-grid">
+          <div class="skeleton-card" *ngFor="let sk of skeletonArray">
+            <div class="sk-date"></div>
+            <div class="sk-lines">
+              <div class="sk-line w60"></div>
+              <div class="sk-line w80"></div>
+              <div class="sk-line w40"></div>
+              <div class="sk-line w70"></div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Error State -->
@@ -104,7 +136,7 @@ interface ChicagoEventsResponse {
       </div>
 
       <!-- Events List -->
-      <div *ngIf="!isLoading || events.length > 0" class="events-section">
+  <div *ngIf="!isLoading || events.length > 0" class="events-section" [class.fade-in]="fadeReady">
         <!-- No Results -->
         <div *ngIf="events.length === 0 && !isLoading && !error" class="no-results">
           <div class="no-results-icon">🎭</div>
@@ -116,9 +148,12 @@ interface ChicagoEventsResponse {
         <!-- Event Cards -->
         <div class="events-grid" *ngIf="events.length > 0">
           <div 
-            *ngFor="let event of events; trackBy: trackByEventId" 
+            *ngFor="let event of events; index as i; trackBy: trackByEventId" 
+            #eventCard
             class="event-card"
             [class.highlighted]="isEventHighlighted(event)"
+            [style.animationDelay]="delayVariance(event,i)"
+            [class.stagger-card]="initialStagger"
           >
             <!-- Event Date Badge -->
             <div class="date-badge">
@@ -244,9 +279,26 @@ interface ChicagoEventsResponse {
   `,
   styles: [``] // Styles moved to global styles.css to stay under component budget
 })
-export class ChicagoEventsComponent implements OnInit, OnDestroy {
+export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit {
   events: ChicagoEvent[] = [];
+  // pending (typed but not yet executed) search text
   searchQuery = '';
+  // last executed search text actually applied to results
+  activeSearchQuery = '';
+  // indicates a user-initiated search request is in flight
+  searchLoading = false;
+  private pendingRestoreScrollY: number | null = null;
+  private lastEnterPress = 0;
+  fadeReady = false; // controls fade-in animation of results
+  initialStagger = true; // only apply card staggering on very first page load (public for template)
+  skeletonArray: any[] = [];
+  // Flag to know initial request in-flight for skeletons
+  get showInitialSkeletons(): boolean { return this.isLoading && !this.firstLoadCompleted && this.events.length === 0; }
+  private firstLoadCompleted = false;
+  private readonly SEARCH_STORAGE_KEY = 'kmm_chi_events_search';
+  @ViewChild('searchBox') searchInput!: ElementRef<HTMLInputElement>;
+  @ViewChildren('eventCard') eventCardElems!: QueryList<ElementRef<HTMLElement>>;
+  private io?: IntersectionObserver;
   isLoading = false;
   isLoadingMore = false;
   hasMore = false;
@@ -260,33 +312,51 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy {
   private lastExpandedEventId: string | null = null;
   
   private destroy$ = new Subject<void>();
-  private searchSubject = new BehaviorSubject<string>('');
   private currentOffset = 0;
   private readonly pageSize = 20;
   
   private apiBaseUrl: string;
+  // Observer scroll throttling
+  private ioPaused = false;
+  private scrollLastY = 0;
+  private scrollLastTime = 0;
+  private ioResumeTimer: any;
+  private ioCurrentThreshold = 0.15;
+  private dynamicThresholdAdjusted = false;
 
   constructor(private http: HttpClient, private interest: ConcertInterestService, private auth: AuthService) {
     this.apiBaseUrl = window.__kmmConfig?.apiBaseUrl || 'http://localhost:8080';
   }
 
   ngOnInit() {
-    // Set up search with debouncing
-    this.searchSubject.pipe(
-      debounceTime(300),
-      distinctUntilChanged(),
-      takeUntil(this.destroy$)
-    ).subscribe(query => {
-      this.resetAndSearch(query);
-    });
-
-    // Initial load
+    this.computeSkeletons();
+    // Restore persisted search (manual search paradigm)
+    this.fadeReady = false;
+    try {
+      const saved = localStorage.getItem(this.SEARCH_STORAGE_KEY);
+      if (saved && saved.trim()) {
+        this.searchQuery = saved;
+        this.activeSearchQuery = saved;
+        this.loadEvents(true, saved);
+        return;
+      }
+    } catch { /* ignore storage errors */ }
     this.loadEvents(true);
+  }
+
+  ngAfterViewInit(): void {
+    this.setupCardObserver();
+    // Re-attach observer when the list of cards changes (pagination or search)
+    this.eventCardElems.changes.subscribe(() => {
+      this.setupCardObserver();
+    });
   }
 
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();
+    if (this.io) this.io.disconnect();
+    if (this.ioResumeTimer) clearTimeout(this.ioResumeTimer);
   }
 
   @HostListener('window:scroll', ['$event'])
@@ -298,11 +368,81 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy {
     if (scrollPosition > documentHeight - 1000 && this.hasMore && !this.isLoadingMore) {
       this.loadMoreEvents();
     }
+
+    // Scroll velocity measurement
+    const now = performance.now();
+    if (this.scrollLastTime === 0) {
+      this.scrollLastTime = now;
+      this.scrollLastY = window.scrollY;
+      return;
+    }
+    const dy = Math.abs(window.scrollY - this.scrollLastY);
+    const dt = now - this.scrollLastTime || 1;
+    const velocity = dy / dt; // px per ms
+    this.scrollLastY = window.scrollY;
+    this.scrollLastTime = now;
+    const FAST_THRESHOLD = 2; // >2 px/ms considered fast
+    if (velocity > FAST_THRESHOLD && !this.ioPaused) {
+      this.pauseObserver();
+    } else if (velocity <= FAST_THRESHOLD && this.ioPaused) {
+      // Debounce resume
+      if (this.ioResumeTimer) clearTimeout(this.ioResumeTimer);
+      this.ioResumeTimer = setTimeout(() => {
+        if (this.ioPaused) this.resumeObserver();
+      }, 160);
+    }
+  }
+
+  @HostListener('window:resize')
+  onResize() {
+    if (!this.firstLoadCompleted) {
+      this.computeSkeletons();
+    }
+    // Recreate observer with new threshold if height drastically changed
+    this.setupCardObserver(true);
   }
 
   onSearchChange(value: string) {
-    this.searchQuery = value;
-    this.searchSubject.next(value);
+    this.searchQuery = value; // only update local buffer; no auto-search
+  }
+
+  performSearch() {
+    this.pendingRestoreScrollY = window.scrollY;
+    this.fadeReady = false;
+    this.activeSearchQuery = this.searchQuery.trim();
+    this.searchLoading = true;
+    if (this.activeSearchQuery) {
+      try { localStorage.setItem(this.SEARCH_STORAGE_KEY, this.activeSearchQuery); } catch {}
+    } else {
+      try { localStorage.removeItem(this.SEARCH_STORAGE_KEY); } catch {}
+    }
+    this.resetAndSearch(this.activeSearchQuery);
+  }
+
+  clearSearch() {
+    if (!this.searchQuery && !this.activeSearchQuery) return;
+    this.pendingRestoreScrollY = 0;
+    this.fadeReady = false;
+    this.searchQuery = '';
+    if (this.activeSearchQuery !== '') {
+      this.activeSearchQuery = '';
+      this.resetAndSearch('');
+    }
+    try { localStorage.removeItem(this.SEARCH_STORAGE_KEY); } catch {}
+    // Focus input after clearing (next tick to allow DOM update)
+    setTimeout(() => { try { this.searchInput?.nativeElement.focus(); } catch {} }, 0);
+  }
+
+  handleEnterSearch() {
+    const now = Date.now();
+    if (now - this.lastEnterPress < 350) {
+      this.lastEnterPress = now;
+      return; // debounce rapid enter presses
+    }
+    this.lastEnterPress = now;
+    if (!this.searchLoading && this.searchQuery.trim() && this.searchQuery.trim() !== this.activeSearchQuery) {
+      this.performSearch();
+    }
   }
 
   onTicketClick(event: Event, ticketUrl: string) {
@@ -349,7 +489,7 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy {
       offset: this.currentOffset.toString()
     });
 
-    const query = searchQuery ?? this.searchQuery;
+  const query = searchQuery ?? this.activeSearchQuery;
     if (query.trim()) {
       params.append('artistName', query.trim());
     }
@@ -377,14 +517,139 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy {
           this.isLoading = false;
           this.isLoadingMore = false;
           this.error = null;
+          this.searchLoading = false;
+          if (isInitialLoad && this.pendingRestoreScrollY !== null) {
+            const target = this.pendingRestoreScrollY;
+            requestAnimationFrame(() => {
+              window.scrollTo({ top: Math.min(target, document.documentElement.scrollHeight - window.innerHeight), behavior: 'instant' as ScrollBehavior });
+            });
+            this.pendingRestoreScrollY = null;
+          }
+          if (isInitialLoad) {
+            requestAnimationFrame(() => { this.fadeReady = true; });
+            // Mark first load complete (for skeletons) and turn off future staggering after initial animation cycle
+            if (!this.firstLoadCompleted) {
+              this.firstLoadCompleted = true;
+              setTimeout(() => { this.initialStagger = false; }, 1000); // allow stagger animation to finish
+            }
+            // Re-run observer for freshly loaded cards
+            this.setupCardObserver(true);
+          } else {
+            // Do not toggle fadeReady during pagination to avoid flicker
+            this.setupCardObserver();
+          }
         },
         error: (error) => {
           console.error('Error loading Chicago events:', error);
           this.error = 'Failed to load events. Please try again.';
           this.isLoading = false;
           this.isLoadingMore = false;
+          this.searchLoading = false;
+          this.pendingRestoreScrollY = null;
+          // Ensure fade still becomes visible to avoid stuck opacity
+          this.fadeReady = true;
+          if (!this.firstLoadCompleted) this.firstLoadCompleted = true;
+          this.initialStagger = false;
         }
       });
+  }
+
+  private setupCardObserver(forceRecreate = false) {
+    if (typeof window === 'undefined' || !('IntersectionObserver' in window)) return;
+    // Respect reduced motion: if user prefers reduced motion, reveal all immediately and skip observer
+    const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReduced) {
+      this.eventCardElems?.forEach(ref => ref.nativeElement.classList.add('in-view'));
+      return;
+    }
+    // Disconnect previous if forced
+    if (forceRecreate && this.io) {
+      this.io.disconnect();
+      this.io = undefined;
+      this.dynamicThresholdAdjusted = false;
+    }
+    if (!this.io) {
+      const vh = window.innerHeight || 800;
+      const threshold = vh > 1200 ? 0.05 : 0.15;
+      this.ioCurrentThreshold = threshold;
+      this.io = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('in-view');
+          // Once revealed, unobserve to avoid repeated class toggling
+          this.io?.unobserve(entry.target as Element);
+        }
+      });
+      // Dynamic threshold adjustment using rootBounds for very tall viewports
+      if (!this.dynamicThresholdAdjusted && entries.length) {
+        const rootH = entries[0].rootBounds?.height;
+        if (rootH && rootH > 1400 && this.ioCurrentThreshold > 0.08) {
+          this.dynamicThresholdAdjusted = true;
+          const remaining: HTMLElement[] = [];
+          this.eventCardElems?.forEach(ref => { if (!ref.nativeElement.classList.contains('in-view')) remaining.push(ref.nativeElement); });
+          this.io?.disconnect();
+          this.ioCurrentThreshold = 0.05;
+          this.io = new IntersectionObserver(innerEntries => {
+            innerEntries.forEach(inner => {
+              if (inner.isIntersecting) {
+                inner.target.classList.add('in-view');
+                this.io?.unobserve(inner.target as Element);
+              }
+            });
+          }, { root: null, rootMargin: '0px 0px -5% 0px', threshold: this.ioCurrentThreshold });
+          remaining.forEach(el => this.io?.observe(el));
+        }
+      }
+    }, { root: null, rootMargin: '0px 0px -5% 0px', threshold });
+    }
+
+    // Observe each card that has not yet been revealed
+    this.eventCardElems?.forEach(ref => {
+      const el = ref.nativeElement;
+      if (!el.classList.contains('in-view')) {
+        this.io?.observe(el);
+      }
+    });
+  }
+
+  private pauseObserver() {
+    if (this.io && !this.ioPaused) {
+      this.ioPaused = true;
+      this.io.disconnect();
+    }
+  }
+
+  private resumeObserver() {
+    if (this.ioPaused) {
+      this.ioPaused = false;
+      // Force recreate to ensure all yet-unseen cards are reattached
+      this.setupCardObserver(true);
+    }
+  }
+
+  // Compute skeleton cards count based on viewport size & approximate card dimensions
+  private computeSkeletons() {
+    const cardMinWidth = 350; // matches grid min width
+    const approxCardHeight = 210; // include padding & margin guess
+    const columns = Math.max(1, Math.floor((window.innerWidth - 40) / cardMinWidth));
+    const rowsNeeded = Math.max(2, Math.ceil(window.innerHeight / approxCardHeight));
+    const total = Math.min(12, columns * rowsNeeded);
+    this.skeletonArray = Array.from({ length: total });
+  }
+
+  // Stable small random variance derived from event id for organic delay
+  delayVariance(event: ChicagoEvent, index: number): string | null {
+    if (!this.initialStagger) return null;
+    const id = event.id || index.toString();
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) {
+      hash = ((hash << 5) - hash) + id.charCodeAt(i);
+      hash |= 0; // 32-bit
+    }
+    const variance = (hash % 61) - 30; // -30..30
+    const base = index * 55;
+    const ms = Math.max(0, base + variance);
+    return ms + 'ms';
   }
 
   loadMoreEvents() {
@@ -440,7 +705,7 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy {
 
   private refreshEventInterest(eventId: string, done?: () => void) {
     const params = new URLSearchParams({ limit: this.pageSize.toString(), offset: '0' });
-    if (this.searchQuery.trim()) params.append('artistName', this.searchQuery.trim());
+  if (this.activeSearchQuery.trim()) params.append('artistName', this.activeSearchQuery.trim());
     this.http.get<ChicagoEventsResponse>(`${this.apiBaseUrl}/chicago/events?${params}`)
       .pipe(catchError(() => of(null)))
       .subscribe(resp => {
