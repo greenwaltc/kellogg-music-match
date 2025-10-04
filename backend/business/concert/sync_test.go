@@ -474,10 +474,10 @@ func (m *MockRepository) AssociateEventWithArtist(ctx context.Context, eventID, 
 }
 
 // Added to satisfy updated Repository interface
-func (m *MockRepository) GetChicagoEvents(ctx context.Context, artistName *string, limit int32, offset int32) ([]*concert.Event, error) {
+func (m *MockRepository) GetChicagoEvents(ctx context.Context, artistName *string, anyInterest bool, limit int32, offset int32) ([]*concert.Event, error) {
 	return []*concert.Event{}, nil
 }
-func (m *MockRepository) GetChicagoEventsCount(ctx context.Context, artistName *string) (int64, error) {
+func (m *MockRepository) GetChicagoEventsCount(ctx context.Context, artistName *string, anyInterest bool) (int64, error) {
 	return 0, nil
 }
 func (m *MockRepository) UpsertUserInterest(ctx context.Context, userID string, eventID string, status string) error {

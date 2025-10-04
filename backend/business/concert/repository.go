@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -23,8 +24,8 @@ type Repository interface {
 	DeleteOldEvents(ctx context.Context, cutoffDate time.Time) error
 	GetEventCount(ctx context.Context) (int64, error)
 	IsHealthy(ctx context.Context) error
-	GetChicagoEvents(ctx context.Context, artistName *string, limit int32, offset int32) ([]*Event, error)
-	GetChicagoEventsCount(ctx context.Context, artistName *string) (int64, error)
+	GetChicagoEvents(ctx context.Context, artistName *string, anyInterest bool, limit int32, offset int32) ([]*Event, error)
+	GetChicagoEventsCount(ctx context.Context, artistName *string, anyInterest bool) (int64, error)
 	GetChicagoEventByID(ctx context.Context, id string) (*Event, error)
 	// User interest operations
 	UpsertUserInterest(ctx context.Context, userID string, eventID string, status string) error
@@ -176,7 +177,7 @@ func (r *PostgreSQLRepository) IsHealthy(ctx context.Context) error {
 }
 
 // GetChicagoEvents retrieves Chicago area events with optional artist filtering and pagination
-func (r *PostgreSQLRepository) GetChicagoEvents(ctx context.Context, artistName *string, limit int32, offset int32) ([]*Event, error) {
+func (r *PostgreSQLRepository) GetChicagoEvents(ctx context.Context, artistName *string, anyInterest bool, limit int32, offset int32) ([]*Event, error) {
 	artistNameParam := ""
 	if artistName != nil {
 		artistNameParam = *artistName
@@ -184,6 +185,7 @@ func (r *PostgreSQLRepository) GetChicagoEvents(ctx context.Context, artistName 
 
 	params := database.GetChicagoEventsWithArtistSearchParams{
 		ArtistName:  artistNameParam,
+		AnyInterest: anyInterest,
 		LimitCount:  limit,
 		OffsetCount: offset,
 	}
@@ -253,13 +255,13 @@ func (r *PostgreSQLRepository) GetChicagoEvents(ctx context.Context, artistName 
 }
 
 // GetChicagoEventsCount returns the total count of Chicago area events with optional artist filtering
-func (r *PostgreSQLRepository) GetChicagoEventsCount(ctx context.Context, artistName *string) (int64, error) {
+func (r *PostgreSQLRepository) GetChicagoEventsCount(ctx context.Context, artistName *string, anyInterest bool) (int64, error) {
 	artistNameParam := ""
 	if artistName != nil {
 		artistNameParam = *artistName
 	}
 
-	params := database.GetChicagoEventsCountWithArtistSearchParams{ArtistName: artistNameParam, InterestStatus: ""}
+	params := database.GetChicagoEventsCountWithArtistSearchParams{ArtistName: artistNameParam, InterestStatus: "", AnyInterest: anyInterest}
 	count, err := r.queries.GetChicagoEventsCountWithArtistSearch(ctx, params)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get Chicago events count: %w", err)
@@ -450,16 +452,20 @@ func (m *MockRepository) IsHealthy(ctx context.Context) error {
 	return nil
 }
 
-func (m *MockRepository) GetChicagoEvents(ctx context.Context, artistName *string, limit int32, offset int32) ([]*Event, error) {
-	// Simple mock implementation - filter for Chicago events
-	var results []*Event
-	count := int32(0)
-	skipped := int32(0)
-
+func (m *MockRepository) GetChicagoEvents(ctx context.Context, artistName *string, anyInterest bool, limit int32, offset int32) ([]*Event, error) {
+	// Collect and sort Chicago events deterministically by date (asc) then ID
+	var all []*Event
 	for _, event := range m.events {
 		// Simple Chicago filter
 		if event.Venue.Address.City != "Chicago" {
 			continue
+		}
+
+		// anyInterest filter: require at least one interested/going/lfg user
+		if anyInterest {
+			if len(event.InterestedUserIDs) == 0 && len(event.GoingUserIDs) == 0 && len(event.LookingForGroupUserIDs) == 0 {
+				continue
+			}
 		}
 
 		// Artist name filter (case-insensitive prefix match)
@@ -478,30 +484,40 @@ func (m *MockRepository) GetChicagoEvents(ctx context.Context, artistName *strin
 			}
 		}
 
-		// Skip for offset
-		if skipped < offset {
-			skipped++
+		all = append(all, event)
+	}
+	// Sort
+	sort.Slice(all, func(i, j int) bool {
+		if all[i].Date.Equal(all[j].Date) {
+			return all[i].ID < all[j].ID
+		}
+		return all[i].Date.Before(all[j].Date)
+	})
+	// Apply offset & limit
+	var window []*Event
+	for idx, e := range all {
+		if int32(idx) < offset {
 			continue
 		}
-
-		// Add to results up to limit
-		if count >= limit {
+		if int32(len(window)) >= limit {
 			break
 		}
-
-		results = append(results, event)
-		count++
+		window = append(window, e)
 	}
-
-	return results, nil
+	return window, nil
 }
 
-func (m *MockRepository) GetChicagoEventsCount(ctx context.Context, artistName *string) (int64, error) {
+func (m *MockRepository) GetChicagoEventsCount(ctx context.Context, artistName *string, anyInterest bool) (int64, error) {
 	count := int64(0)
 	for _, event := range m.events {
 		// Simple Chicago filter
 		if event.Venue.Address.City != "Chicago" {
 			continue
+		}
+		if anyInterest {
+			if len(event.InterestedUserIDs) == 0 && len(event.GoingUserIDs) == 0 && len(event.LookingForGroupUserIDs) == 0 {
+				continue
+			}
 		}
 
 		// Artist name filter

@@ -44,7 +44,7 @@ func TestConcertService_GetChicagoEvents(t *testing.T) {
 	service := NewConcertServiceWithRepository(mockProvider, mockRepo, cfg)
 
 	t.Run("GetChicagoEventsSuccess", func(t *testing.T) {
-		events, count, err := service.GetChicagoEvents(ctx, nil, 10, 0)
+		events, count, err := service.GetChicagoEvents(ctx, nil, false, 10, 0)
 		require.NoError(t, err)
 		assert.Len(t, events, 1, "Should return test event")
 		assert.Equal(t, int64(1), count, "Should return correct count")
@@ -53,7 +53,7 @@ func TestConcertService_GetChicagoEvents(t *testing.T) {
 
 	t.Run("GetChicagoEventsWithArtistFilter", func(t *testing.T) {
 		artistName := "Test"
-		events, count, err := service.GetChicagoEvents(ctx, &artistName, 10, 0)
+		events, count, err := service.GetChicagoEvents(ctx, &artistName, false, 10, 0)
 		require.NoError(t, err)
 		assert.Len(t, events, 1, "Should return filtered event")
 		assert.Equal(t, int64(1), count, "Should return correct count")
@@ -61,7 +61,7 @@ func TestConcertService_GetChicagoEvents(t *testing.T) {
 
 	t.Run("GetChicagoEventsNoRepository", func(t *testing.T) {
 		serviceWithoutRepo := NewConcertService(cfg)
-		_, _, err := serviceWithoutRepo.GetChicagoEvents(ctx, nil, 10, 0)
+		_, _, err := serviceWithoutRepo.GetChicagoEvents(ctx, nil, false, 10, 0)
 		assert.Error(t, err, "Should return error when repository not available")
 		assert.Contains(t, err.Error(), "repository not available")
 	})

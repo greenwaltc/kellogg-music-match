@@ -749,7 +749,7 @@ paths:
       description: |
         Retrieve upcoming concert events in the Chicago area with optional artist name filtering.
         Results are sorted chronologically (soonest first) and support efficient pagination.
-        Perfect for building scrollable event lists with search functionality.
+        You can also filter to only events that currently have at least one user interest recorded.
       operationId: getChicagoEvents
       parameters:
         - name: artistName
@@ -779,6 +779,14 @@ paths:
             minimum: 0
             default: 0
             example: 0
+        - name: anyInterest
+          in: query
+          description: If true, only return events that have at least one user expressing any interest (INTERESTED, GOING, or LOOKING_FOR_GROUP)
+          required: false
+          schema:
+            type: boolean
+            default: false
+            example: false
       responses:
         '200':
           description: Chicago events retrieved successfully

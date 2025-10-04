@@ -60,6 +60,13 @@ interface ChicagoEventsResponse {
       state('collapsed', style({ height: '0px', opacity: 0, padding: '0 0.5rem', overflow: 'hidden' })),
       state('expanded', style({ height: '*', opacity: 1, padding: '0.6rem 0.65rem 0.7rem', overflow: 'hidden' })),
       transition('collapsed <=> expanded', animate('220ms cubic-bezier(0.4, 0.0, 0.2, 1)')),
+    ]),
+    // Fade/scale for scroll-to-top button
+    trigger('fadeScale', [
+      state('hidden', style({ opacity: 0, transform: 'scale(.75)', pointerEvents: 'none' })),
+      state('visible', style({ opacity: 1, transform: 'scale(1)' })),
+      transition('hidden => visible', animate('160ms cubic-bezier(0.4,0,0.2,1)')),
+      transition('visible => hidden', animate('130ms cubic-bezier(0.4,0,0.2,1)'))
     ])
   ],
   template: `
@@ -92,6 +99,13 @@ interface ChicagoEventsResponse {
             class="inline-clear-btn"
             [disabled]="searchLoading"
           >×</button>
+        </div>
+        <!-- Simple filters row -->
+        <div class="simple-filters" style="margin-top:.75rem; display:flex; justify-content:center; gap:1.25rem; flex-wrap:wrap; align-items:center; font-size:.8rem;">
+          <label style="display:inline-flex; align-items:center; gap:.4rem; cursor:pointer; user-select:none;">
+            <input type="checkbox" [(ngModel)]="onlyWithInterest" (change)="onAnyInterestToggle()" />
+            <span>Only events with interested Kellogg students</span>
+          </label>
         </div>
         <div style="margin-top:0.75rem; text-align:center; display:flex; justify-content:center; gap:.5rem; flex-wrap:wrap;">
           <button class="retry-button" (click)="performSearch()" [disabled]="!searchQuery.trim() || searchLoading || isLoadingMore" style="min-width:110px; position:relative;">
@@ -275,9 +289,67 @@ interface ChicagoEventsResponse {
           <span>Loading more events...</span>
         </div>
       </div>
+      <!-- Scroll Controls -->
+      <ng-container *ngIf="!isTouchDevice; else mobileFab">
+        <div class="desktop-scroll-fab" [@fadeScale]="showScrollTop ? 'visible':'hidden'" [class.has-prev]="showPrevFromHistory">
+          <button
+            type="button"
+            class="fab-main-desktop"
+            (click)="scrollToTop()"
+            aria-label="Scroll to top"
+            title="Scroll to top"
+            [class.pulse-on-appear]="pulseScrollTop"
+          >⇧</button>
+          <button *ngIf="showPrevFromHistory"
+            type="button"
+            class="fab-sub"
+            (click)="scrollToPrevious()"
+            aria-label="Scroll to previous position"
+            title="Return to previous position"
+          >↺</button>
+        </div>
+      </ng-container>
+      <ng-template #mobileFab>
+        <div class="fab-wrapper" [@fadeScale]="showScrollTop ? 'visible':'hidden'">
+          <button type="button" class="fab-main" aria-label="Scroll controls"
+            (pointerdown)="onFabPointerDown($event)" (pointerup)="onFabPointerUp($event)" (pointerleave)="onFabPointerCancel()"
+            (click)="onFabClick()" [class.pulse-on-appear]="pulseScrollTop"
+          >⇧</button>
+          <div class="fab-actions" [class.open]="radialMenuOpen">
+            <button type="button" class="fab-action" (click)="scrollToTop(); closeRadialMenu()" aria-label="Scroll to top">↑</button>
+            <button *ngIf="scrollHistory.length" type="button" class="fab-action second" (click)="scrollToPrevious(); closeRadialMenu()" aria-label="Scroll to previous position">↺</button>
+          </div>
+        </div>
+      </ng-template>
     </div>
   `,
-  styles: [``] // Styles moved to global styles.css to stay under component budget
+  styles: [`
+    /* Desktop hover-expand group */
+    .desktop-scroll-fab { position:fixed; right:1.25rem; bottom:1.25rem; z-index:1000; display:flex; align-items:center; gap:.6rem; }
+    .fab-main-desktop { width:52px; height:52px; border-radius:50%; background:var(--color-accent,#2d6cdf); color:#fff; font-size:1.15rem; font-weight:600; border:none; box-shadow:0 6px 20px rgba(0,0,0,.28); cursor:pointer; display:flex; align-items:center; justify-content:center; transition:box-shadow .25s, transform .25s, background .25s; }
+    .fab-main-desktop:hover { transform:translateY(-3px); }
+    .fab-main-desktop:active { transform:translateY(0); box-shadow:0 3px 12px rgba(0,0,0,.35); }
+    .fab-sub { width:40px; height:40px; border-radius:50%; border:none; background:var(--color-border,#444); color:#fff; font-size:.9rem; font-weight:600; box-shadow:0 4px 14px rgba(0,0,0,.25); cursor:pointer; opacity:0; transform:scale(.6) translateX(8px); transition:opacity .25s cubic-bezier(.4,0,.2,1), transform .32s cubic-bezier(.4,0,.2,1); }
+    .desktop-scroll-fab:hover .fab-sub, .desktop-scroll-fab:focus-within .fab-sub { opacity:1; transform:scale(1) translateX(0); }
+    .fab-sub:hover { transform:scale(1) translateX(0) translateY(-2px); }
+    .fab-sub:active { transform:scale(.95) translateX(0); }
+    @keyframes pulseShadow { 0% { box-shadow:0 0 0 0 rgba(45,108,223,0.55);} 60% { box-shadow:0 0 0 14px rgba(45,108,223,0);} 100% { box-shadow:0 0 0 0 rgba(45,108,223,0);} }
+    .pulse-on-appear { animation: pulseShadow 1150ms ease-out 120ms 1; }
+    /* Radial FAB (mobile) */
+    .fab-wrapper { position: fixed; right: 1.05rem; bottom: 1.05rem; z-index: 1100; }
+    .fab-main { width: 52px; height: 52px; border-radius: 50%; background: var(--color-accent,#2d6cdf); color:#fff; font-size:1.15rem; font-weight:600; border:none; box-shadow:0 6px 20px rgba(0,0,0,.28); cursor:pointer; display:flex; align-items:center; justify-content:center; transition: box-shadow .25s, transform .25s; }
+    .fab-main:active { transform: scale(.94); }
+    .fab-actions { position:absolute; bottom: 56px; right:4px; width:0; height:0; pointer-events:none; }
+    .fab-actions.open { pointer-events: auto; }
+    .fab-action { position:absolute; width:40px; height:40px; border-radius:50%; border:none; background: var(--color-border,#444); color:#fff; font-size:.85rem; font-weight:600; box-shadow:0 4px 16px rgba(0,0,0,.25); opacity:0; transform: scale(.6) translate(0,0); transition: opacity .25s cubic-bezier(.4,0,.2,1), transform .32s cubic-bezier(.4,0,.2,1); }
+    .fab-actions.open .fab-action { opacity:1; transform: scale(1) translate(0,0); }
+    .fab-action { bottom:0; right:0; }
+    .fab-actions.open .fab-action:nth-child(1) { transform: scale(1) translate(-4px, -60px); }
+    .fab-actions.open .fab-action.second { transform: scale(1) translate(-54px, -34px); }
+    @media (min-width: 821px) { .fab-wrapper { display:none; } }
+    @media (max-width: 820px) { .desktop-scroll-fab { display:none; } }
+    @media (max-width: 640px) { .fab-wrapper { right:.7rem; bottom:.7rem; } .fab-main { width:48px; height:48px; } }
+  `] // Minimal local styles for the floating button; rest remain in global stylesheet
 })
 export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit {
   events: ChicagoEvent[] = [];
@@ -316,6 +388,9 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
   private readonly pageSize = 20;
   
   private apiBaseUrl: string;
+  // New filter flag
+  onlyWithInterest = false;
+  private ANY_INTEREST_STORAGE_KEY = 'kmm_chi_any_interest';
   // Observer scroll throttling
   private ioPaused = false;
   private scrollLastY = 0;
@@ -323,15 +398,60 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
   private ioResumeTimer: any;
   private ioCurrentThreshold = 0.15;
   private dynamicThresholdAdjusted = false;
+  // Scroll-to-top visibility flag
+  showScrollTop = false;
+  // IntersectionObserver for determining when top content is off-screen
+  private scrollTopObserver?: IntersectionObserver;
+  // Session scroll restoration
+  private readonly SCROLL_POS_KEY = 'kmm_chi_scrollY';
+  private sessionRestoreScrollY: number | null = null;
+  private lastPersistScrollTime = 0;
+  // Scroll history stack & UI state for previous position toggle
+  scrollHistory: number[] = [];
+  private readonly MAX_SCROLL_HISTORY = 5;
+  showPrevFromHistory = false;
+  pulseScrollTop = false;
+  private hideDelayTimer: any;
+  private pendingHide = false;
+  // Touch / radial menu state
+  isTouchDevice = false;
+  radialMenuOpen = false;
+  private longPressTimer: any;
+  private longPressActivated = false;
+  private readonly LONG_PRESS_THRESHOLD = 450; // ms
+  private readonly SCROLL_HISTORY_KEY = 'kmm_chi_scroll_history';
+  private lastHistoryPushTime = 0; // performance.now() timestamp of last accepted history entry
 
   constructor(private http: HttpClient, private interest: ConcertInterestService, private auth: AuthService) {
     this.apiBaseUrl = window.__kmmConfig?.apiBaseUrl || 'http://localhost:8080';
+    // Restore anyInterest flag
+    try {
+      const storedInterest = localStorage.getItem(this.ANY_INTEREST_STORAGE_KEY);
+      if (storedInterest === 'true') this.onlyWithInterest = true;
+    } catch {}
   }
 
   ngOnInit() {
+    // Touch detection
+    try { this.isTouchDevice = (('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0); } catch { this.isTouchDevice = false; }
     this.computeSkeletons();
     // Restore persisted search (manual search paradigm)
     this.fadeReady = false;
+    // Capture prior scroll position from session (used if not doing an in-page search restore)
+    try {
+      const raw = sessionStorage.getItem(this.SCROLL_POS_KEY);
+      if (raw) {
+        const val = parseInt(raw, 10);
+        if (!isNaN(val) && val > 0) this.sessionRestoreScrollY = val;
+      }
+    } catch { /* ignore */ }
+    try {
+      const hist = sessionStorage.getItem(this.SCROLL_HISTORY_KEY);
+      if (hist) {
+        const arr = JSON.parse(hist);
+        if (Array.isArray(arr)) this.scrollHistory = arr.filter(v => typeof v === 'number').slice(-this.MAX_SCROLL_HISTORY);
+      }
+    } catch {}
     try {
       const saved = localStorage.getItem(this.SEARCH_STORAGE_KEY);
       if (saved && saved.trim()) {
@@ -340,7 +460,7 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
         this.loadEvents(true, saved);
         return;
       }
-    } catch { /* ignore storage errors */ }
+    } catch {}
     this.loadEvents(true);
   }
 
@@ -349,7 +469,10 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
     // Re-attach observer when the list of cards changes (pagination or search)
     this.eventCardElems.changes.subscribe(() => {
       this.setupCardObserver();
+      this.setupScrollTopObserver();
     });
+    // Initial setup for scroll-top visibility observer
+    this.setupScrollTopObserver();
   }
 
   ngOnDestroy() {
@@ -357,6 +480,7 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
     this.destroy$.complete();
     if (this.io) this.io.disconnect();
     if (this.ioResumeTimer) clearTimeout(this.ioResumeTimer);
+    if (this.scrollTopObserver) this.scrollTopObserver.disconnect();
   }
 
   @HostListener('window:scroll', ['$event'])
@@ -391,6 +515,15 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
         if (this.ioPaused) this.resumeObserver();
       }, 160);
     }
+    // Persist scroll position (throttled) for session restore
+    const nowPersist = performance.now();
+    if (nowPersist - this.lastPersistScrollTime > 300) {
+      this.lastPersistScrollTime = nowPersist;
+      try { sessionStorage.setItem(this.SCROLL_POS_KEY, String(window.scrollY)); } catch {}
+      this.captureScrollHistory(window.scrollY);
+    }
+    if (window.scrollY < 60) this.showPrevFromHistory = this.scrollHistory.length > 0; else if (this.showPrevFromHistory) this.showPrevFromHistory = false;
+    if (this.radialMenuOpen) this.closeRadialMenu();
   }
 
   @HostListener('window:resize')
@@ -489,6 +622,10 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
       offset: this.currentOffset.toString()
     });
 
+    if (this.onlyWithInterest) {
+      params.append('anyInterest', 'true');
+    }
+
   const query = searchQuery ?? this.activeSearchQuery;
     if (query.trim()) {
       params.append('artistName', query.trim());
@@ -534,9 +671,19 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
             }
             // Re-run observer for freshly loaded cards
             this.setupCardObserver(true);
+            this.setupScrollTopObserver();
+            // Session-based scroll restore (only if no search restoration pending)
+            if (this.pendingRestoreScrollY === null && this.sessionRestoreScrollY !== null) {
+              const target = this.sessionRestoreScrollY;
+              this.sessionRestoreScrollY = null; // one-time
+              requestAnimationFrame(() => {
+                window.scrollTo({ top: Math.min(target, document.documentElement.scrollHeight - window.innerHeight), behavior: 'instant' as ScrollBehavior });
+              });
+            }
           } else {
             // Do not toggle fadeReady during pagination to avoid flicker
             this.setupCardObserver();
+            this.setupScrollTopObserver();
           }
         },
         error: (error) => {
@@ -552,6 +699,75 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
           this.initialStagger = false;
         }
       });
+  }
+
+  // Observer for first event card to drive scroll-top button visibility dynamically based on layout
+  private setupScrollTopObserver() {
+    if (typeof window === 'undefined' || !this.eventCardElems || this.eventCardElems.length === 0) {
+      return;
+    }
+    const first = this.eventCardElems.first?.nativeElement;
+    if (!first) return;
+    if (this.scrollTopObserver) {
+      this.scrollTopObserver.disconnect();
+    }
+    this.scrollTopObserver = new IntersectionObserver(entries => {
+      const entry = entries[0];
+      const shouldShow = !entry.isIntersecting;
+      if (shouldShow) {
+        if (this.hideDelayTimer) { clearTimeout(this.hideDelayTimer); this.hideDelayTimer = null; }
+        this.pendingHide = false;
+        const wasHidden = !this.showScrollTop;
+        this.showScrollTop = true;
+        if (wasHidden) {
+          this.pulseScrollTop = true;
+          setTimeout(() => { this.pulseScrollTop = false; }, 1400);
+        }
+      } else {
+        if (!this.pendingHide && this.showScrollTop) {
+          this.pendingHide = true;
+          this.hideDelayTimer = setTimeout(() => {
+            this.showScrollTop = false;
+            this.pendingHide = false;
+          }, 260);
+        }
+      }
+    }, { root: null, threshold: 0.01 });
+    this.scrollTopObserver.observe(first);
+  }
+
+  private captureScrollHistory(y: number) {
+    if (y < 140) return; // ignore near-top trivial positions
+    const now = performance.now ? performance.now() : Date.now();
+    const last = this.scrollHistory[this.scrollHistory.length - 1];
+    const secondLast = this.scrollHistory[this.scrollHistory.length - 2];
+    const deltaToLast = last !== undefined ? Math.abs(y - last) : Infinity;
+    const timeDelta = now - this.lastHistoryPushTime;
+
+    // Base dedup: very small spatial change (<400px) from last entry -> skip
+    if (deltaToLast < 400) return;
+
+    // Time-window aggressive dedup: if within 1.5s and movement under 600px treat as noise
+    if (deltaToLast < 600 && timeDelta < 1500) return;
+
+    // Cluster compression: if last and secondLast are close (forming a cluster) and new point is far
+    if (secondLast !== undefined) {
+      const clusterSpan = Math.abs(last - secondLast);
+      const distFromSecond = Math.abs(y - secondLast);
+      // Replace the last entry instead of pushing another if cluster is small and new jump is large
+      if (clusterSpan < 350 && distFromSecond > 900) {
+        this.scrollHistory[this.scrollHistory.length - 1] = y;
+        this.lastHistoryPushTime = now;
+        this.persistScrollHistory();
+        return;
+      }
+    }
+
+    // Normal push path
+    this.scrollHistory.push(y);
+    if (this.scrollHistory.length > this.MAX_SCROLL_HISTORY) this.scrollHistory.shift();
+    this.lastHistoryPushTime = now;
+    this.persistScrollHistory();
   }
 
   private setupCardObserver(forceRecreate = false) {
@@ -705,7 +921,8 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
 
   private refreshEventInterest(eventId: string, done?: () => void) {
     const params = new URLSearchParams({ limit: this.pageSize.toString(), offset: '0' });
-  if (this.activeSearchQuery.trim()) params.append('artistName', this.activeSearchQuery.trim());
+    if (this.activeSearchQuery.trim()) params.append('artistName', this.activeSearchQuery.trim());
+    if (this.onlyWithInterest) params.append('anyInterest', 'true');
     this.http.get<ChicagoEventsResponse>(`${this.apiBaseUrl}/chicago/events?${params}`)
       .pipe(catchError(() => of(null)))
       .subscribe(resp => {
@@ -717,6 +934,15 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
         }
         if (done) done();
       });
+  }
+
+  onAnyInterestToggle() {
+    try {
+      if (this.onlyWithInterest) localStorage.setItem(this.ANY_INTEREST_STORAGE_KEY, 'true');
+      else localStorage.removeItem(this.ANY_INTEREST_STORAGE_KEY);
+    } catch {}
+    // Reset list with new filter
+    this.resetAndSearch(this.activeSearchQuery);
   }
 
   formatDate(dateString: string, format: 'day' | 'month' | 'time'): string {
@@ -813,6 +1039,48 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
       // keep expanded
     }
   }
+
+  // Smoothly scroll back to the top and optionally refocus the search bar
+  scrollToTop() {
+    try {
+      const current = window.scrollY;
+      if (current > 0) {
+        if (this.scrollHistory[this.scrollHistory.length - 1] !== current) {
+          this.scrollHistory.push(current);
+          if (this.scrollHistory.length > this.MAX_SCROLL_HISTORY) this.scrollHistory.shift();
+        }
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+  this.persistScrollHistory();
+      // After scroll ends (approx), focus search input if present
+      setTimeout(() => { this.searchInput?.nativeElement?.focus({ preventScroll: true }); }, 550);
+    } catch {
+      // Fallback instant scroll
+      window.scrollTo(0,0);
+    }
+    setTimeout(() => { if (window.scrollY < 60 && this.scrollHistory.length > 0) this.showPrevFromHistory = true; }, 600);
+  }
+
+  scrollToPrevious() {
+    if (this.scrollHistory.length === 0) return;
+    const target = this.scrollHistory.pop();
+    if (target == null) return;
+    try {
+      window.scrollTo({ top: target, behavior: 'smooth' });
+    } catch {
+      window.scrollTo(0, target);
+    }
+    if (this.scrollHistory.length === 0) setTimeout(() => { if (window.scrollY < 60) this.showPrevFromHistory = false; }, 700);
+    this.persistScrollHistory();
+  }
+
+  onFabPointerDown(e: PointerEvent) { if (!this.isTouchDevice) return; this.longPressActivated = false; if (this.longPressTimer) clearTimeout(this.longPressTimer); this.longPressTimer = setTimeout(() => { this.longPressActivated = true; this.openRadialMenu(); }, this.LONG_PRESS_THRESHOLD); }
+  onFabPointerUp(e: PointerEvent) { if (!this.isTouchDevice) return; if (this.longPressTimer) clearTimeout(this.longPressTimer); }
+  onFabPointerCancel() { if (!this.isTouchDevice) return; if (this.longPressTimer) clearTimeout(this.longPressTimer); }
+  onFabClick() { if (!this.isTouchDevice) { this.scrollToTop(); return; } if (this.longPressActivated) return; this.scrollToTop(); }
+  openRadialMenu() { this.radialMenuOpen = true; }
+  closeRadialMenu() { this.radialMenuOpen = false; this.longPressActivated = false; }
+  private persistScrollHistory() { try { sessionStorage.setItem(this.SCROLL_HISTORY_KEY, JSON.stringify(this.scrollHistory)); } catch {} }
 }
 
 // Helper to deep clone an event (limited fields relevant to mutation)

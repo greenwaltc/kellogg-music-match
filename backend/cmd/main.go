@@ -150,7 +150,9 @@ func main() {
 	HealthAPIController := generated.NewHealthAPIController(healthAPIService)
 	MatchingAPIController := generated.NewMatchingAPIController(matchingAPIService)
 	FeedbackAPIController := generated.NewFeedbackAPIController(feedbackAPIService)
-	ConcertsAPIController := generated.NewConcertsAPIController(concertAPIService)
+	// Wrap business concert API service with adapter implementing generated interface
+	concertsAdapter := business.NewGeneratedConcertsAdapter(concertAPIService)
+	ConcertsAPIController := generated.NewConcertsAPIController(concertsAdapter)
 
 	router := generated.NewRouter(AuthenticationAPIController, HealthAPIController, MatchingAPIController, FeedbackAPIController, ConcertsAPIController)
 

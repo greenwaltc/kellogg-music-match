@@ -303,14 +303,14 @@ func (s *ConcertAPIService) convertToAPIConcert(event concert.Event) generated.C
 }
 
 // GetChicagoEvents retrieves Chicago area events with search and pagination
-func (s *ConcertAPIService) GetChicagoEvents(ctx context.Context, artistName string, limit int32, offset int32) (generated.ImplResponse, error) {
+func (s *ConcertAPIService) GetChicagoEvents(ctx context.Context, artistName string, limit int32, offset int32, anyInterest bool) (generated.ImplResponse, error) {
 	// Convert empty string to nil pointer for optional parameter
 	var artistNamePtr *string
 	if artistName != "" {
 		artistNamePtr = &artistName
 	}
 
-	events, totalCount, err := s.concertService.GetChicagoEvents(ctx, artistNamePtr, limit, offset)
+	events, totalCount, err := s.concertService.GetChicagoEvents(ctx, artistNamePtr, anyInterest, limit, offset)
 	if err != nil {
 		return generated.Response(http.StatusInternalServerError, generated.ErrorResponse{
 			Message: fmt.Sprintf("Failed to get Chicago events: %v", err),

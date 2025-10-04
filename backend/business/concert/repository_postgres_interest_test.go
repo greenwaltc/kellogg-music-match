@@ -46,7 +46,7 @@ func TestPostgresRepository_UserInterestExclusivity(t *testing.T) {
 	require.NoError(t, repo.UpsertUserInterest(ctx, userID, ev.ID, "INTERESTED"))
 	require.NoError(t, repo.UpsertUserInterest(ctx, userID, ev.ID, "GOING")) // overwrite
 	// At this point only GOING should remain when we fetch.
-	events, err2 := repo.GetChicagoEvents(ctx, nil, 10, 0)
+	events, err2 := repo.GetChicagoEvents(ctx, nil, false, 10, 0)
 	require.NoError(t, err2)
 	var found *Event
 	for _, e := range events {

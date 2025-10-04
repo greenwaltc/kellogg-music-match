@@ -648,15 +648,17 @@ WHERE ce.event_date >= CURRENT_TIMESTAMP
   AND ce.status = 'onsale'
   AND ($1 = '' OR ca.name ILIKE '%' || $1 || '%')
   AND ($2 = '' OR ucei.interest_status = $2 OR ucei.interest_status IS NULL)
+  AND ($3::bool = false OR EXISTS (SELECT 1 FROM user_concert_event_interest u2 WHERE u2.event_id = ce.id))
 `
 
 type GetChicagoEventsCountWithArtistSearchParams struct {
 	ArtistName     interface{} `json:"artist_name"`
 	InterestStatus interface{} `json:"interest_status"`
+	AnyInterest    bool        `json:"any_interest"`
 }
 
 func (q *Queries) GetChicagoEventsCountWithArtistSearch(ctx context.Context, arg GetChicagoEventsCountWithArtistSearchParams) (int64, error) {
-	row := q.db.QueryRow(ctx, getChicagoEventsCountWithArtistSearch, arg.ArtistName, arg.InterestStatus)
+	row := q.db.QueryRow(ctx, getChicagoEventsCountWithArtistSearch, arg.ArtistName, arg.InterestStatus, arg.AnyInterest)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -685,13 +687,15 @@ WHERE ce.event_date >= CURRENT_TIMESTAMP
   AND v.city ILIKE '%Chicago%'
   AND ce.status = 'onsale'
   AND ($1 = '' OR ca.name ILIKE '%' || $1 || '%')
+  AND ($2::bool = false OR EXISTS (SELECT 1 FROM user_concert_event_interest u2 WHERE u2.event_id = ce.id))
 GROUP BY ce.id, v.name, v.street, v.city, v.state, v.country, v.postal, v.capacity
 ORDER BY ce.event_date ASC
-LIMIT $3 OFFSET $2
+LIMIT $4 OFFSET $3
 `
 
 type GetChicagoEventsWithArtistSearchParams struct {
 	ArtistName  interface{} `json:"artist_name"`
+	AnyInterest bool        `json:"any_interest"`
 	OffsetCount int32       `json:"offset_count"`
 	LimitCount  int32       `json:"limit_count"`
 }
@@ -727,7 +731,12 @@ type GetChicagoEventsWithArtistSearchRow struct {
 }
 
 func (q *Queries) GetChicagoEventsWithArtistSearch(ctx context.Context, arg GetChicagoEventsWithArtistSearchParams) ([]GetChicagoEventsWithArtistSearchRow, error) {
-	rows, err := q.db.Query(ctx, getChicagoEventsWithArtistSearch, arg.ArtistName, arg.OffsetCount, arg.LimitCount)
+	rows, err := q.db.Query(ctx, getChicagoEventsWithArtistSearch,
+		arg.ArtistName,
+		arg.AnyInterest,
+		arg.OffsetCount,
+		arg.LimitCount,
+	)
 	if err != nil {
 		return nil, err
 	}

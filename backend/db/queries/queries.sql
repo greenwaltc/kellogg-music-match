@@ -482,6 +482,7 @@ WHERE ce.event_date >= CURRENT_TIMESTAMP
   AND v.city ILIKE '%Chicago%'
   AND ce.status = 'onsale'
   AND (sqlc.arg(artist_name) = '' OR ca.name ILIKE '%' || sqlc.arg(artist_name) || '%')
+  AND (sqlc.arg(any_interest)::bool = false OR EXISTS (SELECT 1 FROM user_concert_event_interest u2 WHERE u2.event_id = ce.id))
 GROUP BY ce.id, v.name, v.street, v.city, v.state, v.country, v.postal, v.capacity
 ORDER BY ce.event_date ASC
 LIMIT sqlc.arg(limit_count) OFFSET sqlc.arg(offset_count);
@@ -497,7 +498,8 @@ WHERE ce.event_date >= CURRENT_TIMESTAMP
   AND v.city ILIKE '%Chicago%'
   AND ce.status = 'onsale'
   AND (sqlc.arg(artist_name) = '' OR ca.name ILIKE '%' || sqlc.arg(artist_name) || '%')
-  AND (sqlc.arg(interest_status) = '' OR ucei.interest_status = sqlc.arg(interest_status) OR ucei.interest_status IS NULL);
+  AND (sqlc.arg(interest_status) = '' OR ucei.interest_status = sqlc.arg(interest_status) OR ucei.interest_status IS NULL)
+  AND (sqlc.arg(any_interest)::bool = false OR EXISTS (SELECT 1 FROM user_concert_event_interest u2 WHERE u2.event_id = ce.id));
 
 -- name: GetConcertEventsInDateRangeWithInterest :many
 -- Returns events within date range plus associated venue, artists, and user interest buckets
