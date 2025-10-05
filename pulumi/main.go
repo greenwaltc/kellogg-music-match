@@ -46,7 +46,8 @@ func main() {
 		dbHost := get("dbHost", "postgres")
 		dbPort := get("dbPort", "5432")
 		dbUser := get("dbUser", "kellogg_user")
-		dbPassword := get("dbPassword", "kellogg_secure_pass_2024")
+		// Sensitive database password must be provided as a Pulumi secret (no inline default)
+		dbPassword := pulumiCfg.RequireSecret("dbPassword")
 		dbName := get("dbName", "kellogg_music_match")
 		dbSSLMode := get("dbSSLMode", "disable")
 		corsAllowedOrigins := get("corsAllowedOrigins", "http://localhost:4200,http://kmm-ui.traefik.me,https://kmm-ui.traefik.me")
@@ -59,8 +60,9 @@ func main() {
 		artistSearchMaxLength := get("artistSearchMaxLength", "240")
 		artistSearchLimit := get("artistSearchLimit", "10")
 		debugEnabled := getBoolStr("debugEnabled", false)
-		tmKey := get("ticketmasterConsumerKey", "3RVuRqbo6iLpQj0iEG6UUAZiWa2Z5Y0O")
-		tmSecret := get("ticketmasterConsumerSecret", "EzfZFlmQwTHXIrsb")
+		// Ticketmaster credentials required as secrets
+		tmKey := pulumiCfg.RequireSecret("ticketmasterConsumerKey")
+		tmSecret := pulumiCfg.RequireSecret("ticketmasterConsumerSecret")
 		tmBaseURL := get("ticketmasterBaseUrl", "https://app.ticketmaster.com/discovery/v2")
 		tmTimeout := get("ticketmasterTimeout", "30")
 		tmMaxResults := get("ticketmasterMaxResults", "200")
@@ -72,21 +74,25 @@ func main() {
 		emailFromEmail := get("emailFromEmail", "support@kelloggmatch.com")
 		emailFromName := get("emailFromName", "Kellogg Music Match")
 		appBaseURL := get("appBaseUrl", "https://kelloggmatch.com")
-		sendgridAPIKey := get("sendgridApiKey", "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")
+		// SendGrid API key secret
+		sendgridAPIKey := pulumiCfg.RequireSecret("sendgridApiKey")
 		smtpHost := get("smtpHost", "smtp.gmail.com")
 		smtpPort := get("smtpPort", "587")
 		smtpUser := get("smtpUser", "dummy-user@gmail.com")
-		smtpPass := get("smtpPass", "dummy-password")
-		jwtSecret := get("jwtSecretKey", "your-secret-key-here-change-in-production")
+		// SMTP password secret (if using SMTP path)
+		smtpPass := pulumiCfg.RequireSecret("smtpPass")
+		jwtSecret := pulumiCfg.RequireSecret("jwtSecretKey")
 		jwtExpiry := get("jwtExpiryHours", "24")
 		jwtRefresh := get("jwtRefreshHours", "720")
 		legacyPort := serverPort
-		databaseURL := get("databaseUrl", "postgres://kellogg_user:kellogg_secure_pass_2024@postgres:5432/kellogg_music_match?sslmode=disable")
+		// (DATABASE_URL no longer exported; application should build from discrete env vars)
 		backendReplicas := getInt("backendReplicas", 2)
 		uiReplicas := getInt("uiReplicas", 2)
 		backendImage := get("backendImage", "kellogg-music-match-backend:latest")
 		uiImage := get("uiImage", "kellogg-music-match-ui:latest")
 		postgresImage := get("postgresImage", "kellogg-music-match-postgres:latest")
+		// Image pull policy (was hardcoded as "Never" in multiple places)
+		imagePullPolicy := get("imagePullPolicy", "IfNotPresent")
 		musicbrainzImage := get("musicbrainzImage", "kellogg-music-match-musicbrainz:latest")
 		flywayImage := get("flywayImage", "flyway/flyway:latest")
 		tracingEnabled := getBoolStr("tracingEnabled", true)
@@ -322,41 +328,56 @@ END $$;
 
 DROP TABLE temp_musicbrainz_load;`),
 				"load_data.sh": pulumi.String(`#!/bin/bash
-set -e
+set -euo pipefail
 
 echo "🎵 Starting MusicBrainz data loading..."
 
+# Default/fallback values if not provided
+DB_HOST="${DB_HOST:-postgres}"
+DB_PORT="${DB_PORT:-5432}"
+DB_USER="${DB_USER:-kellogg_user}"
+DB_NAME="${DB_NAME:-kellogg_music_match}"
+
+echo "Using database $DB_USER@$DB_HOST:$DB_PORT/$DB_NAME"
+
 # Wait for database to be ready
 echo "Waiting for PostgreSQL to be ready..."
-until pg_isready -h postgres -p 5432 -U kellogg_user; do
-    echo "Waiting for postgres..."
-    sleep 2
+until pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER"; do
+	echo "Waiting for postgres..."
+	sleep 2
 done
 
-export PGPASSWORD=kellogg_secure_pass_2024
+# Prefer explicit PGPASSWORD but fall back to DB_PASSWORD from secret
+export PGPASSWORD="${PGPASSWORD:-${DB_PASSWORD:-}}"
+
+if [ -z "$PGPASSWORD" ]; then
+  echo "❌ No database password provided (PGPASSWORD/DB_PASSWORD). Exiting." >&2
+  exit 1
+fi
 
 # Check if data already exists
 echo "Checking if MusicBrainz data needs to be loaded..."
-count=$(psql -h postgres -U kellogg_user -d kellogg_music_match -t -c "SELECT COUNT(*) FROM artists WHERE is_reference = TRUE;" | tr -d ' ')
+count=$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -t -c "SELECT COUNT(*) FROM artists WHERE is_reference = TRUE;" | tr -d ' ')
+count=${count:-0}
 
 if [ "$count" -lt 1000 ]; then
-    echo "Loading MusicBrainz artists data..."
-    echo "Found $count existing reference artists"
+	echo "Loading MusicBrainz artists data..."
+	echo "Found $count existing reference artists"
     
-    # Verify the embedded CSV data exists and load it directly
-    if [ -f "/data/musicbrainz_artists_50k.csv" ]; then
-        echo "✅ Found CSV file at /data/musicbrainz_artists_50k.csv"
-        echo "📊 File size: $(wc -l < /data/musicbrainz_artists_50k.csv) lines"
-        psql -h postgres -U kellogg_user -d kellogg_music_match -f /scripts/load_artists.sql
-        echo "✅ MusicBrainz data loaded successfully"
-    else
-        echo "❌ CSV file not found at /data/musicbrainz_artists_50k.csv"
-        echo "📂 Available files in /data/:"
-        ls -la /data/ || echo "No /data directory found"
-        exit 1
-    fi
+	# Verify the embedded CSV data exists and load it directly
+	if [ -f "/data/musicbrainz_artists_50k.csv" ]; then
+		echo "✅ Found CSV file at /data/musicbrainz_artists_50k.csv"
+		echo "📊 File size: $(wc -l < /data/musicbrainz_artists_50k.csv) lines"
+		psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -f /scripts/load_artists.sql
+		echo "✅ MusicBrainz data loaded successfully"
+	else
+		echo "❌ CSV file not found at /data/musicbrainz_artists_50k.csv"
+		echo "📂 Available files in /data/:"
+		ls -la /data/ || echo "No /data directory found"
+		exit 1
+	fi
 else
-    echo "✅ MusicBrainz data already exists ($count reference artists), skipping load"
+	echo "✅ MusicBrainz data already exists ($count reference artists), skipping load"
 fi
 
 echo "🎉 MusicBrainz data loading completed"`),
@@ -378,13 +399,15 @@ echo "🎉 MusicBrainz data loading completed"`),
 				},
 			},
 			StringData: pulumi.StringMap{
-				"JWT_SECRET_KEY":               jwtSecret,
-				"TICKETMASTER_CONSUMER_KEY":    tmKey,
-				"TICKETMASTER_CONSUMER_SECRET": tmSecret,
-				"SENDGRID_API_KEY":             sendgridAPIKey,
-				"SMTP_USER":                    smtpUser,
-				"SMTP_PASS":                    smtpPass,
-				"DB_PASSWORD":                  dbPassword,
+				"JWT_SECRET_KEY":               jwtSecret.ToStringOutput(),
+				"TICKETMASTER_CONSUMER_KEY":    tmKey.ToStringOutput(),
+				"TICKETMASTER_CONSUMER_SECRET": tmSecret.ToStringOutput(),
+				"SENDGRID_API_KEY":             sendgridAPIKey.ToStringOutput(),
+				"SMTP_USER":                    smtpUser, // not secret
+				"SMTP_PASS":                    smtpPass.ToStringOutput(),
+				"DB_PASSWORD":                  dbPassword.ToStringOutput(),
+				"FLYWAY_PASSWORD":              dbPassword.ToStringOutput(),
+				"PGPASSWORD":                   dbPassword.ToStringOutput(),
 			},
 		})
 		if err != nil {
@@ -435,18 +458,12 @@ echo "🎉 MusicBrainz data loading completed"`),
 									pulumi.String("migrate"),
 								},
 								Env: corev1.EnvVarArray{
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("FLYWAY_URL"),
-										Value: pulumi.String("jdbc:postgresql://postgres:5432/kellogg_music_match"),
-									},
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("FLYWAY_USER"),
-										Value: pulumi.String("kellogg_user"),
-									},
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("FLYWAY_PASSWORD"),
-										Value: pulumi.String("kellogg_secure_pass_2024"),
-									},
+									&corev1.EnvVarArgs{Name: pulumi.String("FLYWAY_URL"), Value: pulumi.String("jdbc:postgresql://postgres:5432/kellogg_music_match")},
+									&corev1.EnvVarArgs{Name: pulumi.String("FLYWAY_USER"), Value: pulumi.String("kellogg_user")},
+									// FLYWAY_PASSWORD comes from secret via EnvFrom
+								},
+								EnvFrom: corev1.EnvFromSourceArray{
+									&corev1.EnvFromSourceArgs{SecretRef: &corev1.SecretEnvSourceArgs{Name: backendSecret.Metadata.Name()}},
 								},
 								VolumeMounts: corev1.VolumeMountArray{
 									&corev1.VolumeMountArgs{
@@ -464,16 +481,20 @@ echo "🎉 MusicBrainz data loading completed"`),
 							&corev1.ContainerArgs{
 								Name:            pulumi.String("load-musicbrainz-data"),
 								Image:           musicbrainzImage,
-								ImagePullPolicy: pulumi.String("Never"),
+								ImagePullPolicy: imagePullPolicy,
 								Command: pulumi.StringArray{
 									pulumi.String("bash"),
 									pulumi.String("/scripts/load_data.sh"),
 								},
 								Env: corev1.EnvVarArray{
-									&corev1.EnvVarArgs{
-										Name:  pulumi.String("PGPASSWORD"),
-										Value: pulumi.String("kellogg_secure_pass_2024"),
-									},
+									&corev1.EnvVarArgs{Name: pulumi.String("DB_HOST"), Value: dbHost},
+									&corev1.EnvVarArgs{Name: pulumi.String("DB_PORT"), Value: dbPort},
+									&corev1.EnvVarArgs{Name: pulumi.String("DB_USER"), Value: dbUser},
+									&corev1.EnvVarArgs{Name: pulumi.String("DB_NAME"), Value: dbName},
+								},
+								// PGPASSWORD comes from secret via EnvFrom
+								EnvFrom: corev1.EnvFromSourceArray{
+									&corev1.EnvFromSourceArgs{SecretRef: &corev1.SecretEnvSourceArgs{Name: backendSecret.Metadata.Name()}},
 								},
 								VolumeMounts: corev1.VolumeMountArray{
 									&corev1.VolumeMountArgs{
@@ -488,12 +509,16 @@ echo "🎉 MusicBrainz data loading completed"`),
 							&corev1.ContainerArgs{
 								Name:            pulumi.String("backend"),
 								Image:           backendImage,
-								ImagePullPolicy: pulumi.String("Never"),
+								ImagePullPolicy: imagePullPolicy,
 								Ports: corev1.ContainerPortArray{
 									&corev1.ContainerPortArgs{
 										ContainerPort: pulumi.Int(8080),
 										Name:          pulumi.String("http"),
 									},
+								},
+								// Pull all secret values in (DB_PASSWORD, JWT_SECRET_KEY, etc.)
+								EnvFrom: corev1.EnvFromSourceArray{
+									&corev1.EnvFromSourceArgs{SecretRef: &corev1.SecretEnvSourceArgs{Name: backendSecret.Metadata.Name()}},
 								},
 								Env: corev1.EnvVarArray{
 									// Server Configuration
@@ -502,7 +527,7 @@ echo "🎉 MusicBrainz data loading completed"`),
 									&corev1.EnvVarArgs{Name: pulumi.String("DB_HOST"), Value: dbHost},
 									&corev1.EnvVarArgs{Name: pulumi.String("DB_PORT"), Value: dbPort},
 									&corev1.EnvVarArgs{Name: pulumi.String("DB_USER"), Value: dbUser},
-									&corev1.EnvVarArgs{Name: pulumi.String("DB_PASSWORD"), ValueFrom: &corev1.EnvVarSourceArgs{SecretKeyRef: &corev1.SecretKeySelectorArgs{Name: backendSecret.Metadata.Name(), Key: pulumi.String("DB_PASSWORD")}}},
+									// DB_PASSWORD provided via EnvFrom secret
 									&corev1.EnvVarArgs{Name: pulumi.String("DB_NAME"), Value: dbName},
 									&corev1.EnvVarArgs{Name: pulumi.String("DB_SSLMODE"), Value: dbSSLMode},
 									// CORS Configuration
@@ -519,8 +544,7 @@ echo "🎉 MusicBrainz data loading completed"`),
 									// Debug Configuration
 									&corev1.EnvVarArgs{Name: pulumi.String("DEBUG_ENABLED"), Value: debugEnabled},
 									// Ticketmaster API Configuration
-									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_CONSUMER_KEY"), ValueFrom: &corev1.EnvVarSourceArgs{SecretKeyRef: &corev1.SecretKeySelectorArgs{Name: backendSecret.Metadata.Name(), Key: pulumi.String("TICKETMASTER_CONSUMER_KEY")}}},
-									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_CONSUMER_SECRET"), ValueFrom: &corev1.EnvVarSourceArgs{SecretKeyRef: &corev1.SecretKeySelectorArgs{Name: backendSecret.Metadata.Name(), Key: pulumi.String("TICKETMASTER_CONSUMER_SECRET")}}},
+									// Ticketmaster secrets provided via EnvFrom
 									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_BASE_URL"), Value: tmBaseURL},
 									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_TIMEOUT"), Value: tmTimeout},
 									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_MAX_RESULTS"), Value: tmMaxResults},
@@ -534,14 +558,13 @@ echo "🎉 MusicBrainz data loading completed"`),
 									&corev1.EnvVarArgs{Name: pulumi.String("EMAIL_FROM_NAME"), Value: emailFromName},
 									&corev1.EnvVarArgs{Name: pulumi.String("APP_BASE_URL"), Value: appBaseURL},
 									// SendGrid Configuration (will be set when service is configured)
-									&corev1.EnvVarArgs{Name: pulumi.String("SENDGRID_API_KEY"), ValueFrom: &corev1.EnvVarSourceArgs{SecretKeyRef: &corev1.SecretKeySelectorArgs{Name: backendSecret.Metadata.Name(), Key: pulumi.String("SENDGRID_API_KEY")}}},
+									// SENDGRID_API_KEY via EnvFrom
 									// SMTP Configuration (alternative to SendGrid)
 									&corev1.EnvVarArgs{Name: pulumi.String("SMTP_HOST"), Value: smtpHost},
 									&corev1.EnvVarArgs{Name: pulumi.String("SMTP_PORT"), Value: smtpPort},
-									&corev1.EnvVarArgs{Name: pulumi.String("SMTP_USER"), ValueFrom: &corev1.EnvVarSourceArgs{SecretKeyRef: &corev1.SecretKeySelectorArgs{Name: backendSecret.Metadata.Name(), Key: pulumi.String("SMTP_USER")}}},
-									&corev1.EnvVarArgs{Name: pulumi.String("SMTP_PASS"), ValueFrom: &corev1.EnvVarSourceArgs{SecretKeyRef: &corev1.SecretKeySelectorArgs{Name: backendSecret.Metadata.Name(), Key: pulumi.String("SMTP_PASS")}}},
+									// SMTP_USER / SMTP_PASS via EnvFrom
 									// JWT Configuration
-									&corev1.EnvVarArgs{Name: pulumi.String("JWT_SECRET_KEY"), ValueFrom: &corev1.EnvVarSourceArgs{SecretKeyRef: &corev1.SecretKeySelectorArgs{Name: backendSecret.Metadata.Name(), Key: pulumi.String("JWT_SECRET_KEY")}}},
+									// JWT_SECRET_KEY via EnvFrom
 									&corev1.EnvVarArgs{Name: pulumi.String("JWT_EXPIRY_HOURS"), Value: jwtExpiry},
 									&corev1.EnvVarArgs{Name: pulumi.String("JWT_REFRESH_HOURS"), Value: jwtRefresh},
 									// Telemetry / Tracing Configuration
@@ -555,7 +578,7 @@ echo "🎉 MusicBrainz data loading completed"`),
 									&corev1.EnvVarArgs{Name: pulumi.String("OTEL_TRACES_SAMPLER_ARG"), Value: otelTracesSamplerArg},
 									// Legacy environment variables for backward compatibility
 									&corev1.EnvVarArgs{Name: pulumi.String("PORT"), Value: legacyPort},
-									&corev1.EnvVarArgs{Name: pulumi.String("DATABASE_URL"), Value: databaseURL},
+									// DATABASE_URL derived at runtime from other envs; omitted to avoid duplicating secret
 								},
 								Resources: &corev1.ResourceRequirementsArgs{
 									Requests: pulumi.StringMap{"cpu": backendCPUReq, "memory": backendMemReq},
@@ -670,7 +693,7 @@ echo "🎉 MusicBrainz data loading completed"`),
 							&corev1.ContainerArgs{
 								Name:            pulumi.String("ui"),
 								Image:           uiImage,
-								ImagePullPolicy: pulumi.String("Never"),
+								ImagePullPolicy: imagePullPolicy,
 								Ports: corev1.ContainerPortArray{
 									&corev1.ContainerPortArgs{
 										ContainerPort: pulumi.Int(80),
@@ -838,9 +861,9 @@ echo "🎉 MusicBrainz data loading completed"`),
 				},
 			},
 			StringData: pulumi.StringMap{
-				"POSTGRES_USER":     pulumi.String("kellogg_user"),
-				"POSTGRES_PASSWORD": pulumi.String("kellogg_secure_pass_2024"),
-				"POSTGRES_DB":       pulumi.String("kellogg_music_match"),
+				"POSTGRES_USER":     dbUser,
+				"POSTGRES_PASSWORD": dbPassword.ToStringOutput(),
+				"POSTGRES_DB":       dbName,
 			},
 		})
 		if err != nil {
@@ -897,7 +920,7 @@ echo "🎉 MusicBrainz data loading completed"`),
 							&corev1.ContainerArgs{
 								Name:            pulumi.String("postgres"),
 								Image:           postgresImage,
-								ImagePullPolicy: pulumi.String("Never"),
+								ImagePullPolicy: imagePullPolicy,
 								Ports: corev1.ContainerPortArray{
 									&corev1.ContainerPortArgs{
 										ContainerPort: pulumi.Int(5432),

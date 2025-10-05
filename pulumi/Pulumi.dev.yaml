@@ -12,6 +12,7 @@ config:
   kellogg-music-match:serverPort: "8080"
   kellogg-music-match:debugEnabled: "false"
   kellogg-music-match:ingressClass: "traefik"
+  kellogg-music-match:ingressSkipWait: "true"  
 
   # ---------------------------------------------------------------------------
   # Database (either use discrete settings below OR provide databaseUrl override)
@@ -24,6 +25,14 @@ config:
   kellogg-music-match:dbSSLMode: "disable"
   # Optional explicit URL (overrides discrete DB settings if set)
   # (databaseUrl removed because it embeds credentials – prefer discrete vars; if needed set with --secret)
+
+  # ---------------------------------------------------------------------------
+  # Persistent Volume Claim
+  # ---------------------------------------------------------------------------
+  kellogg-music-match:persistentVolumeName: "postgres-storage"
+  kellogg-music-match:persistentVolumeSize: "10Gi"
+  kellogg-music-match:persistentVolumeAccessModes: "ReadWriteOnce"
+  kellogg-music-match:persistentVolumeStorageClassName: "local-path"
 
   # ---------------------------------------------------------------------------
   # CORS

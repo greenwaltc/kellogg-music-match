@@ -8,21 +8,28 @@ config:
   # Core Server / Operational
   # ---------------------------------------------------------------------------
   kellogg-music-match:serverPort: "8080"
-  kellogg-music-match:debugEnabled: "false"                 # Disable noisy debug logs
-  kellogg-music-match:ingressClass: "traefik"               # Or nginx/alb/etc.
-
+  kellogg-music-match:debugEnabled: "false" # Disable noisy debug logs
+  kellogg-music-match:ingressClass: "traefik" # Or nginx/alb/etc.
+  kellogg-music-match:ingressSkipWait: "true" # Skip waiting for LB IP
   # ---------------------------------------------------------------------------
   # Database (prefer managed service or hardened StatefulSet)
   # ---------------------------------------------------------------------------
-  kellogg-music-match:dbHost: "postgres"                    # Or managed endpoint
+  kellogg-music-match:dbHost: "postgres" # Or managed endpoint
   kellogg-music-match:dbPort: "5432"
-  kellogg-music-match:dbUser: "kmm_app"                     # Least-privilege user
+  kellogg-music-match:dbUser: "kellogg_user" # Least-privilege user
   # (dbPassword removed – set with: pulumi config set --secret kellogg-music-match:dbPassword <value>)
   kellogg-music-match:dbName: "kellogg_music_match"
-  kellogg-music-match:dbSSLMode: "require"                  # Enforce TLS in prod
+  kellogg-music-match:dbSSLMode: "disable" # Enforce TLS in prod
   # If using a managed DB provide a full URL (omit if using discrete vars)
   # kellogg-music-match:databaseUrl: "postgres://kmm_app:REDACTED@db-host:5432/kellogg_music_match?sslmode=require"
 
+  # ---------------------------------------------------------------------------
+  # Persistent Volume Claim
+  # ---------------------------------------------------------------------------
+  kellogg-music-match:persistentVolumeName: "postgres-storage"
+  kellogg-music-match:persistentVolumeSize: "10Gi"
+  kellogg-music-match:persistentVolumeAccessModes: "ReadWriteOnce"
+  kellogg-music-match:persistentVolumeStorageClassName: "local-path"
   # ---------------------------------------------------------------------------
   # CORS (restrict to production domains only)
   # ---------------------------------------------------------------------------
@@ -30,7 +37,6 @@ config:
   kellogg-music-match:corsAllowedMethods: "GET, POST, PUT, DELETE, OPTIONS"
   kellogg-music-match:corsAllowedHeaders: "Content-Type, Authorization, X-User-Username"
   kellogg-music-match:corsAllowCredentials: "true"
-
   # ---------------------------------------------------------------------------
   # Artist Constraints (leave defaults unless business rules change)
   # ---------------------------------------------------------------------------
@@ -39,7 +45,6 @@ config:
   kellogg-music-match:artistMaxNameLength: "240"
   kellogg-music-match:artistSearchMaxLength: "240"
   kellogg-music-match:artistSearchLimit: "10"
-
   # ---------------------------------------------------------------------------
   # Ticketmaster API (production credentials stored as secrets)
   # ---------------------------------------------------------------------------
@@ -50,7 +55,6 @@ config:
   kellogg-music-match:ticketmasterDefaultCity: "Chicago"
   kellogg-music-match:ticketmasterDefaultState: "IL"
   kellogg-music-match:ticketmasterDefaultCountry: "US"
-
   # ---------------------------------------------------------------------------
   # Email / Notifications
   # ---------------------------------------------------------------------------
@@ -60,35 +64,33 @@ config:
   kellogg-music-match:emailFromName: "Kellogg Music Match"
   kellogg-music-match:appBaseUrl: "https://app.kelloggmatch.com"
   # (sendgridApiKey removed – set via: pulumi config set --secret kellogg-music-match:sendgridApiKey <value>)
-  kellogg-music-match:smtpHost: "smtp.sendgrid.net"                     # If using SMTP fallback
+  kellogg-music-match:smtpHost: "smtp.sendgrid.net" # If using SMTP fallback
   kellogg-music-match:smtpPort: "587"
-  kellogg-music-match:smtpUser: "apikey"                                # Typical for SendGrid SMTP
+  kellogg-music-match:smtpUser: "apikey" # Typical for SendGrid SMTP
   # (smtpPass removed – set with --secret if SMTP credentials required)
 
   # ---------------------------------------------------------------------------
   # Authentication / JWT
   # ---------------------------------------------------------------------------
   # (jwtSecretKey removed – set via: pulumi config set --secret kellogg-music-match:jwtSecretKey <value>)
-  kellogg-music-match:jwtExpiryHours: "24"                               # Access token lifetime
-  kellogg-music-match:jwtRefreshHours: "720"                             # Refresh token lifetime
-
+  kellogg-music-match:jwtExpiryHours: "24" # Access token lifetime
+  kellogg-music-match:jwtRefreshHours: "720" # Refresh token lifetime
   # ---------------------------------------------------------------------------
   # Images (pin explicit digests in production for supply-chain security)
   # ---------------------------------------------------------------------------
-  kellogg-music-match:backendImage: "registry.example.com/kmm/backend:1.0.0"
-  kellogg-music-match:uiImage: "registry.example.com/kmm/ui:1.0.0"
-  kellogg-music-match:postgresImage: "registry.example.com/kmm/postgres:16.3"
-  kellogg-music-match:musicbrainzImage: "registry.example.com/kmm/musicbrainz:1.0.0"
-  kellogg-music-match:flywayImage: "flyway/flyway:10.18"
+  kellogg-music-match:imagePullPolicy: "IfNotPresent" #IfNotPresent
+  kellogg-music-match:backendImage: "kellogg-music-match-backend:latest"
+  kellogg-music-match:uiImage: "kellogg-music-match-ui:latest"
+  kellogg-music-match:postgresImage: "kellogg-music-match-postgres:latest"
+  kellogg-music-match:musicbrainzImage: "kellogg-music-match-musicbrainz:latest"
+  kellogg-music-match:flywayImage: "flyway/flyway:latest"
   kellogg-music-match:otelCollectorImage: "otel/opentelemetry-collector:0.103.1"
-
   # ---------------------------------------------------------------------------
   # Replicas (scale appropriately; backend may scale horizontally)
   # ---------------------------------------------------------------------------
   kellogg-music-match:backendReplicas: "3"
   kellogg-music-match:uiReplicas: "2"
   kellogg-music-match:otelCollectorReplicas: "2"
-
   # ---------------------------------------------------------------------------
   # Resource Requests & Limits (tune after profiling)
   # ---------------------------------------------------------------------------
@@ -96,40 +98,48 @@ config:
   kellogg-music-match:backendMemRequest: "256Mi"
   kellogg-music-match:backendCpuLimit: "1"
   kellogg-music-match:backendMemLimit: "1Gi"
-
   kellogg-music-match:uiCpuRequest: "50m"
   kellogg-music-match:uiMemRequest: "64Mi"
   kellogg-music-match:uiCpuLimit: "300m"
   kellogg-music-match:uiMemLimit: "256Mi"
-
   kellogg-music-match:postgresCpuRequest: "500m"
   kellogg-music-match:postgresMemRequest: "1Gi"
   kellogg-music-match:postgresCpuLimit: "2"
   kellogg-music-match:postgresMemLimit: "4Gi"
-
   kellogg-music-match:otelCollectorCpuRequest: "100m"
   kellogg-music-match:otelCollectorMemRequest: "128Mi"
   kellogg-music-match:otelCollectorCpuLimit: "500m"
   kellogg-music-match:otelCollectorMemLimit: "512Mi"
-
   # ---------------------------------------------------------------------------
   # OpenTelemetry / Tracing
   # ---------------------------------------------------------------------------
   kellogg-music-match:tracingEnabled: "true"
   kellogg-music-match:tracingExporter: "otlp"
-  kellogg-music-match:otlpEndpoint: "http://otel-collector:4318"         # Internal service name
+  kellogg-music-match:otlpEndpoint: "http://otel-collector:4318" # Internal service name
   kellogg-music-match:otelServiceName: "kmm-backend"
   kellogg-music-match:otelServiceVersion: "1.0.0"
   kellogg-music-match:otelResourceAttributes: "environment=prod,team=matching"
   kellogg-music-match:otelTracesSampler: "parentbased_traceidratio"
-  kellogg-music-match:otelTracesSamplerArg: "0.05"                       # Lower sample rate in prod
-  kellogg-music-match:otelCollectorPrometheus: "true"                    # Enable metrics exporter
+  kellogg-music-match:otelTracesSamplerArg: "0.05" # Lower sample rate in prod
+  kellogg-music-match:otelCollectorPrometheus: "true" # Enable metrics exporter
   kellogg-music-match:otelCollectorPrometheusPort: "8888"
-
   # ---------------------------------------------------------------------------
   # Future Config Flags (placeholders)
   # ---------------------------------------------------------------------------
   # kellogg-music-match:networkPolicyStrict: "true"
+
+  kellogg-music-match:dbPassword:
+    secure: AAABACz2kWesUG/zU9jZt3RYsnPpgLaOXZJE2DJ9dyReh90OaON6/0IQixIIVXo/bV+7IK91xms=
+  kellogg-music-match:ticketmasterConsumerKey:
+    secure: AAABAGRT6/L7gzVwpwPOLFlX1CIJ/PHAvzjWojruE3VrxTrVBiAZe/o2xwsW2pBlYo3KMUYpAKs4OdEIfkzU3w==
+  kellogg-music-match:ticketmasterConsumerSecret:
+    secure: AAABADCFg12DRnz4rn42h7EV7TUapMVyvmEkO1QTLIvkGaeZ5XpTaSyr2rzR2sSb
+  kellogg-music-match:sendgridApiKey:
+    secure: AAABAJVVzxouIJU43sr8GGOevmHa+lEk9TgXtSdckcfDQWVz2AWVJA+0uO1ofw2eBAY+Q38P9zSHm7TRY2RwpYA502lx/cc3Q/RnQGKi46wLOY/GixdvVEdM4SMpcXPPK181LDY=
+  kellogg-music-match:smtpPass:
+    secure: AAABAHRZK6CffwR6t7uCv0itOK+05gsp0cVkmTUjICwbdzwtLUXNQd+3zQ2VAA==
+  kellogg-music-match:jwtSecretKey:
+    secure: AAABAKfUKUPinZ7bTlrUpTMQ/1T0NtJy41f8SpjlQKRdfNEY1P1X7sJm9CcPJbKFao9FDW50abXS55LD7pewZ1u71kqUdpQpnj0ohEX2rTRIjJ4KdHQY8ll90IzdPy+m
 
 # SECRETS REMINDER: For each placeholder beginning with REPLACE_ run
 #   pulumi config set --secret kellogg-music-match:<key> <real-value>
