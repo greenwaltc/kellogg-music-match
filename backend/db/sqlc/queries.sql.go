@@ -677,27 +677,38 @@ SELECT
   COALESCE(jsonb_agg(DISTINCT jsonb_build_object('id', ca.id, 'name', ca.name, 'genres', ca.genres)) FILTER (WHERE ca.id IS NOT NULL), '[]'::jsonb) AS artists_json,
   (array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'INTERESTED'), NULL))::text[] AS interested_user_ids,
   (array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'GOING'), NULL))::text[] AS going_user_ids,
-  (array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'LOOKING_FOR_GROUP'), NULL))::text[] AS looking_for_group_user_ids
+  (array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'LOOKING_FOR_GROUP'), NULL))::text[] AS looking_for_group_user_ids,
+  COALESCE(rel.relevancy, 0) AS relevancy
 FROM concert_events ce
 LEFT JOIN venues v ON ce.venue_id = v.id
 LEFT JOIN concert_event_artists cea ON ce.id = cea.event_id
 LEFT JOIN concert_artists ca ON cea.artist_id = ca.id
  LEFT JOIN user_concert_event_interest ucei ON ucei.event_id = ce.id
+LEFT JOIN LATERAL (
+  SELECT MAX(ar.musicbrainz_score) AS relevancy
+  FROM concert_event_artists cea2
+  JOIN concert_artists ca2 ON cea2.artist_id = ca2.id
+  LEFT JOIN artists ar ON lower(ar.name) LIKE ('%' || lower(ca2.name) || '%')
+  WHERE cea2.event_id = ce.id
+) rel ON TRUE
 WHERE ce.event_date >= CURRENT_TIMESTAMP
   AND v.city ILIKE '%Chicago%'
   AND ce.status = 'onsale'
   AND ($1 = '' OR ca.name ILIKE '%' || $1 || '%')
   AND ($2::bool = false OR EXISTS (SELECT 1 FROM user_concert_event_interest u2 WHERE u2.event_id = ce.id))
-GROUP BY ce.id, v.name, v.street, v.city, v.state, v.country, v.postal, v.capacity
-ORDER BY ce.event_date ASC
-LIMIT $4 OFFSET $3
+GROUP BY ce.id, v.name, v.street, v.city, v.state, v.country, v.postal, v.capacity, rel.relevancy
+ORDER BY
+  CASE WHEN $3::bool THEN COALESCE(rel.relevancy,0) END DESC NULLS LAST,
+  ce.event_date ASC
+LIMIT $5 OFFSET $4
 `
 
 type GetChicagoEventsWithArtistSearchParams struct {
-	ArtistName  interface{} `json:"artist_name"`
-	AnyInterest bool        `json:"any_interest"`
-	OffsetCount int32       `json:"offset_count"`
-	LimitCount  int32       `json:"limit_count"`
+	ArtistName      interface{} `json:"artist_name"`
+	AnyInterest     bool        `json:"any_interest"`
+	SortByRelevancy bool        `json:"sort_by_relevancy"`
+	OffsetCount     int32       `json:"offset_count"`
+	LimitCount      int32       `json:"limit_count"`
 }
 
 type GetChicagoEventsWithArtistSearchRow struct {
@@ -728,12 +739,14 @@ type GetChicagoEventsWithArtistSearchRow struct {
 	InterestedUserIds      []string         `json:"interested_user_ids"`
 	GoingUserIds           []string         `json:"going_user_ids"`
 	LookingForGroupUserIds []string         `json:"looking_for_group_user_ids"`
+	Relevancy              interface{}      `json:"relevancy"`
 }
 
 func (q *Queries) GetChicagoEventsWithArtistSearch(ctx context.Context, arg GetChicagoEventsWithArtistSearchParams) ([]GetChicagoEventsWithArtistSearchRow, error) {
 	rows, err := q.db.Query(ctx, getChicagoEventsWithArtistSearch,
 		arg.ArtistName,
 		arg.AnyInterest,
+		arg.SortByRelevancy,
 		arg.OffsetCount,
 		arg.LimitCount,
 	)
@@ -772,6 +785,7 @@ func (q *Queries) GetChicagoEventsWithArtistSearch(ctx context.Context, arg GetC
 			&i.InterestedUserIds,
 			&i.GoingUserIds,
 			&i.LookingForGroupUserIds,
+			&i.Relevancy,
 		); err != nil {
 			return nil, err
 		}
@@ -1007,28 +1021,39 @@ SELECT
     array_remove(array_agg(DISTINCT ca.name), NULL) AS artist_names,
   array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'INTERESTED'), NULL) AS interested_user_ids,
   array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'GOING'), NULL) AS going_user_ids,
-  array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'LOOKING_FOR_GROUP'), NULL) AS looking_for_group_user_ids
+  array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'LOOKING_FOR_GROUP'), NULL) AS looking_for_group_user_ids,
+  COALESCE(rel.relevancy, 0) AS relevancy
 FROM concert_events ce
 LEFT JOIN venues v ON ce.venue_id = v.id
 LEFT JOIN concert_event_artists cea ON ce.id = cea.event_id
 LEFT JOIN concert_artists ca ON cea.artist_id = ca.id
 LEFT JOIN user_concert_event_interest ucei ON ucei.event_id = ce.id
+LEFT JOIN LATERAL (
+  SELECT MAX(ar.musicbrainz_score) AS relevancy
+  FROM concert_event_artists cea2
+  JOIN concert_artists ca2 ON cea2.artist_id = ca2.id
+  LEFT JOIN artists ar ON lower(ar.name) LIKE ('%' || lower(ca2.name) || '%')
+  WHERE cea2.event_id = ce.id
+) rel ON TRUE
 WHERE ce.event_date >= $1
   AND ce.event_date <= $2
   AND ($3::text IS NULL OR v.city ILIKE '%' || $3 || '%')
   AND ($4::text IS NULL OR ce.status = $4)
-GROUP BY ce.id, v.name, v.street, v.city, v.state, v.country, v.postal, v.capacity
-ORDER BY ce.event_date ASC
-LIMIT $6 OFFSET $5
+GROUP BY ce.id, v.name, v.street, v.city, v.state, v.country, v.postal, v.capacity, rel.relevancy
+ORDER BY
+  CASE WHEN $5::bool THEN COALESCE(rel.relevancy,0) END DESC NULLS LAST,
+  ce.event_date ASC
+LIMIT $7 OFFSET $6
 `
 
 type GetConcertEventsInDateRangeWithInterestParams struct {
-	StartDate pgtype.Timestamp `json:"start_date"`
-	EndDate   pgtype.Timestamp `json:"end_date"`
-	City      string           `json:"city"`
-	Status    string           `json:"status"`
-	OffSet    int32            `json:"off_set"`
-	Lim       int32            `json:"lim"`
+	StartDate       pgtype.Timestamp `json:"start_date"`
+	EndDate         pgtype.Timestamp `json:"end_date"`
+	City            string           `json:"city"`
+	Status          string           `json:"status"`
+	SortByRelevancy bool             `json:"sort_by_relevancy"`
+	OffSet          int32            `json:"off_set"`
+	Lim             int32            `json:"lim"`
 }
 
 type GetConcertEventsInDateRangeWithInterestRow struct {
@@ -1059,6 +1084,7 @@ type GetConcertEventsInDateRangeWithInterestRow struct {
 	InterestedUserIds      interface{}      `json:"interested_user_ids"`
 	GoingUserIds           interface{}      `json:"going_user_ids"`
 	LookingForGroupUserIds interface{}      `json:"looking_for_group_user_ids"`
+	Relevancy              interface{}      `json:"relevancy"`
 }
 
 // Returns events within date range plus associated venue, artists, and user interest buckets
@@ -1068,6 +1094,7 @@ func (q *Queries) GetConcertEventsInDateRangeWithInterest(ctx context.Context, a
 		arg.EndDate,
 		arg.City,
 		arg.Status,
+		arg.SortByRelevancy,
 		arg.OffSet,
 		arg.Lim,
 	)
@@ -1106,6 +1133,7 @@ func (q *Queries) GetConcertEventsInDateRangeWithInterest(ctx context.Context, a
 			&i.InterestedUserIds,
 			&i.GoingUserIds,
 			&i.LookingForGroupUserIds,
+			&i.Relevancy,
 		); err != nil {
 			return nil, err
 		}
@@ -1341,21 +1369,32 @@ SELECT
     v.capacity as venue_capacity,
   array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'INTERESTED'), NULL) AS interested_user_ids,
   array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'GOING'), NULL) AS going_user_ids,
-  array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'LOOKING_FOR_GROUP'), NULL) AS looking_for_group_user_ids
+  array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'LOOKING_FOR_GROUP'), NULL) AS looking_for_group_user_ids,
+  COALESCE(rel.relevancy, 0) AS relevancy
 FROM concert_events ce
 LEFT JOIN venues v ON ce.venue_id = v.id
 LEFT JOIN user_concert_event_interest ucei ON ucei.event_id = ce.id
+LEFT JOIN LATERAL (
+  SELECT MAX(ar.musicbrainz_score) AS relevancy
+  FROM concert_event_artists cea2
+  JOIN concert_artists ca2 ON cea2.artist_id = ca2.id
+  LEFT JOIN artists ar ON lower(ar.name) LIKE ('%' || lower(ca2.name) || '%')
+  WHERE cea2.event_id = ce.id
+) rel ON TRUE
 WHERE ce.event_date >= CURRENT_TIMESTAMP
   AND v.city ILIKE '%' || $1 || '%'
   AND ce.status = 'onsale'
-GROUP BY ce.id, v.name, v.street, v.city, v.state, v.country, v.postal, v.capacity
-ORDER BY ce.event_date ASC
-LIMIT $2
+GROUP BY ce.id, v.name, v.street, v.city, v.state, v.country, v.postal, v.capacity, rel.relevancy
+ORDER BY
+  CASE WHEN $2::bool THEN COALESCE(rel.relevancy,0) END DESC NULLS LAST,
+  ce.event_date ASC
+LIMIT $3
 `
 
 type GetUpcomingConcertEventsInCityParams struct {
-	City pgtype.Text `json:"city"`
-	Lim  int32       `json:"lim"`
+	City            pgtype.Text `json:"city"`
+	SortByRelevancy bool        `json:"sort_by_relevancy"`
+	Lim             int32       `json:"lim"`
 }
 
 type GetUpcomingConcertEventsInCityRow struct {
@@ -1385,10 +1424,11 @@ type GetUpcomingConcertEventsInCityRow struct {
 	InterestedUserIds      interface{}      `json:"interested_user_ids"`
 	GoingUserIds           interface{}      `json:"going_user_ids"`
 	LookingForGroupUserIds interface{}      `json:"looking_for_group_user_ids"`
+	Relevancy              interface{}      `json:"relevancy"`
 }
 
 func (q *Queries) GetUpcomingConcertEventsInCity(ctx context.Context, arg GetUpcomingConcertEventsInCityParams) ([]GetUpcomingConcertEventsInCityRow, error) {
-	rows, err := q.db.Query(ctx, getUpcomingConcertEventsInCity, arg.City, arg.Lim)
+	rows, err := q.db.Query(ctx, getUpcomingConcertEventsInCity, arg.City, arg.SortByRelevancy, arg.Lim)
 	if err != nil {
 		return nil, err
 	}
@@ -1423,6 +1463,7 @@ func (q *Queries) GetUpcomingConcertEventsInCity(ctx context.Context, arg GetUpc
 			&i.InterestedUserIds,
 			&i.GoingUserIds,
 			&i.LookingForGroupUserIds,
+			&i.Relevancy,
 		); err != nil {
 			return nil, err
 		}

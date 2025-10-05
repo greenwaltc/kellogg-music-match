@@ -787,6 +787,14 @@ paths:
             type: boolean
             default: false
             example: false
+        - name: sortByRelevancy
+          in: query
+          description: If true, sort events by relevancy to users' favorite artists when artistName is provided. Otherwise, sort by event date (soonest first).
+          required: false
+          schema:
+            type: boolean
+            default: true
+            example: false
       responses:
         '200':
           description: Chicago events retrieved successfully

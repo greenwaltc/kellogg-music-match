@@ -112,12 +112,12 @@ func (s *ConcertService) ValidateConfiguration(ctx context.Context) error {
 }
 
 // GetChicagoEvents retrieves Chicago area events from the local database with search and pagination
-func (s *ConcertService) GetChicagoEvents(ctx context.Context, artistName *string, anyInterest bool, limit int32, offset int32) ([]*concert.Event, int64, error) {
+func (s *ConcertService) GetChicagoEvents(ctx context.Context, artistName *string, anyInterest bool, sortByRelevancy bool, limit int32, offset int32) ([]*concert.Event, int64, error) {
 	if s.repository == nil {
 		return nil, 0, fmt.Errorf("repository not available")
 	}
 
-	events, err := s.repository.GetChicagoEvents(ctx, artistName, anyInterest, limit, offset)
+	events, err := s.repository.GetChicagoEvents(ctx, artistName, anyInterest, sortByRelevancy, limit, offset)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get Chicago events: %w", err)
 	}

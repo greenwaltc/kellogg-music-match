@@ -18,8 +18,8 @@ func NewGeneratedConcertsAdapter(inner *ConcertAPIService) *GeneratedConcertsAda
 }
 
 // Delegate Chicago events to business logic
-func (a *GeneratedConcertsAdapter) GetChicagoEvents(ctx context.Context, artistName string, limit int32, offset int32, anyInterest bool) (generated.ImplResponse, error) {
-	return a.Inner.GetChicagoEvents(ctx, artistName, limit, offset, anyInterest)
+func (a *GeneratedConcertsAdapter) GetChicagoEvents(ctx context.Context, artistName string, limit int32, offset int32, anyInterest bool, sortByRelevancy bool) (generated.ImplResponse, error) {
+	return a.Inner.GetChicagoEvents(ctx, artistName, limit, offset, anyInterest, sortByRelevancy)
 }
 
 // Pass-through to generated stubs for endpoints we have not overridden yet
