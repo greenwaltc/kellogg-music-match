@@ -792,6 +792,7 @@ echo "🎉 MusicBrainz data loading completed"`),
 					// Allow the ingress class to be configured per-stack. Default is
 					// traefik; local stacks can set this to nginx.
 					"kubernetes.io/ingress.class": pulumi.String(ingressClass),
+					"pulumi.com/skipAwait":        pulumi.String("true"),
 				},
 			},
 			Spec: &networkingv1.IngressSpecArgs{
