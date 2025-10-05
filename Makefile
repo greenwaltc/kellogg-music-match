@@ -35,6 +35,7 @@ help:
 	@echo "🗄️ Database:"
 	@echo "  make db-migrate     Apply migrations"
 	@echo "  make db-connect     Connect to database"
+	@echo "  make refresh-relevancy-mv  Refresh concert_event_relevancy_mv"
 	@echo ""
 	@echo "☁️ Infrastructure:"
 	@echo "  make infra-preview  Preview infra changes"
@@ -146,6 +147,14 @@ db-migrate: ## Apply database migrations
 
 db-connect: ## Connect to database with psql
 	docker-compose exec postgres psql -U kellogg_user -d kellogg_music_match
+
+refresh-relevancy-mv: ## Refresh the concert_event_relevancy_mv materialized view (concurrent if possible)
+	@echo "🔄 Refreshing concert_event_relevancy_mv..."
+	@docker-compose exec postgres psql -U kellogg_user -d kellogg_music_match -v ON_ERROR_STOP=1 -c "SELECT refresh_concert_event_relevancy_mv(true);" 2>/dev/null \
+		|| (echo "⚠️ Concurrent refresh unsupported; attempting non-concurrent" && \
+		docker-compose exec postgres psql -U kellogg_user -d kellogg_music_match -c "SELECT refresh_concert_event_relevancy_mv(false);")
+	@echo "✅ Refresh complete"
+	@echo "📊 Current MV stats:" && docker-compose exec postgres psql -U kellogg_user -d kellogg_music_match -c "SELECT * FROM (SELECT COUNT(*) AS row_count FROM concert_event_relevancy_mv) rc;" || true
 
 # Infrastructure Commands (Pulumi)
 infra-preview: ## Preview infrastructure changes

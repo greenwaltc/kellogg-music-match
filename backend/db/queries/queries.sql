@@ -453,19 +453,13 @@ SELECT
 FROM concert_events ce
 LEFT JOIN venues v ON ce.venue_id = v.id
 LEFT JOIN user_concert_event_interest ucei ON ucei.event_id = ce.id
-LEFT JOIN LATERAL (
-  SELECT MAX(ar.musicbrainz_score) AS relevancy
-  FROM concert_event_artists cea2
-  JOIN concert_artists ca2 ON cea2.artist_id = ca2.id
-  LEFT JOIN artists ar ON lower(ar.name) LIKE ('%' || lower(ca2.name) || '%')
-  WHERE cea2.event_id = ce.id
-) rel ON TRUE
+LEFT JOIN concert_event_relevancy_mv cer ON cer.event_id = ce.id
 WHERE ce.event_date >= CURRENT_TIMESTAMP
   AND v.city ILIKE '%' || sqlc.arg(city) || '%'
   AND ce.status = 'onsale'
-GROUP BY ce.id, v.name, v.street, v.city, v.state, v.country, v.postal, v.capacity, rel.relevancy
+GROUP BY ce.id, v.name, v.street, v.city, v.state, v.country, v.postal, v.capacity, cer.relevancy
 ORDER BY
-  CASE WHEN sqlc.arg(sort_by_relevancy)::bool THEN COALESCE(rel.relevancy,0) END DESC NULLS LAST,
+  CASE WHEN sqlc.arg(sort_by_relevancy)::bool THEN COALESCE(cer.relevancy,0) END DESC NULLS LAST,
   ce.event_date ASC
 LIMIT sqlc.arg(lim);
 
@@ -489,21 +483,15 @@ LEFT JOIN venues v ON ce.venue_id = v.id
 LEFT JOIN concert_event_artists cea ON ce.id = cea.event_id
 LEFT JOIN concert_artists ca ON cea.artist_id = ca.id
  LEFT JOIN user_concert_event_interest ucei ON ucei.event_id = ce.id
-LEFT JOIN LATERAL (
-  SELECT MAX(ar.musicbrainz_score) AS relevancy
-  FROM concert_event_artists cea2
-  JOIN concert_artists ca2 ON cea2.artist_id = ca2.id
-  LEFT JOIN artists ar ON lower(ar.name) LIKE ('%' || lower(ca2.name) || '%')
-  WHERE cea2.event_id = ce.id
-) rel ON TRUE
+LEFT JOIN concert_event_relevancy_mv cer ON cer.event_id = ce.id
 WHERE ce.event_date >= CURRENT_TIMESTAMP
   AND v.city ILIKE '%Chicago%'
   AND ce.status = 'onsale'
   AND (sqlc.arg(artist_name) = '' OR ca.name ILIKE '%' || sqlc.arg(artist_name) || '%')
   AND (sqlc.arg(any_interest)::bool = false OR EXISTS (SELECT 1 FROM user_concert_event_interest u2 WHERE u2.event_id = ce.id))
-GROUP BY ce.id, v.name, v.street, v.city, v.state, v.country, v.postal, v.capacity, rel.relevancy
+GROUP BY ce.id, v.name, v.street, v.city, v.state, v.country, v.postal, v.capacity, cer.relevancy
 ORDER BY
-  CASE WHEN sqlc.arg(sort_by_relevancy)::bool THEN COALESCE(rel.relevancy,0) END DESC NULLS LAST,
+  CASE WHEN sqlc.arg(sort_by_relevancy)::bool THEN COALESCE(cer.relevancy,0) END DESC NULLS LAST,
   ce.event_date ASC
 LIMIT sqlc.arg(limit_count) OFFSET sqlc.arg(offset_count);
 
@@ -542,20 +530,14 @@ LEFT JOIN venues v ON ce.venue_id = v.id
 LEFT JOIN concert_event_artists cea ON ce.id = cea.event_id
 LEFT JOIN concert_artists ca ON cea.artist_id = ca.id
 LEFT JOIN user_concert_event_interest ucei ON ucei.event_id = ce.id
-LEFT JOIN LATERAL (
-  SELECT MAX(ar.musicbrainz_score) AS relevancy
-  FROM concert_event_artists cea2
-  JOIN concert_artists ca2 ON cea2.artist_id = ca2.id
-  LEFT JOIN artists ar ON lower(ar.name) LIKE ('%' || lower(ca2.name) || '%')
-  WHERE cea2.event_id = ce.id
-) rel ON TRUE
+LEFT JOIN concert_event_relevancy_mv cer ON cer.event_id = ce.id
 WHERE ce.event_date >= sqlc.arg(start_date)
   AND ce.event_date <= sqlc.arg(end_date)
   AND (sqlc.arg(city)::text IS NULL OR v.city ILIKE '%' || sqlc.arg(city) || '%')
   AND (sqlc.arg(status)::text IS NULL OR ce.status = sqlc.arg(status))
-GROUP BY ce.id, v.name, v.street, v.city, v.state, v.country, v.postal, v.capacity, rel.relevancy
+GROUP BY ce.id, v.name, v.street, v.city, v.state, v.country, v.postal, v.capacity, cer.relevancy
 ORDER BY
-  CASE WHEN sqlc.arg(sort_by_relevancy)::bool THEN COALESCE(rel.relevancy,0) END DESC NULLS LAST,
+  CASE WHEN sqlc.arg(sort_by_relevancy)::bool THEN COALESCE(cer.relevancy,0) END DESC NULLS LAST,
   ce.event_date ASC
 LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off_set);
 
@@ -593,3 +575,26 @@ UPDATE users
 SET password_hash = sqlc.arg(password_hash), updated_at = NOW()
 WHERE id = sqlc.arg(id)
 RETURNING id, username, email;
+
+-- =======================
+-- Monitoring / Relevancy MV
+-- =======================
+
+-- name: GetRelevancyMaterializedViewStats :one
+-- Returns the row count of the concert_event_relevancy_mv and an approximation of last refresh time.
+-- Because PostgreSQL does not track MV refresh timestamp natively, we infer recency from the
+-- youngest tuple's xmin age relative to now as a heuristic. For higher fidelity, create a tiny
+-- side table updated in the same transaction as REFRESH.
+WITH mv AS (
+  SELECT COUNT(*)::bigint AS row_count FROM concert_event_relevancy_mv
+), age_hint AS (
+  SELECT now() - pg_xact_commit_timestamp(xmin) AS approx_age
+  FROM concert_event_relevancy_mv
+  WHERE pg_xact_commit_timestamp(xmin) IS NOT NULL
+  ORDER BY xmin DESC
+  LIMIT 1
+)
+SELECT mv.row_count,
+       COALESCE(age_hint.approx_age, NULL) AS approx_age_since_last_refresh
+FROM mv
+LEFT JOIN age_hint ON TRUE;

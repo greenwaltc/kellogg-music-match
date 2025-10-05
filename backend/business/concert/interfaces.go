@@ -18,6 +18,8 @@ type Event struct {
 	Description    string     `json:"description,omitempty"`
 	Status         string     `json:"status"` // e.g., "onsale", "offsale", "cancelled"
 	AgeRestriction string     `json:"ageRestriction,omitempty"`
+	// Relevancy score (max MusicBrainz artist score among matched artists); 0 if unknown
+	Relevancy int `json:"relevancy,omitempty"`
 	// Aggregated user interest buckets (UUIDs as strings)
 	InterestedUserIDs      []string `json:"interestedUserIds,omitempty"`
 	GoingUserIDs           []string `json:"goingUserIds,omitempty"`
