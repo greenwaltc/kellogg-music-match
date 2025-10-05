@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"time"
 
 	"github.com/greenwaltc/kellogg-music-match/backend/config"
@@ -104,16 +105,49 @@ func (p *TicketmasterProxy) FetchConcertsWithPagination(ctx context.Context, pag
 	// Build query parameters
 	params := url.Values{}
 	params.Set("apikey", p.config.ConsumerKey)
-	params.Set("classificationName", "music")          // Only music events
-	params.Set("city", p.config.DefaultCity)           // Configurable city
-	params.Set("stateCode", p.config.DefaultState)     // Configurable state
-	params.Set("countryCode", p.config.DefaultCountry) // Configurable country
+	params.Set("classificationName", "music") // Only music events
 	params.Set("startDateTime", now.Format("2006-01-02T15:04:05Z"))
 	params.Set("endDateTime", endDate.Format("2006-01-02T15:04:05Z"))
 	params.Set("size", fmt.Sprintf("%d", p.config.MaxResults)) // Configurable max results per page
 	params.Set("page", fmt.Sprintf("%d", page))                // Requested page
 	params.Set("sort", "date,asc")                             // Sort by date ascending
 	params.Set("includeSpellcheck", "yes")                     // Include spell suggestions
+
+	// Validate geo lat/long if provided
+	geoValid := false
+	if p.config.GeoLatLong != "" {
+		// Accept simple "lat,long" where each is -?digits(.digits)?
+		re := regexp.MustCompile(`^-?\d{1,3}(?:\.\d+)?,-?\d{1,3}(?:\.\d+)?$`)
+		geoValid = re.MatchString(p.config.GeoLatLong)
+		if !geoValid {
+			span.SetAttributes(attribute.String("ticketmaster.geo_invalid", p.config.GeoLatLong))
+		}
+	}
+
+	// If geo radius search configured and valid, prefer that over city/state
+	if geoValid && p.config.Radius > 0 {
+		params.Set("geoPoint", p.config.GeoLatLong)
+		params.Set("radius", fmt.Sprintf("%d", p.config.Radius))
+		if p.config.RadiusUnit != "" {
+			params.Set("unit", p.config.RadiusUnit)
+		}
+		span.SetAttributes(
+			attribute.String("ticketmaster.mode", "geo"),
+			attribute.String("ticketmaster.geo", p.config.GeoLatLong),
+			attribute.Int("ticketmaster.radius", p.config.Radius),
+			attribute.String("ticketmaster.unit", p.config.RadiusUnit),
+		)
+	} else {
+		// Fallback to legacy city/state search
+		params.Set("city", p.config.DefaultCity)
+		params.Set("stateCode", p.config.DefaultState)
+		params.Set("countryCode", p.config.DefaultCountry)
+		span.SetAttributes(
+			attribute.String("ticketmaster.mode", "city"),
+			attribute.String("ticketmaster.city", p.config.DefaultCity),
+			attribute.String("ticketmaster.state", p.config.DefaultState),
+		)
+	}
 
 	// Build the full URL
 	fullURL := fmt.Sprintf("%s/events?%s", p.config.BaseURL, params.Encode()) // Create HTTP request
@@ -170,14 +204,43 @@ func (p *TicketmasterProxy) FetchConcertsByArtist(ctx context.Context, artistNam
 	params := url.Values{}
 	params.Set("apikey", p.config.ConsumerKey)
 	params.Set("classificationName", "music")
-	params.Set("city", p.config.DefaultCity)
-	params.Set("stateCode", p.config.DefaultState)
-	params.Set("countryCode", p.config.DefaultCountry)
 	params.Set("keyword", artistName) // Search for specific artist
 	params.Set("startDateTime", now.Format("2006-01-02T15:04:05Z"))
 	params.Set("endDateTime", endDate.Format("2006-01-02T15:04:05Z"))
 	params.Set("size", "50") // Could make this configurable too
 	params.Set("sort", "date,asc")
+
+	geoValid := false
+	if p.config.GeoLatLong != "" {
+		re := regexp.MustCompile(`^-?\d{1,3}(?:\.\d+)?,-?\d{1,3}(?:\.\d+)?$`)
+		geoValid = re.MatchString(p.config.GeoLatLong)
+		if !geoValid {
+			span.SetAttributes(attribute.String("ticketmaster.geo_invalid", p.config.GeoLatLong))
+		}
+	}
+
+	if geoValid && p.config.Radius > 0 {
+		params.Set("geoPoint", p.config.GeoLatLong)
+		params.Set("radius", fmt.Sprintf("%d", p.config.Radius))
+		if p.config.RadiusUnit != "" {
+			params.Set("unit", p.config.RadiusUnit)
+		}
+		span.SetAttributes(
+			attribute.String("ticketmaster.mode", "geo"),
+			attribute.String("ticketmaster.geo", p.config.GeoLatLong),
+			attribute.Int("ticketmaster.radius", p.config.Radius),
+			attribute.String("ticketmaster.unit", p.config.RadiusUnit),
+		)
+	} else {
+		params.Set("city", p.config.DefaultCity)
+		params.Set("stateCode", p.config.DefaultState)
+		params.Set("countryCode", p.config.DefaultCountry)
+		span.SetAttributes(
+			attribute.String("ticketmaster.mode", "city"),
+			attribute.String("ticketmaster.city", p.config.DefaultCity),
+			attribute.String("ticketmaster.state", p.config.DefaultState),
+		)
+	}
 
 	fullURL := fmt.Sprintf("%s/events?%s", p.config.BaseURL, params.Encode())
 

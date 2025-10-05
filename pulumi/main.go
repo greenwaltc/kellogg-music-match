@@ -1,8 +1,11 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	appsv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/apps/v1"
@@ -74,6 +77,12 @@ func main() {
 		emailFromEmail := get("emailFromEmail", "support@kelloggmatch.com")
 		emailFromName := get("emailFromName", "Kellogg Music Match")
 		appBaseURL := get("appBaseUrl", "https://kelloggmatch.com")
+		// Optional geo search overrides (for broader metro search)
+		// Defaults now target downtown Chicago with a 50 mile radius to broaden concert discovery.
+		// Stacks can override via Pulumi config keys: ticketmasterGeoLatLong, ticketmasterRadius, ticketmasterRadiusUnit
+		geoLatLong := get("ticketmasterGeoLatLong", "41.8781,-87.6298")
+		geoRadius := get("ticketmasterRadius", "50") // string form; backend parses int env
+		radiusUnit := get("ticketmasterRadiusUnit", "miles")
 		// SendGrid API key secret
 		sendgridAPIKey := pulumiCfg.RequireSecret("sendgridApiKey")
 		smtpHost := get("smtpHost", "smtp.gmail.com")
@@ -94,7 +103,8 @@ func main() {
 		// Image pull policy (was hardcoded as "Never" in multiple places)
 		imagePullPolicy := get("imagePullPolicy", "IfNotPresent")
 		musicbrainzImage := get("musicbrainzImage", "kellogg-music-match-musicbrainz:latest")
-		flywayImage := get("flywayImage", "flyway/flyway:latest")
+		// Pin Flyway image to a specific version for deterministic migrations (can override via Pulumi config key `flywayImage`)
+		flywayImage := get("flywayImage", "flyway/flyway:10-alpine")
 		tracingEnabled := getBoolStr("tracingEnabled", true)
 		tracingExporter := get("tracingExporter", "otlp")
 		otlpEndpoint := get("otlpEndpoint", "http://otel-collector:4318")
@@ -150,15 +160,46 @@ func main() {
 			return err
 		}
 
+		// Keep a raw map for hashing
+		rawMigrations := map[string]string{}
 		for _, entry := range entries {
 			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".sql") {
 				content, err := os.ReadFile(migrationDir + "/" + entry.Name())
 				if err != nil {
 					return err
 				}
-				migrationFiles[entry.Name()] = pulumi.String(string(content))
+				text := string(content)
+				rawMigrations[entry.Name()] = text
+				migrationFiles[entry.Name()] = pulumi.String(text)
 			}
 		}
+
+		// ------------------------------------------------------------------
+		// Compute a content hash of flyway.conf + all migration files. We add
+		// this as an annotation to both the ConfigMap and the backend pod
+		// template so that any migration change (add/edit) forces a new
+		// Deployment rollout, ensuring initContainers re-run Flyway.
+		// ------------------------------------------------------------------
+		var migrationNames []string
+		for name := range rawMigrations {
+			migrationNames = append(migrationNames, name)
+		}
+		sort.Strings(migrationNames)
+		builder := strings.Builder{}
+		builder.WriteString("flyway.conf::")
+		builder.WriteString(string(flywayConfig))
+		builder.WriteByte('\n')
+		for _, name := range migrationNames {
+			builder.WriteString(name)
+			builder.WriteString("::")
+			builder.WriteString(rawMigrations[name])
+			builder.WriteByte('\n')
+		}
+		sum := sha256.Sum256([]byte(builder.String()))
+		flywayMigrationsHash := hex.EncodeToString(sum[:])
+
+		// Store hash in context for later use (closure capture)
+		_ = flywayMigrationsHash
 		// Create the namespace
 		namespace, err := corev1.NewNamespace(ctx, "kmm", &corev1.NamespaceArgs{
 			Metadata: &metav1.ObjectMetaArgs{
@@ -221,6 +262,9 @@ func main() {
 				Labels: pulumi.StringMap{
 					"app":       pulumi.String("kmm"),
 					"component": pulumi.String("flyway"),
+				},
+				Annotations: pulumi.StringMap{
+					"kmm.flyway/hash": pulumi.String(flywayMigrationsHash),
 				},
 			},
 			Data: flywayConfigMapData,
@@ -434,6 +478,9 @@ echo "🎉 MusicBrainz data loading completed"`),
 							"app":       pulumi.String("kmm"),
 							"component": pulumi.String("backend"),
 						},
+						Annotations: pulumi.StringMap{
+							"kmm.flyway/hash": pulumi.String(flywayMigrationsHash),
+						},
 					},
 					Spec: &corev1.PodSpecArgs{
 						ServiceAccountName: serviceAccount.Metadata.Name(),
@@ -548,6 +595,10 @@ echo "🎉 MusicBrainz data loading completed"`),
 									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_DEFAULT_CITY"), Value: tmCity},
 									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_DEFAULT_STATE"), Value: tmState},
 									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_DEFAULT_COUNTRY"), Value: tmCountry},
+									// Optional geo override
+									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_GEO_LATLONG"), Value: geoLatLong},
+									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_RADIUS"), Value: geoRadius},
+									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_RADIUS_UNIT"), Value: radiusUnit},
 									// Email Configuration
 									&corev1.EnvVarArgs{Name: pulumi.String("EMAIL_ENABLED"), Value: emailEnabled},
 									&corev1.EnvVarArgs{Name: pulumi.String("EMAIL_PROVIDER"), Value: emailProvider},

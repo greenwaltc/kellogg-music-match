@@ -33,7 +33,15 @@ IMAGES=(
     "kellogg-music-match-backend:latest"
     "kellogg-music-match-ui:latest"
     "kellogg-music-match-postgres:latest"
+    # Both underscore (compose default) and hyphen variants if present
     "kellogg-music-match_musicbrainz-loader:latest"
+    "kellogg-music-match-musicbrainz:latest"
+)
+
+# External (upstream) images we rely on at runtime but do not build locally.
+# These will be docker pulled (if not already) and then imported into k3s.
+EXTERNAL_IMAGES=(
+    "flyway/flyway:10-alpine"  # Pin Flyway version used by init container
 )
 
 NAMESPACE="kmm"
@@ -80,11 +88,24 @@ build_and_import() {
         docker-compose build
     fi
     
-    success "All images built successfully"
-    
-    # Import each image
+    success "All locally built images processed"
+
+    # Pull external images (pinning versions) so they exist locally
+    for ext in "${EXTERNAL_IMAGES[@]}"; do
+        log "Ensuring external image present: $ext"
+        if ! docker image inspect "$ext" >/dev/null 2>&1; then
+            docker pull "$ext"
+        fi
+        import_image "$ext"
+    done
+
+    # Import each local project image (skip if missing to avoid hard failure when optional)
     for image in "${IMAGES[@]}"; do
-        import_image "$image"
+        if docker image inspect "$image" >/dev/null 2>&1; then
+            import_image "$image"
+        else
+            warn "Skipping missing local image: $image"
+        fi
     done
 }
 

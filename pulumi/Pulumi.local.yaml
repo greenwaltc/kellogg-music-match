@@ -1,0 +1,2 @@
+config:
+  kellogg-music-match:ingressClass: "nginx"
