@@ -103,19 +103,19 @@ func main() {
 		otelResourceAttributes := get("otelResourceAttributes", "environment=dev,team=matching")
 		otelTracesSampler := get("otelTracesSampler", "parentbased_traceidratio")
 		otelTracesSamplerArg := get("otelTracesSamplerArg", "0.10")
-		collectorImage := get("otelCollectorImage", "otel/opentelemetry-collector:0.103.1")
-		collectorReplicas := getInt("otelCollectorReplicas", 1)
-		collectorConfigOverride := pulumiCfg.Get("otelCollectorConfig")
+		// collectorImage := get("otelCollectorImage", "otel/opentelemetry-collector:0.103.1")
+		// collectorReplicas := getInt("otelCollectorReplicas", 1)
+		// collectorConfigOverride := pulumiCfg.Get("otelCollectorConfig")
 		promEnabled := pulumiCfg.GetBool("otelCollectorPrometheus")
 		collectorPromPort := getInt("otelCollectorPrometheusPort", 8888)
 		backendCPUReq := get("backendCpuRequest", "100m")
 		backendMemReq := get("backendMemRequest", "128Mi")
 		backendCPULimit := get("backendCpuLimit", "500m")
 		backendMemLimit := get("backendMemLimit", "512Mi")
-		collectorCPUReq := get("otelCollectorCpuRequest", "50m")
-		collectorMemReq := get("otelCollectorMemRequest", "64Mi")
-		collectorCPULimit := get("otelCollectorCpuLimit", "500m")
-		collectorMemLimit := get("otelCollectorMemLimit", "256Mi")
+		// collectorCPUReq := get("otelCollectorCpuRequest", "50m")
+		// collectorMemReq := get("otelCollectorMemRequest", "64Mi")
+		// collectorCPULimit := get("otelCollectorCpuLimit", "500m")
+		// collectorMemLimit := get("otelCollectorMemLimit", "256Mi")
 		postgresCPUReq := get("postgresCpuRequest", "200m")
 		postgresMemReq := get("postgresMemRequest", "512Mi")
 		postgresCPULimit := get("postgresCpuLimit", "3000m")
@@ -129,15 +129,12 @@ func main() {
 		if promEnabled {
 			baseCollector += fmt.Sprintf("  prometheus:\n    endpoint: 0.0.0.0:%d\n", collectorPromPort)
 		}
-		baseCollector += "service:\n  pipelines:\n    traces:\n      receivers: [otlp]\n      processors: [batch]\n      exporters: [logging"
-		if promEnabled {
-			baseCollector += ",prometheus"
-		}
-		baseCollector += "]\n"
-		collectorConfigContent := baseCollector
-		if collectorConfigOverride != "" {
-			collectorConfigContent = collectorConfigOverride
-		}
+		// Build traces pipeline exporters list (exclude prometheus exporter which doesn't handle traces)
+		// baseCollector += "service:\n  pipelines:\n    traces:\n      receivers: [otlp]\n      processors: [batch]\n      exporters: [logging]\n"
+		// collectorConfigContent := baseCollector
+		// if collectorConfigOverride != "" {
+		// 	collectorConfigContent = collectorConfigOverride
+		// }
 
 		// Read Flyway configuration file
 		flywayConfig, err := os.ReadFile("../database/flyway.conf")
@@ -1057,74 +1054,74 @@ echo "🎉 MusicBrainz data loading completed"`),
 			return err
 		}
 
-		// OpenTelemetry Collector (ConfigMap + Deployment + Service) for OTLP ingestion
-		collectorConfigMap, err := corev1.NewConfigMap(ctx, "otel-collector-config", &corev1.ConfigMapArgs{
-			Metadata: &metav1.ObjectMetaArgs{
-				Name:      pulumi.String("otel-collector-config"),
-				Namespace: namespace.Metadata.Name(),
-				Labels:    pulumi.StringMap{"app": pulumi.String("kmm"), "component": pulumi.String("otel-collector")},
-			},
-			Data: pulumi.StringMap{"collector.yaml": pulumi.String(collectorConfigContent)},
-		})
-		if err != nil {
-			return err
-		}
+		// // OpenTelemetry Collector (ConfigMap + Deployment + Service) for OTLP ingestion
+		// collectorConfigMap, err := corev1.NewConfigMap(ctx, "otel-collector-config", &corev1.ConfigMapArgs{
+		// 	Metadata: &metav1.ObjectMetaArgs{
+		// 		Name:      pulumi.String("otel-collector-config"),
+		// 		Namespace: namespace.Metadata.Name(),
+		// 		Labels:    pulumi.StringMap{"app": pulumi.String("kmm"), "component": pulumi.String("otel-collector")},
+		// 	},
+		// 	Data: pulumi.StringMap{"collector.yaml": pulumi.String(collectorConfigContent)},
+		// })
+		// if err != nil {
+		// 	return err
+		// }
 
-		collectorDeployment, err := appsv1.NewDeployment(ctx, "otel-collector", &appsv1.DeploymentArgs{
-			Metadata: &metav1.ObjectMetaArgs{
-				Name:      pulumi.String("otel-collector"),
-				Namespace: namespace.Metadata.Name(),
-				Labels:    pulumi.StringMap{"app": pulumi.String("kmm"), "component": pulumi.String("otel-collector")},
-			},
-			Spec: &appsv1.DeploymentSpecArgs{
-				Replicas: pulumi.Int(collectorReplicas),
-				Selector: &metav1.LabelSelectorArgs{MatchLabels: pulumi.StringMap{"app": pulumi.String("kmm"), "component": pulumi.String("otel-collector")}},
-				Template: &corev1.PodTemplateSpecArgs{
-					Metadata: &metav1.ObjectMetaArgs{Labels: pulumi.StringMap{"app": pulumi.String("kmm"), "component": pulumi.String("otel-collector")}},
-					Spec: &corev1.PodSpecArgs{
-						ServiceAccountName: serviceAccount.Metadata.Name(),
-						Containers: corev1.ContainerArray{
-							&corev1.ContainerArgs{
-								Name:  pulumi.String("otel-collector"),
-								Image: collectorImage,
-								Args:  pulumi.StringArray{pulumi.String("--config=/conf/collector.yaml")},
-								Ports: corev1.ContainerPortArray{
-									&corev1.ContainerPortArgs{ContainerPort: pulumi.Int(4318), Name: pulumi.String("otlp-http")},
-									&corev1.ContainerPortArgs{ContainerPort: pulumi.Int(4317), Name: pulumi.String("otlp-grpc")},
-								},
-								VolumeMounts: corev1.VolumeMountArray{
-									&corev1.VolumeMountArgs{Name: pulumi.String("otel-config"), MountPath: pulumi.String("/conf")},
-								},
-								Resources:      &corev1.ResourceRequirementsArgs{Requests: pulumi.StringMap{"cpu": collectorCPUReq, "memory": collectorMemReq}, Limits: pulumi.StringMap{"cpu": collectorCPULimit, "memory": collectorMemLimit}},
-								LivenessProbe:  &corev1.ProbeArgs{HttpGet: &corev1.HTTPGetActionArgs{Path: pulumi.String("/healthz"), Port: pulumi.String("otlp-http")}, InitialDelaySeconds: pulumi.Int(15), PeriodSeconds: pulumi.Int(30)},
-								ReadinessProbe: &corev1.ProbeArgs{HttpGet: &corev1.HTTPGetActionArgs{Path: pulumi.String("/healthz"), Port: pulumi.String("otlp-http")}, InitialDelaySeconds: pulumi.Int(5), PeriodSeconds: pulumi.Int(15)},
-							},
-						},
-						Volumes: corev1.VolumeArray{
-							&corev1.VolumeArgs{Name: pulumi.String("otel-config"), ConfigMap: &corev1.ConfigMapVolumeSourceArgs{Name: collectorConfigMap.Metadata.Name()}},
-						},
-					},
-				},
-			},
-		})
-		if err != nil {
-			return err
-		}
+		// collectorDeployment, err := appsv1.NewDeployment(ctx, "otel-collector", &appsv1.DeploymentArgs{
+		// 	Metadata: &metav1.ObjectMetaArgs{
+		// 		Name:      pulumi.String("otel-collector"),
+		// 		Namespace: namespace.Metadata.Name(),
+		// 		Labels:    pulumi.StringMap{"app": pulumi.String("kmm"), "component": pulumi.String("otel-collector")},
+		// 	},
+		// 	Spec: &appsv1.DeploymentSpecArgs{
+		// 		Replicas: pulumi.Int(collectorReplicas),
+		// 		Selector: &metav1.LabelSelectorArgs{MatchLabels: pulumi.StringMap{"app": pulumi.String("kmm"), "component": pulumi.String("otel-collector")}},
+		// 		Template: &corev1.PodTemplateSpecArgs{
+		// 			Metadata: &metav1.ObjectMetaArgs{Labels: pulumi.StringMap{"app": pulumi.String("kmm"), "component": pulumi.String("otel-collector")}},
+		// 			Spec: &corev1.PodSpecArgs{
+		// 				ServiceAccountName: serviceAccount.Metadata.Name(),
+		// 				Containers: corev1.ContainerArray{
+		// 					&corev1.ContainerArgs{
+		// 						Name:  pulumi.String("otel-collector"),
+		// 						Image: collectorImage,
+		// 						Args:  pulumi.StringArray{pulumi.String("--config=/conf/collector.yaml")},
+		// 						Ports: corev1.ContainerPortArray{
+		// 							&corev1.ContainerPortArgs{ContainerPort: pulumi.Int(4318), Name: pulumi.String("otlp-http")},
+		// 							&corev1.ContainerPortArgs{ContainerPort: pulumi.Int(4317), Name: pulumi.String("otlp-grpc")},
+		// 						},
+		// 						VolumeMounts: corev1.VolumeMountArray{
+		// 							&corev1.VolumeMountArgs{Name: pulumi.String("otel-config"), MountPath: pulumi.String("/conf")},
+		// 						},
+		// 						Resources:      &corev1.ResourceRequirementsArgs{Requests: pulumi.StringMap{"cpu": collectorCPUReq, "memory": collectorMemReq}, Limits: pulumi.StringMap{"cpu": collectorCPULimit, "memory": collectorMemLimit}},
+		// 						LivenessProbe:  &corev1.ProbeArgs{HttpGet: &corev1.HTTPGetActionArgs{Path: pulumi.String("/healthz"), Port: pulumi.String("otlp-http")}, InitialDelaySeconds: pulumi.Int(15), PeriodSeconds: pulumi.Int(30)},
+		// 						ReadinessProbe: &corev1.ProbeArgs{HttpGet: &corev1.HTTPGetActionArgs{Path: pulumi.String("/healthz"), Port: pulumi.String("otlp-http")}, InitialDelaySeconds: pulumi.Int(5), PeriodSeconds: pulumi.Int(15)},
+		// 					},
+		// 				},
+		// 				Volumes: corev1.VolumeArray{
+		// 					&corev1.VolumeArgs{Name: pulumi.String("otel-config"), ConfigMap: &corev1.ConfigMapVolumeSourceArgs{Name: collectorConfigMap.Metadata.Name()}},
+		// 				},
+		// 			},
+		// 		},
+		// 	},
+		// })
+		// if err != nil {
+		// 	return err
+		// }
 
-		collectorService, err := corev1.NewService(ctx, "otel-collector-svc", &corev1.ServiceArgs{
-			Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String("otel-collector"), Namespace: namespace.Metadata.Name(), Labels: pulumi.StringMap{"app": pulumi.String("kmm"), "component": pulumi.String("otel-collector")}},
-			Spec: &corev1.ServiceSpecArgs{
-				Type: pulumi.String("ClusterIP"),
-				Ports: corev1.ServicePortArray{
-					&corev1.ServicePortArgs{Name: pulumi.String("otlp-http"), Port: pulumi.Int(4318), TargetPort: pulumi.String("otlp-http")},
-					&corev1.ServicePortArgs{Name: pulumi.String("otlp-grpc"), Port: pulumi.Int(4317), TargetPort: pulumi.String("otlp-grpc")},
-				},
-				Selector: pulumi.StringMap{"app": pulumi.String("kmm"), "component": pulumi.String("otel-collector")},
-			},
-		})
-		if err != nil {
-			return err
-		}
+		// collectorService, err := corev1.NewService(ctx, "otel-collector-svc", &corev1.ServiceArgs{
+		// 	Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String("otel-collector"), Namespace: namespace.Metadata.Name(), Labels: pulumi.StringMap{"app": pulumi.String("kmm"), "component": pulumi.String("otel-collector")}},
+		// 	Spec: &corev1.ServiceSpecArgs{
+		// 		Type: pulumi.String("ClusterIP"),
+		// 		Ports: corev1.ServicePortArray{
+		// 			&corev1.ServicePortArgs{Name: pulumi.String("otlp-http"), Port: pulumi.Int(4318), TargetPort: pulumi.String("otlp-http")},
+		// 			&corev1.ServicePortArgs{Name: pulumi.String("otlp-grpc"), Port: pulumi.Int(4317), TargetPort: pulumi.String("otlp-grpc")},
+		// 		},
+		// 		Selector: pulumi.StringMap{"app": pulumi.String("kmm"), "component": pulumi.String("otel-collector")},
+		// 	},
+		// })
+		// if err != nil {
+		// 	return err
+		// }
 
 		// Export useful information for Kellogg Music Match deployment
 		ctx.Export("namespaceName", namespace.Metadata.Name())
@@ -1137,8 +1134,8 @@ echo "🎉 MusicBrainz data loading completed"`),
 		ctx.Export("postgresStatefulSetName", pgStatefulSet.Metadata.Name())
 		ctx.Export("postgresServiceName", pgService.Metadata.Name())
 		ctx.Export("postgresSecretName", pgSecret.Metadata.Name())
-		ctx.Export("otelCollectorDeployment", collectorDeployment.Metadata.Name())
-		ctx.Export("otelCollectorService", collectorService.Metadata.Name())
+		// ctx.Export("otelCollectorDeployment", collectorDeployment.Metadata.Name())
+		// ctx.Export("otelCollectorService", collectorService.Metadata.Name())
 
 		// Export application URLs for easy access
 		ctx.Export("uiUrl", pulumi.String("http://kmm-ui.traefik.me"))
