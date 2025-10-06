@@ -17,6 +17,7 @@ type Config struct {
 	Telemetry    TelemetryConfig
 	JWT          JWTConfig
 	Email        EmailConfig
+	Spotify      SpotifyConfig
 }
 
 // ServerConfig holds server-related configuration
@@ -103,6 +104,12 @@ type JWTConfig struct {
 	LeewaySeconds int // allowed clock skew (nbf/iat/exp) in seconds
 }
 
+// SpotifyConfig holds Spotify API configuration
+type SpotifyConfig struct {
+	ClientID     string
+	ClientSecret string
+}
+
 // Load creates a new Config instance from environment variables
 func Load() *Config {
 	return &Config{
@@ -173,6 +180,10 @@ func Load() *Config {
 			SMTPUser:  getEnvWithDefault("SMTP_USER", ""),
 			SMTPPass:  getEnvWithDefault("SMTP_PASS", ""),
 			Enabled:   getEnvBoolWithDefault("EMAIL_ENABLED", false),
+		},
+		Spotify: SpotifyConfig{
+			ClientID:     getEnvWithDefault("SPOTIFY_CLIENT_ID", "spotify-client-id"),
+			ClientSecret: getEnvWithDefault("SPOTIFY_CLIENT_SECRET", "spotify-client-secret"),
 		},
 	}
 }

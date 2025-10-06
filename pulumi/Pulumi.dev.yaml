@@ -91,6 +91,12 @@ config:
   kellogg-music-match:jwtRefreshHours: "720"
 
   # ---------------------------------------------------------------------------
+  # Spotify API (for future integration)
+  # ---------------------------------------------------------------------------
+  # (spotifyClientId removed – set via: pulumi config set --secret kellogg-music-match:spotifyClientId <value>)
+  # (spotifyClientSecret removed – set via: pulumi config set --secret kellogg-music-match:spotifyClientSecret <value>)
+
+  # ---------------------------------------------------------------------------
   # Images (override for custom registries)
   # ---------------------------------------------------------------------------
   kellogg-music-match:backendImage: "kellogg-music-match-backend:latest"
