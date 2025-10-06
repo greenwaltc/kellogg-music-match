@@ -10,6 +10,7 @@
   <a routerLink="/chicago-events" routerLinkActive="active">Chicago Events</a>
   <a routerLink="/matches" routerLinkActive="active">Matches</a>
   <a routerLink="/artists" routerLinkActive="active">Artists</a>
+  <a routerLink="/spotify/connect" routerLinkActive="active">Spotify</a>
       <button type="button" class="ghost" (click)="toggleTheme()" aria-label="Toggle theme">{{ theme.mode() === 'dark' ? '🌞' : '🌙' }}</button>
       <button type="button" (click)="logout()">Logout</button>
     </nav>
@@ -36,6 +37,7 @@
   <a routerLink="/chicago-events" routerLinkActive="active" (click)="closeMobileMenu()">Chicago Events</a>
   <a routerLink="/matches" routerLinkActive="active" (click)="closeMobileMenu()">Matches</a>
   <a routerLink="/artists" routerLinkActive="active" (click)="closeMobileMenu()">Artists</a>
+  <a routerLink="/spotify/connect" routerLinkActive="active" (click)="closeMobileMenu()">Spotify</a>
       <button type="button" class="ghost" (click)="toggleTheme()" aria-label="Toggle theme">{{ theme.mode() === 'dark' ? '🌞' : '🌙' }}</button>
       <button type="button" (click)="logout(); closeMobileMenu()">Logout</button>
     </nav>

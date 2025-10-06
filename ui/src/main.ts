@@ -9,6 +9,8 @@ import { MatchesComponent } from './app/matches.component';
 import { FeedbackComponent } from './app/feedback.component';
 import { RoadmapComponent } from './app/roadmap.component';
 import { ChicagoEventsComponent } from './app/chicago-events.component';
+import { SpotifyConnectComponent } from './app/spotify-connect.component';
+import { SpotifyCallbackComponent } from './app/spotify-callback.component';
 import { authGuard } from './app/auth.guard';
 import { jwtInterceptor } from './app/jwt.interceptor';
 import { loginRedirectGuard } from './app/login-redirect.guard';
@@ -26,6 +28,8 @@ const routes: Routes = [
   { path: 'feedback', component: FeedbackComponent, canActivate: [authGuard] },
   { path: 'roadmap', component: RoadmapComponent, canActivate: [authGuard] },
   { path: 'chicago-events', component: ChicagoEventsComponent, canActivate: [authGuard] },
+  { path: 'spotify/connect', component: SpotifyConnectComponent, canActivate: [authGuard] },
+  { path: 'spotify/callback', component: SpotifyCallbackComponent },
   { path: '**', redirectTo: '' }
 ];
 

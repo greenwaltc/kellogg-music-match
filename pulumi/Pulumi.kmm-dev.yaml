@@ -1,0 +1,94 @@
+config:
+  kellogg-music-match:appBaseUrl: https://app.kelloggmatch.com
+  kellogg-music-match:artistMaxCount: "20"
+  kellogg-music-match:artistMaxNameLength: "240"
+  kellogg-music-match:artistMinCount: "5"
+  kellogg-music-match:artistSearchLimit: "10"
+  kellogg-music-match:artistSearchMaxLength: "240"
+  kellogg-music-match:backendCpuLimit: "1"
+  kellogg-music-match:backendCpuRequest: 200m
+  kellogg-music-match:backendImage: kellogg-music-match-backend:latest
+  kellogg-music-match:backendMemLimit: 1Gi
+  kellogg-music-match:backendMemRequest: 256Mi
+  kellogg-music-match:backendReplicas: "3"
+  kellogg-music-match:corsAllowCredentials: "true"
+  kellogg-music-match:corsAllowedHeaders: Content-Type, Authorization, X-User-Username
+  kellogg-music-match:corsAllowedMethods: GET, POST, PUT, DELETE, OPTIONS
+  kellogg-music-match:corsAllowedOrigins: https://app.kelloggmatch.com,https://kelloggmatch.com
+  kellogg-music-match:dbHost: postgres
+  kellogg-music-match:dbName: kellogg_music_match
+  kellogg-music-match:dbPort: "5432"
+  kellogg-music-match:dbSSLMode: disable
+  kellogg-music-match:dbUser: kellogg_user
+  kellogg-music-match:debugEnabled: "false"
+  kellogg-music-match:emailEnabled: "true"
+  kellogg-music-match:emailFromEmail: support@kelloggmatch.com
+  kellogg-music-match:emailFromName: Kellogg Music Match
+  kellogg-music-match:emailProvider: sendgrid
+  kellogg-music-match:flywayImage: flyway/flyway:latest
+  kellogg-music-match:imagePullPolicy: IfNotPresent
+  kellogg-music-match:ingressClass: traefik
+  kellogg-music-match:ingressSkipWait: "true"
+  kellogg-music-match:jwtExpiryHours: "24"
+  kellogg-music-match:jwtRefreshHours: "720"
+  kellogg-music-match:musicbrainzImage: kellogg-music-match-musicbrainz:latest
+  kellogg-music-match:otelCollectorCpuLimit: 500m
+  kellogg-music-match:otelCollectorCpuRequest: 100m
+  kellogg-music-match:otelCollectorImage: otel/opentelemetry-collector:0.103.1
+  kellogg-music-match:otelCollectorMemLimit: 512Mi
+  kellogg-music-match:otelCollectorMemRequest: 128Mi
+  kellogg-music-match:otelCollectorPrometheus: "true"
+  kellogg-music-match:otelCollectorPrometheusPort: "8888"
+  kellogg-music-match:otelCollectorReplicas: "2"
+  kellogg-music-match:otelResourceAttributes: environment=prod,team=matching
+  kellogg-music-match:otelServiceName: kmm-backend
+  kellogg-music-match:otelServiceVersion: 1.0.0
+  kellogg-music-match:otelTracesSampler: parentbased_traceidratio
+  kellogg-music-match:otelTracesSamplerArg: "0.05"
+  kellogg-music-match:otlpEndpoint: http://otel-collector:4318
+  kellogg-music-match:persistentVolumeAccessModes: ReadWriteOnce
+  kellogg-music-match:persistentVolumeName: postgres-storage
+  kellogg-music-match:persistentVolumeSize: 10Gi
+  kellogg-music-match:persistentVolumeStorageClassName: local-path
+  kellogg-music-match:postgresCpuLimit: "2"
+  kellogg-music-match:postgresCpuRequest: 500m
+  kellogg-music-match:postgresImage: kellogg-music-match-postgres:latest
+  kellogg-music-match:postgresMemLimit: 4Gi
+  kellogg-music-match:postgresMemRequest: 1Gi
+  kellogg-music-match:serverPort: "8080"
+  kellogg-music-match:smtpHost: smtp.sendgrid.net
+  kellogg-music-match:smtpPort: "587"
+  kellogg-music-match:smtpUser: apikey
+  kellogg-music-match:ticketmasterBaseUrl: https://app.ticketmaster.com/discovery/v2
+  kellogg-music-match:ticketmasterDefaultCity: Chicago
+  kellogg-music-match:ticketmasterDefaultCountry: US
+  kellogg-music-match:ticketmasterDefaultState: IL
+  kellogg-music-match:ticketmasterGeoLatLong: 41.8781,-87.6298
+  kellogg-music-match:ticketmasterMaxResults: "200"
+  kellogg-music-match:ticketmasterRadius: "50"
+  kellogg-music-match:ticketmasterRadiusUnit: miles
+  kellogg-music-match:ticketmasterTimeout: "30"
+  kellogg-music-match:tracingEnabled: "true"
+  kellogg-music-match:tracingExporter: otlp
+  kellogg-music-match:uiCpuLimit: 300m
+  kellogg-music-match:uiCpuRequest: 50m
+  kellogg-music-match:uiImage: kellogg-music-match-ui:latest
+  kellogg-music-match:uiMemLimit: 256Mi
+  kellogg-music-match:uiMemRequest: 64Mi
+  kellogg-music-match:uiReplicas: "2"
+  kellogg-music-match:dbPassword:
+    secure: AAABAMfUjujqiH4onFbdPiUUtggb7QR/zmKlvCBOGRmFmtrgU3OOns5632wKQRk9mzPDYYTPI+0=
+  kellogg-music-match:jwtSecretKey:
+    secure: AAABAK8GcBmdVz4tDHsmCZGtO6ADar9K3LyMMJA72OKY8UA693e8VFaSb3EggsbJyBZXOsPLequgFOOmCxXBXysqLEq/idKsx0x+gpQ7yDKkh2AcxbVyh3It8s5uLX6/
+  kellogg-music-match:sendgridApiKey:
+    secure: AAABAJGHgNQpXvhrOhggaTODdIrdTwKYx8pDGL96Z786biOMXok7qE48MM3ik9sMbQ0EsAkhzoVOjahDZ/71+6KomOrER9qYF6zr10gknGj5QB4RDOb4BmzT2TRNQYuSJrjK0Bo=
+  kellogg-music-match:smtpPass:
+    secure: AAABAJi8XPDDchY89UsPv53kAPmGFLQEnq5RfKzfwI/fMipVT8lSmYhvMeCl1g==
+  kellogg-music-match:ticketmasterConsumerKey:
+    secure: AAABABnHfq/uiQny/DZDdVbr2cV0/5/isbfpQIzWKWIrTq8aMf9eIMsFlOKwGUh1ZEGrBz5/551JPZ67EOXETamU
+  kellogg-music-match:ticketmasterConsumerSecret:
+    secure: AAABAGjJXBHNxaPgygmb7oqb6dg4sKBY/CU8Mrfw6Z4em07YwEhqNFO68dMSMDPIfaM=
+  kellogg-music-match:spotifyClientId:
+    secure: AAABAPaMY+6gJV8IjhRGxQ5FmajCmoCGCruTQE1w/tex1Ryi8pZgKQOr/SEa0Uei5DgFryA+KiPGYZfweUAavsGE
+  kellogg-music-match:spotifyClientSecret:
+    secure: AAABABnkWK2Q2yT0HxZj4hk2CEomQZKQLlLZnVpIgWEPitd1heHXMpZ1+G9KBB5IJZQr4klMOu6JOpkZG/FIIK2A

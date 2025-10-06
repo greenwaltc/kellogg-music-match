@@ -1,9 +1,11 @@
 import { Component, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule, Router } from '@angular/router';
+import { RouterModule, Router, Routes } from '@angular/router';
 import { AuthService } from './auth.service';
 import { ThemeService } from './theme.service';
 import { MatchService } from './match.service';
+import { SpotifyConnectComponent } from './spotify-connect.component';
+import { SpotifyCallbackComponent } from './spotify-callback.component';
 
 @Component({
   selector: 'app-root',
@@ -40,3 +42,9 @@ export class AppComponent {
 
   ngOnInit(): void { this.matchService.fetchIfReady(); }
 }
+
+// Provide route definitions (Angular standalone style) - This snippet is illustrative; actual route wiring likely elsewhere.
+export const SPOTIFY_ROUTES: Routes = [
+  { path: 'spotify/connect', component: SpotifyConnectComponent },
+  { path: 'spotify/callback', component: SpotifyCallbackComponent }
+];

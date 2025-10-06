@@ -45,7 +45,6 @@ backend/generated/**/*
 kellogg-music-match
 
 # Local env / secrets
-.env
 .env.*
 *.local
 

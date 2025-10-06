@@ -62,6 +62,9 @@ func main() {
 		artistMaxNameLength := get("artistMaxNameLength", "240")
 		artistSearchMaxLength := get("artistSearchMaxLength", "240")
 		artistSearchLimit := get("artistSearchLimit", "10")
+		// Public (non-secret) Spotify values for UI runtime config
+		spotifyClientIdPublic := get("spotifyClientIdPublic", "")
+		spotifyRedirectUri := get("spotifyRedirectUri", "")
 		debugEnabled := getBoolStr("debugEnabled", false)
 		// Ticketmaster credentials required as secrets
 		tmKey := pulumiCfg.RequireSecret("ticketmasterConsumerKey")
@@ -240,7 +243,8 @@ func main() {
 				},
 			},
 			Data: pulumi.StringMap{
-				"config.json": pulumi.String("{\"apiBaseUrl\": \"/api\", \"artistMinCount\": 5, \"artistMaxCount\": 20}"),
+				// spotifyClientId / spotifyRedirectUri are optional; blank values will fallback client side
+				"config.json": pulumi.Sprintf("{\"apiBaseUrl\": \"/api\", \"artistMinCount\": 5, \"artistMaxCount\": 20, \"spotifyClientId\": %q, \"spotifyRedirectUri\": %q}", spotifyClientIdPublic, spotifyRedirectUri),
 			},
 		})
 		if err != nil {

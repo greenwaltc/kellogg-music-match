@@ -149,6 +149,10 @@ config:
     secure: AAABAMPtW+Ksp/oUnOmH5XojWSRXfI8nXegooQ3ErMM5YjpkueNqs4qdAY4QdXEMKhJRQdwBjK5FLgdUtOFsBA==
   kellogg-music-match:spotify_client_secret:
     secure: AAABANgCOm64Z5UCPIKQ8kshd4hapItOHgRaBpgiDp+/OshjpA+DIPU9EoydslZsZM3QBwJkztJbvyVkbg8G8A==
+  kellogg-music-match:spotifyClientId:
+    secure: AAABAInIvuaHc2KkvpRQ7ZzdUagPW7hpsk9T55ysmxQauj55yhy33fTD+KSJf55Fm5suqcUtmSkOwkbh5kedPnNL
+  kellogg-music-match:spotifyClientSecret:
+    secure: AAABAKmMdsrdaHOVDMLWi/MED3LYM7uKCGHhUeahuO6LqjeLvxoCR4TS+M3rTbUANxp/3BRhYDbMrCs8jUun++OR
 
 # SECRETS REMINDER: For each placeholder beginning with REPLACE_ run
 #   pulumi config set --secret kellogg-music-match:<key> <real-value>
