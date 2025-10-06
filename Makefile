@@ -195,4 +195,9 @@ ui-%: ## Forward UI commands
 infra-%: ## Forward infrastructure commands
 	@cd pulumi && pulumi $*
 
+ngrok-tunnel: ## Start ngrok tunnel for backend
+	@echo "🌐 Starting ngrok tunnel..."
+	ngrok http 4200
+	@echo "✅ ngrok tunnel started!"
+
 .DEFAULT_GOAL := help
