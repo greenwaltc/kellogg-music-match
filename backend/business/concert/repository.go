@@ -207,27 +207,6 @@ func (r *PostgreSQLRepository) GetChicagoEvents(ctx context.Context, artistName 
 			Description:    row.Description.String,
 			AgeRestriction: row.AgeRestriction.String,
 			Genres:         row.Genres,
-			Relevancy: func() int {
-				if row.Relevancy != nil {
-					switch v := row.Relevancy.(type) {
-					case int32:
-						return int(v)
-					case int64:
-						return int(v)
-					case int:
-						return v
-					case float64:
-						return int(v)
-					case float32:
-						return int(v)
-					case []byte:
-						if iv, err := strconv.Atoi(string(v)); err == nil {
-							return iv
-						}
-					}
-				}
-				return 0
-			}(),
 			Venue: Venue{
 				ID:   row.VenueID.String,
 				Name: row.VenueName.String,
@@ -317,28 +296,7 @@ func (r *PostgreSQLRepository) GetChicagoEventByID(ctx context.Context, id strin
 			Description:    row.Description.String,
 			AgeRestriction: row.AgeRestriction.String,
 			Genres:         row.Genres,
-			Relevancy: func() int {
-				if row.Relevancy != nil {
-					switch v := row.Relevancy.(type) {
-					case int32:
-						return int(v)
-					case int64:
-						return int(v)
-					case int:
-						return v
-					case float64:
-						return int(v)
-					case float32:
-						return int(v)
-					case []byte:
-						if iv, err := strconv.Atoi(string(v)); err == nil {
-							return iv
-						}
-					}
-				}
-				return 0
-			}(),
-			Venue: Venue{ID: row.VenueID.String, Name: row.VenueName.String, Address: Address{Street: row.VenueStreet.String, City: row.VenueCity.String, State: row.VenueState.String, Country: row.VenueCountry.String, Postal: row.VenuePostal.String}, Capacity: int(row.VenueCapacity.Int32)},
+			Venue:          Venue{ID: row.VenueID.String, Name: row.VenueName.String, Address: Address{Street: row.VenueStreet.String, City: row.VenueCity.String, State: row.VenueState.String, Country: row.VenueCountry.String, Postal: row.VenuePostal.String}, Capacity: int(row.VenueCapacity.Int32)},
 		}
 		minPrice := numericToFloat(row.PriceMin)
 		maxPrice := numericToFloat(row.PriceMax)

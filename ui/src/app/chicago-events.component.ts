@@ -106,10 +106,6 @@ interface ChicagoEventsResponse {
             <input type="checkbox" [(ngModel)]="onlyWithInterest" (change)="onAnyInterestToggle()" />
             <span>Only events with interested Kellogg students</span>
           </label>
-          <label style="display:inline-flex; align-items:center; gap:.4rem; cursor:pointer; user-select:none;" title="When enabled, events are sorted by highest matching artist score (MusicBrainz) first; within same score, earlier dates appear first.">
-            <input type="checkbox" [checked]="sortByRelevancy" (change)="onRelevancyToggle()" />
-            <span>Sort by Relevancy</span>
-          </label>
         </div>
         <div style="margin-top:0.75rem; text-align:center; display:flex; justify-content:center; gap:.5rem; flex-wrap:wrap;">
           <button class="retry-button" (click)="performSearch()" [disabled]="!searchQuery.trim() || searchLoading || isLoadingMore" style="min-width:110px; position:relative;">
@@ -184,9 +180,6 @@ interface ChicagoEventsResponse {
               <div class="event-header">
                 <h3 class="event-title">{{event.name}}</h3>
                 <div class="event-time">{{formatDate(event.date, 'time')}}</div>
-              </div>
-              <div class="relevancy-row" *ngIf="event.relevancy && sortByRelevancy" style="margin-top:.15rem; display:flex; align-items:center; gap:.4rem;">
-                <span class="relevancy-badge" [title]="'Relevancy score derived from top matching artist MusicBrainz score: '+event.relevancy">⭐ {{event.relevancy}}</span>
               </div>
 
               <!-- Venue Info -->
@@ -356,10 +349,6 @@ interface ChicagoEventsResponse {
     @media (min-width: 821px) { .fab-wrapper { display:none; } }
     @media (max-width: 820px) { .desktop-scroll-fab { display:none; } }
     @media (max-width: 640px) { .fab-wrapper { right:.7rem; bottom:.7rem; } .fab-main { width:48px; height:48px; } }
-    .relevancy-badge { background:linear-gradient(90deg,#ffb347,#ffcc33); color:#432; font-weight:600; font-size:.65rem; padding:.18rem .45rem .2rem; border-radius:999px; box-shadow:0 1px 3px rgba(0,0,0,.25); letter-spacing:.5px; display:inline-flex; align-items:center; gap:.25rem; }
-    .relevancy-badge::before { content:'★'; display:inline-block; filter:drop-shadow(0 0 2px rgba(0,0,0,.3)); }
-    .relevancy-row { animation: fadeIn .4s ease; }
-    @keyframes fadeIn { from { opacity:0; transform:translateY(-2px);} to { opacity:1; transform:translateY(0);} }
   `] // Minimal local styles for the floating button; rest remain in global stylesheet
 })
 export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit {

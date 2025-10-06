@@ -251,13 +251,12 @@ func (s *ConcertAPIService) convertToAPIConcert(event concert.Event) generated.C
 	}
 
 	concert := generated.Concert{
-		Id:        event.ID,
-		Name:      event.Name,
-		Date:      event.Date,
-		Venue:     apiVenue,
-		Artists:   apiArtists,
-		Genres:    event.Genres,
-		Relevancy: event.Relevancy,
+		Id:      event.ID,
+		Name:    event.Name,
+		Date:    event.Date,
+		Venue:   apiVenue,
+		Artists: apiArtists,
+		Genres:  event.Genres,
 	}
 
 	// Include user interest aggregates if present
