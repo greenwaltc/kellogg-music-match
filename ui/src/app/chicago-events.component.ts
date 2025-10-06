@@ -391,8 +391,6 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
   // New filter flag
   onlyWithInterest = false;
   private ANY_INTEREST_STORAGE_KEY = 'kmm_chi_any_interest';
-  private SORT_RELEVANCY_STORAGE_KEY = 'kmm_chi_sort_relevancy';
-  sortByRelevancy = false;
   // Observer scroll throttling
   private ioPaused = false;
   private scrollLastY = 0;
@@ -430,10 +428,6 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
     try {
       const storedInterest = localStorage.getItem(this.ANY_INTEREST_STORAGE_KEY);
       if (storedInterest === 'true') this.onlyWithInterest = true;
-    } catch {}
-    // Restore relevancy sorting preference
-    try {
-      this.sortByRelevancy = localStorage.getItem(this.SORT_RELEVANCY_STORAGE_KEY) === 'true';
     } catch {}
   }
 
@@ -619,11 +613,6 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
       limit: this.pageSize.toString(),
       offset: this.currentOffset.toString()
     });
-
-    // Optional relevancy sorting toggle (persisted in localStorage)
-    if (this.sortByRelevancy) {
-      params.append('sortByRelevancy', 'true');
-    }
 
     if (this.onlyWithInterest) {
       params.append('anyInterest', 'true');
@@ -926,7 +915,6 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
     const params = new URLSearchParams({ limit: this.pageSize.toString(), offset: '0' });
     if (this.activeSearchQuery.trim()) params.append('artistName', this.activeSearchQuery.trim());
     if (this.onlyWithInterest) params.append('anyInterest', 'true');
-    if (this.sortByRelevancy) params.append('sortByRelevancy', 'true');
     this.http.get<ChicagoEventsResponse>(`${this.apiBaseUrl}/chicago/events?${params}`)
       .pipe(catchError(() => of(null)))
       .subscribe(resp => {
@@ -946,15 +934,6 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
       else localStorage.removeItem(this.ANY_INTEREST_STORAGE_KEY);
     } catch {}
     // Reset list with new filter
-    this.resetAndSearch(this.activeSearchQuery);
-  }
-
-  onRelevancyToggle() {
-    this.sortByRelevancy = !this.sortByRelevancy;
-    try {
-      if (this.sortByRelevancy) localStorage.setItem(this.SORT_RELEVANCY_STORAGE_KEY, 'true');
-      else localStorage.removeItem(this.SORT_RELEVANCY_STORAGE_KEY);
-    } catch {}
     this.resetAndSearch(this.activeSearchQuery);
   }
 

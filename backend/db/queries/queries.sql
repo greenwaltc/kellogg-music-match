@@ -448,25 +448,15 @@ SELECT
     v.capacity as venue_capacity,
   array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'INTERESTED'), NULL) AS interested_user_ids,
   array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'GOING'), NULL) AS going_user_ids,
-  array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'LOOKING_FOR_GROUP'), NULL) AS looking_for_group_user_ids,
-  COALESCE(rel.relevancy, 0) AS relevancy
+  array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'LOOKING_FOR_GROUP'), NULL) AS looking_for_group_user_ids
 FROM concert_events ce
 LEFT JOIN venues v ON ce.venue_id = v.id
 LEFT JOIN user_concert_event_interest ucei ON ucei.event_id = ce.id
-LEFT JOIN LATERAL (
-  SELECT MAX(ar.musicbrainz_score) AS relevancy
-  FROM concert_event_artists cea2
-  JOIN concert_artists ca2 ON cea2.artist_id = ca2.id
-  LEFT JOIN artists ar ON lower(ar.name) LIKE ('%' || lower(ca2.name) || '%')
-  WHERE cea2.event_id = ce.id
-) rel ON TRUE
 WHERE ce.event_date >= CURRENT_TIMESTAMP
   AND v.city ILIKE '%' || sqlc.arg(city) || '%'
   AND ce.status = 'onsale'
-GROUP BY ce.id, v.name, v.street, v.city, v.state, v.country, v.postal, v.capacity, rel.relevancy
-ORDER BY
-  CASE WHEN sqlc.arg(sort_by_relevancy)::bool THEN COALESCE(rel.relevancy,0) END DESC NULLS LAST,
-  ce.event_date ASC
+GROUP BY ce.id, v.name, v.street, v.city, v.state, v.country, v.postal, v.capacity
+ORDER BY ce.event_date ASC
 LIMIT sqlc.arg(lim);
 
 -- name: GetChicagoEventsWithArtistSearch :many
@@ -482,29 +472,19 @@ SELECT
   COALESCE(jsonb_agg(DISTINCT jsonb_build_object('id', ca.id, 'name', ca.name, 'genres', ca.genres)) FILTER (WHERE ca.id IS NOT NULL), '[]'::jsonb) AS artists_json,
   (array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'INTERESTED'), NULL))::text[] AS interested_user_ids,
   (array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'GOING'), NULL))::text[] AS going_user_ids,
-  (array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'LOOKING_FOR_GROUP'), NULL))::text[] AS looking_for_group_user_ids,
-  COALESCE(rel.relevancy, 0) AS relevancy
+  (array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'LOOKING_FOR_GROUP'), NULL))::text[] AS looking_for_group_user_ids
 FROM concert_events ce
 LEFT JOIN venues v ON ce.venue_id = v.id
 LEFT JOIN concert_event_artists cea ON ce.id = cea.event_id
 LEFT JOIN concert_artists ca ON cea.artist_id = ca.id
  LEFT JOIN user_concert_event_interest ucei ON ucei.event_id = ce.id
-LEFT JOIN LATERAL (
-  SELECT MAX(ar.musicbrainz_score) AS relevancy
-  FROM concert_event_artists cea2
-  JOIN concert_artists ca2 ON cea2.artist_id = ca2.id
-  LEFT JOIN artists ar ON lower(ar.name) LIKE ('%' || lower(ca2.name) || '%')
-  WHERE cea2.event_id = ce.id
-) rel ON TRUE
 WHERE ce.event_date >= CURRENT_TIMESTAMP
   AND v.city ILIKE '%Chicago%'
   AND ce.status = 'onsale'
   AND (sqlc.arg(artist_name) = '' OR ca.name ILIKE '%' || sqlc.arg(artist_name) || '%')
   AND (sqlc.arg(any_interest)::bool = false OR EXISTS (SELECT 1 FROM user_concert_event_interest u2 WHERE u2.event_id = ce.id))
-GROUP BY ce.id, v.name, v.street, v.city, v.state, v.country, v.postal, v.capacity, rel.relevancy
-ORDER BY
-  CASE WHEN sqlc.arg(sort_by_relevancy)::bool THEN COALESCE(rel.relevancy,0) END DESC NULLS LAST,
-  ce.event_date ASC
+GROUP BY ce.id, v.name, v.street, v.city, v.state, v.country, v.postal, v.capacity
+ORDER BY ce.event_date ASC
 LIMIT sqlc.arg(limit_count) OFFSET sqlc.arg(offset_count);
 
 -- name: GetChicagoEventsCountWithArtistSearch :one
@@ -535,28 +515,18 @@ SELECT
     array_remove(array_agg(DISTINCT ca.name), NULL) AS artist_names,
   array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'INTERESTED'), NULL) AS interested_user_ids,
   array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'GOING'), NULL) AS going_user_ids,
-  array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'LOOKING_FOR_GROUP'), NULL) AS looking_for_group_user_ids,
-  COALESCE(rel.relevancy, 0) AS relevancy
+  array_remove(array_agg(DISTINCT ucei.user_id::text) FILTER (WHERE ucei.interest_status = 'LOOKING_FOR_GROUP'), NULL) AS looking_for_group_user_ids
 FROM concert_events ce
 LEFT JOIN venues v ON ce.venue_id = v.id
 LEFT JOIN concert_event_artists cea ON ce.id = cea.event_id
 LEFT JOIN concert_artists ca ON cea.artist_id = ca.id
 LEFT JOIN user_concert_event_interest ucei ON ucei.event_id = ce.id
-LEFT JOIN LATERAL (
-  SELECT MAX(ar.musicbrainz_score) AS relevancy
-  FROM concert_event_artists cea2
-  JOIN concert_artists ca2 ON cea2.artist_id = ca2.id
-  LEFT JOIN artists ar ON lower(ar.name) LIKE ('%' || lower(ca2.name) || '%')
-  WHERE cea2.event_id = ce.id
-) rel ON TRUE
 WHERE ce.event_date >= sqlc.arg(start_date)
   AND ce.event_date <= sqlc.arg(end_date)
   AND (sqlc.arg(city)::text IS NULL OR v.city ILIKE '%' || sqlc.arg(city) || '%')
   AND (sqlc.arg(status)::text IS NULL OR ce.status = sqlc.arg(status))
-GROUP BY ce.id, v.name, v.street, v.city, v.state, v.country, v.postal, v.capacity, rel.relevancy
-ORDER BY
-  CASE WHEN sqlc.arg(sort_by_relevancy)::bool THEN COALESCE(rel.relevancy,0) END DESC NULLS LAST,
-  ce.event_date ASC
+GROUP BY ce.id, v.name, v.street, v.city, v.state, v.country, v.postal, v.capacity
+ORDER BY ce.event_date ASC
 LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off_set);
 
 -- =======================

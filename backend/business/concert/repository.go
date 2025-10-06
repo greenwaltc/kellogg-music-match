@@ -24,7 +24,7 @@ type Repository interface {
 	DeleteOldEvents(ctx context.Context, cutoffDate time.Time) error
 	GetEventCount(ctx context.Context) (int64, error)
 	IsHealthy(ctx context.Context) error
-	GetChicagoEvents(ctx context.Context, artistName *string, anyInterest bool, sortByRelevancy bool, limit int32, offset int32) ([]*Event, error)
+	GetChicagoEvents(ctx context.Context, artistName *string, anyInterest bool, limit int32, offset int32) ([]*Event, error)
 	GetChicagoEventsCount(ctx context.Context, artistName *string, anyInterest bool) (int64, error)
 	GetChicagoEventByID(ctx context.Context, id string) (*Event, error)
 	// User interest operations
@@ -177,18 +177,17 @@ func (r *PostgreSQLRepository) IsHealthy(ctx context.Context) error {
 }
 
 // GetChicagoEvents retrieves Chicago area events with optional artist filtering and pagination
-func (r *PostgreSQLRepository) GetChicagoEvents(ctx context.Context, artistName *string, anyInterest bool, sortByRelevancy bool, limit int32, offset int32) ([]*Event, error) {
+func (r *PostgreSQLRepository) GetChicagoEvents(ctx context.Context, artistName *string, anyInterest bool, limit int32, offset int32) ([]*Event, error) {
 	artistNameParam := ""
 	if artistName != nil {
 		artistNameParam = *artistName
 	}
 
 	params := database.GetChicagoEventsWithArtistSearchParams{
-		ArtistName:      artistNameParam,
-		AnyInterest:     anyInterest,
-		SortByRelevancy: sortByRelevancy,
-		LimitCount:      limit,
-		OffsetCount:     offset,
+		ArtistName:  artistNameParam,
+		AnyInterest: anyInterest,
+		LimitCount:  limit,
+		OffsetCount: offset,
 	}
 
 	rows, err := r.queries.GetChicagoEventsWithArtistSearch(ctx, params)
@@ -277,7 +276,7 @@ func (r *PostgreSQLRepository) GetChicagoEventByID(ctx context.Context, id strin
 		return nil, fmt.Errorf("empty id")
 	}
 	// Reuse existing list query with limit 1 filtering by artistName empty then filter in code (simpler short-term)
-	params := database.GetChicagoEventsWithArtistSearchParams{ArtistName: "", LimitCount: 1, SortByRelevancy: true, OffsetCount: 0}
+	params := database.GetChicagoEventsWithArtistSearchParams{ArtistName: "", LimitCount: 1, OffsetCount: 0}
 	rows, err := r.queries.GetChicagoEventsWithArtistSearch(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("query failed: %w", err)
@@ -453,7 +452,7 @@ func (m *MockRepository) IsHealthy(ctx context.Context) error {
 	return nil
 }
 
-func (m *MockRepository) GetChicagoEvents(ctx context.Context, artistName *string, anyInterest bool, sortByRelevancy bool, limit int32, offset int32) ([]*Event, error) {
+func (m *MockRepository) GetChicagoEvents(ctx context.Context, artistName *string, anyInterest bool, limit int32, offset int32) ([]*Event, error) {
 	// Collect and sort Chicago events deterministically by date (asc) then ID
 	var all []*Event
 	for _, event := range m.events {

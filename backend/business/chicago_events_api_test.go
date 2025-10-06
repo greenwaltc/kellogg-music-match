@@ -75,7 +75,7 @@ func TestConcertAPIService_GetChicagoEvents(t *testing.T) {
 	service := NewConcertAPIServiceWithRepository(mockProvider, mockRepo, cfg)
 
 	t.Run("GetAllChicagoEvents", func(t *testing.T) {
-		response, err := service.GetChicagoEvents(ctx, "", 10, 0, false, false)
+		response, err := service.GetChicagoEvents(ctx, "", 10, 0, false)
 		require.NoError(t, err)
 
 		assert.Equal(t, http.StatusOK, response.Code)
@@ -93,7 +93,7 @@ func TestConcertAPIService_GetChicagoEvents(t *testing.T) {
 	})
 
 	t.Run("SearchByArtistName", func(t *testing.T) {
-		response, err := service.GetChicagoEvents(ctx, "Rock", 10, 0, false, false)
+		response, err := service.GetChicagoEvents(ctx, "Rock", 10, 0, false)
 		require.NoError(t, err)
 
 		assert.Equal(t, http.StatusOK, response.Code)
@@ -107,7 +107,7 @@ func TestConcertAPIService_GetChicagoEvents(t *testing.T) {
 	})
 
 	t.Run("PaginationWithLimit", func(t *testing.T) {
-		response, err := service.GetChicagoEvents(ctx, "", 1, 0, false, false)
+		response, err := service.GetChicagoEvents(ctx, "", 1, 0, false)
 		require.NoError(t, err)
 
 		result, ok := response.Body.(generated.ChicagoEventsResult)
@@ -119,7 +119,7 @@ func TestConcertAPIService_GetChicagoEvents(t *testing.T) {
 	})
 
 	t.Run("PaginationWithOffset", func(t *testing.T) {
-		response, err := service.GetChicagoEvents(ctx, "", 1, 1, false, false)
+		response, err := service.GetChicagoEvents(ctx, "", 1, 1, false)
 		require.NoError(t, err)
 
 		result, ok := response.Body.(generated.ChicagoEventsResult)
@@ -131,7 +131,7 @@ func TestConcertAPIService_GetChicagoEvents(t *testing.T) {
 	})
 
 	t.Run("NoResults", func(t *testing.T) {
-		response, err := service.GetChicagoEvents(ctx, "NonexistentArtist", 10, 0, false, false)
+		response, err := service.GetChicagoEvents(ctx, "NonexistentArtist", 10, 0, false)
 		require.NoError(t, err)
 
 		result, ok := response.Body.(generated.ChicagoEventsResult)
@@ -143,7 +143,7 @@ func TestConcertAPIService_GetChicagoEvents(t *testing.T) {
 	})
 
 	t.Run("EventDataIntegrity", func(t *testing.T) {
-		response, err := service.GetChicagoEvents(ctx, "", 1, 0, false, false)
+		response, err := service.GetChicagoEvents(ctx, "", 1, 0, false)
 		require.NoError(t, err)
 
 		result, ok := response.Body.(generated.ChicagoEventsResult)
