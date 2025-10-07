@@ -98,6 +98,7 @@ func main() {
 		jwtRefresh := get("jwtRefreshHours", "720")
 		spotifyClientID := pulumiCfg.RequireSecret("spotifyClientId")
 		spotifyClientSecret := pulumiCfg.RequireSecret("spotifyClientSecret")
+		spotifyRefreshKey := pulumiCfg.RequireSecret("spotifyRefreshTokenKey")
 		legacyPort := serverPort
 		// (DATABASE_URL no longer exported; application should build from discrete env vars)
 		backendReplicas := getInt("backendReplicas", 2)
@@ -457,6 +458,7 @@ echo "🎉 MusicBrainz data loading completed"`),
 				"PGPASSWORD":                   dbPassword.ToStringOutput(),
 				"SPOTIFY_CLIENT_ID":            spotifyClientID.ToStringOutput(),
 				"SPOTIFY_CLIENT_SECRET":        spotifyClientSecret.ToStringOutput(),
+				"SPOTIFY_REFRESH_TOKEN_KEY":    spotifyRefreshKey.ToStringOutput(),
 			},
 		})
 		if err != nil {

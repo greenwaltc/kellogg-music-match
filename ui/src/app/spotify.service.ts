@@ -77,7 +77,7 @@ export class SpotifyService {
     window.location.href = authUrl;
   }
 
-  // Exchange code for token via backend (backend will hold client secret)
+  // Initiate server-side sync (code exchange performed backend-side)
   exchangeCode(code: string, state: string): Observable<any> {
     const storedState = localStorage.getItem('spotify_auth_state');
     const cookieState = this.getCookie('spotify_auth_state');
@@ -97,7 +97,8 @@ export class SpotifyService {
     return from(this.cfg.getConfig()).pipe(
       switchMap(cfg => {
         const redirectUri = cfg.spotifyRedirectUri && cfg.spotifyRedirectUri.trim().length > 0 ? cfg.spotifyRedirectUri : this.fallbackRedirectUri;
-        return this.http.post(this.api.url('/spotify/oauth/callback'), { code, codeVerifier, redirectUri });
+        // Backend expects code/state only at /sync/spotify; codeVerifier & redirectUri remain client-side.
+        return this.http.post(this.api.url('/sync/spotify'), { code, state });
       }),
       tap({
         next: () => {

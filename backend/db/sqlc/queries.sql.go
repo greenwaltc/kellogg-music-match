@@ -1329,6 +1329,26 @@ func (q *Queries) GetPasswordResetToken(ctx context.Context, token string) (Pass
 	return i, err
 }
 
+const getSpotifyTokensByUser = `-- name: GetSpotifyTokensByUser :one
+SELECT user_id, access_token, refresh_token_encrypted, expires_at, scope, token_type, created_at, updated_at FROM spotify_tokens WHERE user_id = $1 LIMIT 1
+`
+
+func (q *Queries) GetSpotifyTokensByUser(ctx context.Context, userID uuid.UUID) (SpotifyToken, error) {
+	row := q.db.QueryRow(ctx, getSpotifyTokensByUser, userID)
+	var i SpotifyToken
+	err := row.Scan(
+		&i.UserID,
+		&i.AccessToken,
+		&i.RefreshTokenEncrypted,
+		&i.ExpiresAt,
+		&i.Scope,
+		&i.TokenType,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getUpcomingConcertEventsInCity = `-- name: GetUpcomingConcertEventsInCity :many
 SELECT 
     ce.id, ce.name, ce.event_date, ce.venue_id, ce.genres, ce.price_min, ce.price_max, ce.price_currency, ce.ticket_url, ce.description, ce.status, ce.age_restriction, ce.provider, ce.external_url, ce.created_at, ce.updated_at,
@@ -1954,6 +1974,43 @@ type UpsertEventArtistParams struct {
 
 func (q *Queries) UpsertEventArtist(ctx context.Context, arg UpsertEventArtistParams) error {
 	_, err := q.db.Exec(ctx, upsertEventArtist, arg.EventID, arg.ArtistID, arg.Role)
+	return err
+}
+
+const upsertSpotifyTokens = `-- name: UpsertSpotifyTokens :exec
+
+INSERT INTO spotify_tokens (user_id, access_token, refresh_token_encrypted, expires_at, scope, token_type)
+VALUES ($1, $2, $3, $4, $5, COALESCE($6, 'Bearer'))
+ON CONFLICT (user_id) DO UPDATE SET
+    access_token = EXCLUDED.access_token,
+    refresh_token_encrypted = EXCLUDED.refresh_token_encrypted,
+    expires_at = EXCLUDED.expires_at,
+    scope = EXCLUDED.scope,
+    token_type = EXCLUDED.token_type,
+    updated_at = NOW()
+`
+
+type UpsertSpotifyTokensParams struct {
+	UserID                uuid.UUID          `json:"user_id"`
+	AccessToken           string             `json:"access_token"`
+	RefreshTokenEncrypted []byte             `json:"refresh_token_encrypted"`
+	ExpiresAt             pgtype.Timestamptz `json:"expires_at"`
+	Scope                 pgtype.Text        `json:"scope"`
+	TokenType             interface{}        `json:"token_type"`
+}
+
+// =======================
+// Spotify Tokens
+// =======================
+func (q *Queries) UpsertSpotifyTokens(ctx context.Context, arg UpsertSpotifyTokensParams) error {
+	_, err := q.db.Exec(ctx, upsertSpotifyTokens,
+		arg.UserID,
+		arg.AccessToken,
+		arg.RefreshTokenEncrypted,
+		arg.ExpiresAt,
+		arg.Scope,
+		arg.TokenType,
+	)
 	return err
 }
 

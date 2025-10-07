@@ -54,6 +54,10 @@ type UserRepository interface {
 	DeleteExpiredPasswordResetTokens(ctx context.Context) error
 	DeleteUserPasswordResetTokens(ctx context.Context, userID uuid.UUID) error
 	UpdateUserPassword(ctx context.Context, userID uuid.UUID, passwordHash string) (sqlc.UpdateUserPasswordRow, error)
+
+	// Spotify token operations
+	UpsertSpotifyTokens(ctx context.Context, userID uuid.UUID, accessToken string, refreshTokenEncrypted []byte, expiresAt time.Time, scope string, tokenType string) error
+	GetSpotifyTokensByUser(ctx context.Context, userID uuid.UUID) (*sqlc.SpotifyToken, error)
 }
 
 // PostgreSQLUserRepository implements UserRepository using pgxpool
@@ -462,4 +466,26 @@ func (r *PostgreSQLUserRepository) UpdateUserPassword(ctx context.Context, userI
 		ID:           userID,
 		PasswordHash: passwordHash,
 	})
+}
+
+// UpsertSpotifyTokens stores or updates a user's Spotify tokens (refresh token already encrypted by caller)
+func (r *PostgreSQLUserRepository) UpsertSpotifyTokens(ctx context.Context, userID uuid.UUID, accessToken string, refreshTokenEncrypted []byte, expiresAt time.Time, scope string, tokenType string) error {
+	params := sqlc.UpsertSpotifyTokensParams{
+		UserID:                userID,
+		AccessToken:           accessToken,
+		RefreshTokenEncrypted: refreshTokenEncrypted,
+		ExpiresAt:             pgtype.Timestamptz{Time: expiresAt, Valid: true},
+		Scope:                 pgtype.Text{String: scope, Valid: scope != ""},
+		TokenType:             tokenType,
+	}
+	return r.queries.UpsertSpotifyTokens(ctx, params)
+}
+
+// GetSpotifyTokensByUser retrieves stored (encrypted) Spotify tokens for user
+func (r *PostgreSQLUserRepository) GetSpotifyTokensByUser(ctx context.Context, userID uuid.UUID) (*sqlc.SpotifyToken, error) {
+	tok, err := r.queries.GetSpotifyTokensByUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return &tok, nil
 }

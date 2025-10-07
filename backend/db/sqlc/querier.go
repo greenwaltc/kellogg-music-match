@@ -69,6 +69,7 @@ type Querier interface {
 	GetEventsForArtist(ctx context.Context, arg GetEventsForArtistParams) ([]GetEventsForArtistRow, error)
 	GetFeedbackByUser(ctx context.Context, userID uuid.UUID) ([]Feedback, error)
 	GetPasswordResetToken(ctx context.Context, token string) (PasswordResetToken, error)
+	GetSpotifyTokensByUser(ctx context.Context, userID uuid.UUID) (SpotifyToken, error)
 	GetUpcomingConcertEventsInCity(ctx context.Context, arg GetUpcomingConcertEventsInCityParams) ([]GetUpcomingConcertEventsInCityRow, error)
 	GetUserArtists(ctx context.Context, userID uuid.UUID) ([]GetUserArtistsRow, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
@@ -93,6 +94,10 @@ type Querier interface {
 	UpsertConcertArtist(ctx context.Context, arg UpsertConcertArtistParams) (ConcertArtist, error)
 	UpsertConcertEvent(ctx context.Context, arg UpsertConcertEventParams) (ConcertEvent, error)
 	UpsertEventArtist(ctx context.Context, arg UpsertEventArtistParams) error
+	// =======================
+	// Spotify Tokens
+	// =======================
+	UpsertSpotifyTokens(ctx context.Context, arg UpsertSpotifyTokensParams) error
 	UpsertUserConcertEventInterest(ctx context.Context, arg UpsertUserConcertEventInterestParams) error
 	// =======================
 	// Concert Events

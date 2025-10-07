@@ -12,8 +12,7 @@ config:
   kellogg-music-match:serverPort: "8080"
   kellogg-music-match:debugEnabled: "false"
   kellogg-music-match:ingressClass: "traefik"
-  kellogg-music-match:ingressSkipWait: "true"  
-
+  kellogg-music-match:ingressSkipWait: "true"
   # ---------------------------------------------------------------------------
   # Database (either use discrete settings below OR provide databaseUrl override)
   # ---------------------------------------------------------------------------
@@ -33,7 +32,6 @@ config:
   kellogg-music-match:persistentVolumeSize: "10Gi"
   kellogg-music-match:persistentVolumeAccessModes: "ReadWriteOnce"
   kellogg-music-match:persistentVolumeStorageClassName: "local-path"
-
   # ---------------------------------------------------------------------------
   # CORS
   # ---------------------------------------------------------------------------
@@ -41,7 +39,6 @@ config:
   kellogg-music-match:corsAllowedMethods: "GET, POST, PUT, DELETE, OPTIONS"
   kellogg-music-match:corsAllowedHeaders: "Content-Type, Authorization, X-User-Username"
   kellogg-music-match:corsAllowCredentials: "true"
-
   # ---------------------------------------------------------------------------
   # Artist Constraints
   # ---------------------------------------------------------------------------
@@ -50,30 +47,27 @@ config:
   kellogg-music-match:artistMaxNameLength: "240"
   kellogg-music-match:artistSearchMaxLength: "240"
   kellogg-music-match:artistSearchLimit: "10"
-
   # ---------------------------------------------------------------------------
   # Ticketmaster API
   # ---------------------------------------------------------------------------
   # (ticketmasterConsumerKey / ticketmasterConsumerSecret removed – set both with --secret)
   kellogg-music-match:ticketmasterBaseUrl: "https://app.ticketmaster.com/discovery/v2"
-  kellogg-music-match:ticketmasterTimeout: "30"          # seconds
+  kellogg-music-match:ticketmasterTimeout: "30" # seconds
   kellogg-music-match:ticketmasterMaxResults: "200"
   kellogg-music-match:ticketmasterDefaultCity: "Chicago"
   kellogg-music-match:ticketmasterDefaultState: "IL"
   kellogg-music-match:ticketmasterDefaultCountry: "US"
-
   # Geo-based concert search defaults (centered on downtown Chicago)
   # Override any of these to adjust metro boundary search behavior.
   # Format: <lat>,<long>; Radius is integer; Unit supports miles or km (backend validates).
   kellogg-music-match:ticketmasterGeoLatLong: "41.8781,-87.6298"
   kellogg-music-match:ticketmasterRadius: "50"
   kellogg-music-match:ticketmasterRadiusUnit: "miles"
-
   # ---------------------------------------------------------------------------
   # Email / Notifications
   # ---------------------------------------------------------------------------
   kellogg-music-match:emailEnabled: "true"
-  kellogg-music-match:emailProvider: "sendgrid"          # or smtp
+  kellogg-music-match:emailProvider: "sendgrid" # or smtp
   kellogg-music-match:emailFromEmail: "support@kelloggmatch.com"
   kellogg-music-match:emailFromName: "Kellogg Music Match"
   kellogg-music-match:appBaseUrl: "https://kelloggmatch.com"
@@ -89,12 +83,12 @@ config:
   # (jwtSecretKey removed – set via: pulumi config set --secret kellogg-music-match:jwtSecretKey <value>)
   kellogg-music-match:jwtExpiryHours: "24"
   kellogg-music-match:jwtRefreshHours: "720"
-
   # ---------------------------------------------------------------------------
   # Spotify API (for future integration)
   # ---------------------------------------------------------------------------
   # (spotifyClientId removed – set via: pulumi config set --secret kellogg-music-match:spotifyClientId <value>)
   # (spotifyClientSecret removed – set via: pulumi config set --secret kellogg-music-match:spotifyClientSecret <value>)
+  # (spotifyRefreshTokenKey removed – set via: pulumi config set --secret kellogg-music-match:spotifyRefreshTokenKey <base64-32-byte-key>)
 
   # ---------------------------------------------------------------------------
   # Images (override for custom registries)
@@ -104,14 +98,12 @@ config:
   kellogg-music-match:postgresImage: "kellogg-music-match-postgres:latest"
   kellogg-music-match:musicbrainzImage: "kellogg-music-match-musicbrainz:latest"
   kellogg-music-match:flywayImage: "flyway/flyway:latest"
-
   # ---------------------------------------------------------------------------
   # Replicas
   # ---------------------------------------------------------------------------
   kellogg-music-match:backendReplicas: "2"
   kellogg-music-match:uiReplicas: "2"
   kellogg-music-match:otelCollectorReplicas: "1"
-
   # ---------------------------------------------------------------------------
   # Resource Requests & Limits
   # ---------------------------------------------------------------------------
@@ -119,27 +111,23 @@ config:
   kellogg-music-match:backendMemRequest: "128Mi"
   kellogg-music-match:backendCpuLimit: "500m"
   kellogg-music-match:backendMemLimit: "512Mi"
-
   kellogg-music-match:uiCpuRequest: "50m"
   kellogg-music-match:uiMemRequest: "64Mi"
   kellogg-music-match:uiCpuLimit: "200m"
   kellogg-music-match:uiMemLimit: "256Mi"
-
   kellogg-music-match:postgresCpuRequest: "200m"
   kellogg-music-match:postgresMemRequest: "512Mi"
   kellogg-music-match:postgresCpuLimit: "3000m"
   kellogg-music-match:postgresMemLimit: "2Gi"
-
   kellogg-music-match:otelCollectorCpuRequest: "50m"
   kellogg-music-match:otelCollectorMemRequest: "64Mi"
   kellogg-music-match:otelCollectorCpuLimit: "500m"
   kellogg-music-match:otelCollectorMemLimit: "256Mi"
-
   # ---------------------------------------------------------------------------
   # OpenTelemetry / Tracing
   # ---------------------------------------------------------------------------
   kellogg-music-match:tracingEnabled: "true"
-  kellogg-music-match:tracingExporter: "otlp"           # stdout|otlp
+  kellogg-music-match:tracingExporter: "otlp" # stdout|otlp
   kellogg-music-match:otlpEndpoint: "http://otel-collector:4318"
   kellogg-music-match:otelServiceName: "kmm-backend"
   kellogg-music-match:otelServiceVersion: "1.0.0"
@@ -168,11 +156,13 @@ config:
   # Enable Prometheus exporter in collector (also expose metrics port if you wire it)
   kellogg-music-match:otelCollectorPrometheus: "false"
   kellogg-music-match:otelCollectorPrometheusPort: "8888"
-
   # ---------------------------------------------------------------------------
   # OPTIONAL: Example future NetworkPolicy toggles (not yet implemented)
   # ---------------------------------------------------------------------------
   # kellogg-music-match:networkPolicyStrict: "false"
+
+  kellogg-music-match:spotifyRefreshTokenKey:
+    secure: AAABALxGpuoOvskkfMfd9EyxqxEuIr0jXiQgaM+hx0Rn3dY53GtoriB1lweZmZe8uhF3RoxQt69C5KbMbfygD6huDfkBwSkMd39xYw==
 
 # -----------------------------------------------------------------------------
 # SECRETS HANDLING REMINDER

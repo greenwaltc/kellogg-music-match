@@ -108,6 +108,20 @@ type ReferenceArtist struct {
 	MusicbrainzID    pgtype.UUID `json:"musicbrainz_id"`
 }
 
+// Per-user Spotify OAuth tokens (refresh token encrypted at rest)
+type SpotifyToken struct {
+	UserID      uuid.UUID `json:"user_id"`
+	AccessToken string    `json:"access_token"`
+	// Ciphertext (AES-GCM or similar) of refresh token
+	RefreshTokenEncrypted []byte             `json:"refresh_token_encrypted"`
+	ExpiresAt             pgtype.Timestamptz `json:"expires_at"`
+	// Granted OAuth scopes
+	Scope     pgtype.Text        `json:"scope"`
+	TokenType pgtype.Text        `json:"token_type"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
 type User struct {
 	ID           uuid.UUID          `json:"id"`
 	Username     string             `json:"username"`

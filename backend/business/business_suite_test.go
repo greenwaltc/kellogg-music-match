@@ -323,3 +323,11 @@ func (m *MockUserRepository) DeleteExpiredPasswordResetTokens(ctx context.Contex
 func (m *MockUserRepository) DeleteUserPasswordResetTokens(ctx context.Context, userID uuid.UUID) error {
 	return nil // Not implemented for these tests
 }
+
+// Spotify token operations (unused in these tests)
+func (m *MockUserRepository) UpsertSpotifyTokens(ctx context.Context, userID uuid.UUID, accessToken string, refreshTokenEncrypted []byte, expiresAt time.Time, scope string, tokenType string) error {
+	return nil
+}
+func (m *MockUserRepository) GetSpotifyTokensByUser(ctx context.Context, userID uuid.UUID) (*sqlc.SpotifyToken, error) {
+	return nil, nil
+}

@@ -14,7 +14,16 @@ import { HttpClient } from '@angular/common/http';
       <ng-container *ngIf="phase === 'processing'; else doneTpl">
         <div class="spinner" aria-label="Loading" role="status"></div>
         <p *ngIf="!syncing">Processing authorization…</p>
-        <p *ngIf="syncing">Syncing your Spotify data now…</p>
+        <ng-container *ngIf="syncing">
+          <p *ngIf="status !== 'failed' && status !== 'cancelled'">
+            Syncing your Spotify data<span *ngIf="progress !== null">… {{ progress }}%</span>
+          </p>
+          <p *ngIf="status === 'failed'" class="error">Sync failed. {{ statusMessage || 'Please retry.' }} <button type="button" (click)="retry()">Retry</button></p>
+          <p *ngIf="status === 'cancelled'" class="warn">Sync cancelled. <button type="button" (click)="retry()">Retry</button></p>
+          <div class="actions" *ngIf="status !== 'failed' && status !== 'cancelled'">
+            <button type="button" (click)="cancel()" [disabled]="cancelling">Cancel</button>
+          </div>
+        </ng-container>
       </ng-container>
       <ng-template #doneTpl>
         <p *ngIf="denied && !error" class="warn">Spotify access is required to find musically similar students and concerts relevant to you. However, you can still interact with the concerts page!</p>
@@ -37,10 +46,18 @@ export class SpotifyCallbackComponent implements OnInit {
   error: string | null = null;
   denied = false;
   syncing = false;
+  progress: number | null = null;
+  status: string | null = null;
+  statusMessage: string | null = null;
+  cancelling = false;
+  origCode: string | null = null;
+  origState: string | null = null;
   constructor(private route: ActivatedRoute, private router: Router, private spotify: SpotifyService, private http: HttpClient) {}
   ngOnInit(): void {
     const code = this.route.snapshot.queryParamMap.get('code');
     const state = this.route.snapshot.queryParamMap.get('state') || '';
+  this.origCode = code;
+  this.origState = state;
     // If user denied (Spotify sends error=access_denied), show message & button.
     const errorParam = this.route.snapshot.queryParamMap.get('error');
     if (errorParam) {
@@ -52,17 +69,11 @@ export class SpotifyCallbackComponent implements OnInit {
     // Begin token exchange then start sync spinner
     this.spotify.exchangeCode(code, state).subscribe({
       next: () => {
-        // Show syncing message while calling /sync/spotify
         this.error = null;
         this.phase = 'processing';
         this.syncing = true;
-  this.http.post('/api/sync/spotify', { code, state }).subscribe({
-          next: () => {
-            // Start polling status until complete
-            this.pollStatus(0);
-          },
-          error: () => { this.error = 'Spotify sync failed'; this.phase = 'done'; this.syncing = false; }
-        });
+        // Start polling status directly (sync already started)
+        this.pollStatus(0);
       },
       error: (err: any) => { this.error = err?.error?.message || err.message || 'Exchange failed'; this.phase = 'done'; }
     });
@@ -75,17 +86,44 @@ export class SpotifyCallbackComponent implements OnInit {
       this.syncing = false;
       return;
     }
-    this.http.get<{status:string}>('/api/sync/spotify/status').subscribe({
+    this.http.get<{status:string; progress?: number; message?: string}>('/api/sync/spotify/status').subscribe({
       next: (res) => {
+        this.status = res.status;
+        if (typeof res.progress === 'number') { this.progress = res.progress; }
+        if (res.message) { this.statusMessage = res.message; }
         if (res.status === 'complete') {
           this.phase = 'done';
           this.syncing = false;
           this.router.navigate(['/matches']);
+        } else if (res.status === 'failed' || res.status === 'cancelled') {
+          this.phase = 'done';
+          this.syncing = false;
         } else {
           setTimeout(() => this.pollStatus(attempt + 1), 1000);
         }
       },
-      error: () => setTimeout(() => this.pollStatus(attempt + 1), 1000)
+      error: () => { this.error = 'Sync failed'; setTimeout(() => this.pollStatus(attempt + 1), 1000); }
+    });
+  }
+
+  cancel() {
+    this.cancelling = true;
+    this.http.delete('/api/sync/spotify').subscribe({
+      next: () => { this.status = 'cancelled'; this.phase = 'done'; this.syncing = false; },
+      error: () => { this.cancelling = false; }
+    });
+  }
+  
+  retry() {
+    if (!this.origCode || !this.origState) { return; }
+    this.error = null;
+    this.statusMessage = null;
+    this.phase = 'processing';
+    this.syncing = true;
+    this.progress = 0;
+    this.http.post('/api/sync/spotify/retry', { code: this.origCode, state: this.origState }).subscribe({
+      next: () => this.pollStatus(0),
+      error: () => { this.error = 'Retry failed'; this.phase = 'done'; this.syncing = false; }
     });
   }
 

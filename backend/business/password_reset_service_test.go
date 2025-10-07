@@ -121,6 +121,14 @@ func (m *EnhancedMockUserRepository) DeleteExpiredPasswordResetTokens(ctx contex
 	return nil
 }
 
+// Spotify token operations (unused in password reset tests)
+func (m *EnhancedMockUserRepository) UpsertSpotifyTokens(ctx context.Context, userID uuid.UUID, accessToken string, refreshTokenEncrypted []byte, expiresAt time.Time, scope string, tokenType string) error {
+	return nil
+}
+func (m *EnhancedMockUserRepository) GetSpotifyTokensByUser(ctx context.Context, userID uuid.UUID) (*sqlc.SpotifyToken, error) {
+	return nil, nil
+}
+
 var _ = Describe("PasswordResetService", func() {
 	var (
 		service          *business.PasswordResetService

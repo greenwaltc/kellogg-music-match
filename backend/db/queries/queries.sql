@@ -399,6 +399,25 @@ FROM concert_artists ca
 JOIN concert_event_artists cea ON ca.id = cea.artist_id
 WHERE cea.event_id = sqlc.arg(event_id);
 
+-- =======================
+-- Spotify Tokens
+-- =======================
+
+-- name: UpsertSpotifyTokens :exec
+INSERT INTO spotify_tokens (user_id, access_token, refresh_token_encrypted, expires_at, scope, token_type)
+VALUES (sqlc.arg(user_id), sqlc.arg(access_token), sqlc.arg(refresh_token_encrypted), sqlc.arg(expires_at), sqlc.arg(scope), COALESCE(sqlc.arg(token_type), 'Bearer'))
+ON CONFLICT (user_id) DO UPDATE SET
+    access_token = EXCLUDED.access_token,
+    refresh_token_encrypted = EXCLUDED.refresh_token_encrypted,
+    expires_at = EXCLUDED.expires_at,
+    scope = EXCLUDED.scope,
+    token_type = EXCLUDED.token_type,
+    updated_at = NOW();
+
+-- name: GetSpotifyTokensByUser :one
+SELECT * FROM spotify_tokens WHERE user_id = sqlc.arg(user_id) LIMIT 1;
+
+
 -- name: GetEventsForArtist :many
 SELECT 
     ce.*,

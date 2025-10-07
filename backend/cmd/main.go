@@ -8,6 +8,7 @@ import (
 
 	"github.com/greenwaltc/kellogg-music-match/backend/business"
 	"github.com/greenwaltc/kellogg-music-match/backend/business/concert"
+	"github.com/greenwaltc/kellogg-music-match/backend/business/spotify"
 	"github.com/greenwaltc/kellogg-music-match/backend/config"
 	"github.com/greenwaltc/kellogg-music-match/backend/generated"
 	"github.com/greenwaltc/kellogg-music-match/backend/logger"
@@ -85,6 +86,9 @@ func main() {
 	matchingService := business.NewMatchingServiceWithConfig(userRepo, matchingEngine, &cfg.Artist)
 	feedbackService := business.NewFeedbackService(userRepo)
 
+	// Initialize Spotify service (stubbed sync + token exchange placeholder)
+	spotifyService := spotify.NewService(userRepo, cfg.Spotify.RefreshTokenKey) // with token persistence
+
 	// Initialize concert API service (will be enhanced with repository if available)
 	var concertAPIService *business.ConcertAPIService
 
@@ -144,7 +148,7 @@ func main() {
 	// Create service wrappers that implement the OpenAPI service interfaces
 	authAPIService := NewAuthAPIServiceWrapper(authService, passwordResetService)
 	healthAPIService := NewHealthAPIServiceWrapper(healthService)
-	matchingAPIService := NewMatchingAPIServiceWrapper(matchingService)
+	matchingAPIService := NewMatchingAPIServiceWrapper(matchingService, spotifyService)
 	feedbackAPIService := NewFeedbackAPIServiceWrapper(feedbackService)
 
 	// Create controllers with our wrapped services
