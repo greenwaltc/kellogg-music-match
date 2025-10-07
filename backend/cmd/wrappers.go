@@ -91,11 +91,6 @@ func (w *MatchingAPIServiceWrapper) FindMusicMatches(ctx context.Context, artist
 	return w.matchingService.FindMusicMatches(ctx, artistsRequest, "")
 }
 
-// SearchArtists delegates to business logic
-func (w *MatchingAPIServiceWrapper) SearchArtists(ctx context.Context, q string, limit int32) (generated.ImplResponse, error) {
-	return w.matchingService.SearchArtists(ctx, q, limit)
-}
-
 // Add SyncSpotify and GetSpotifySyncStatus to satisfy generated.MatchingAPIServicer
 func (w *MatchingAPIServiceWrapper) SyncSpotify(ctx context.Context, body generated.SpotifySyncStartRequest) (generated.ImplResponse, error) {
 	user, _ := GetUserFromContext(ctx)

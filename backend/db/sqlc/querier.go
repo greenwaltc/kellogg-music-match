@@ -12,18 +12,6 @@ import (
 )
 
 type Querier interface {
-	// =======================
-	// User-Artist relations
-	// =======================
-	// FIX: conflict target must be a unique/PK constraint. Your table has PK (user_id, artist_id)
-	AddUserArtist(ctx context.Context, arg AddUserArtistParams) error
-	ChamferSimilarityByIDs(ctx context.Context, arg ChamferSimilarityByIDsParams) (float64, error)
-	ChamferSimilarityByNames(ctx context.Context, arg ChamferSimilarityByNamesParams) (float64, error)
-	ClearUserArtists(ctx context.Context, userID uuid.UUID) error
-	// =======================
-	// Artists
-	// =======================
-	CreateArtist(ctx context.Context, name string) (Artist, error)
 	// (If you also want the :by-user-id variant, keep your FindSimilarUsersChamferByUserID below unchanged.)
 	// Feedback queries
 	CreateFeedback(ctx context.Context, arg CreateFeedbackParams) (Feedback, error)
@@ -40,23 +28,8 @@ type Querier interface {
 	DeleteUser(ctx context.Context, id uuid.UUID) error
 	DeleteUserConcertEventInterest(ctx context.Context, arg DeleteUserConcertEventInterestParams) error
 	DeleteUserPasswordResetTokens(ctx context.Context, userID uuid.UUID) error
-	// =======================
-	// Nearest neighbors (Chamfer-based)
-	// Replace old PWO query with Chamfer under the same exported name
-	// =======================
-	// :username => the anchor profile
-	// :limit_n  => how many matches to return
-	// Performance optimizations:
-	// 1) Restrict candidates to users who share at least 1 artist with the target (uses idx_user_artists_artist_user)
-	// 2) Compute distances first and LIMIT to top-N before fetching per-user artist arrays
-	// 3) Limit returned artist list to top_k via a lateral subquery to reduce memory/CPU
-	FindSimilarUsers(ctx context.Context, arg FindSimilarUsersParams) ([]FindSimilarUsersRow, error)
-	GetAllArtists(ctx context.Context) ([]Artist, error)
 	GetAllFeedback(ctx context.Context, lim int32) ([]GetAllFeedbackRow, error)
 	GetAllUsers(ctx context.Context) ([]User, error)
-	GetArtistByID(ctx context.Context, id int32) (Artist, error)
-	GetArtistByName(ctx context.Context, name string) (Artist, error)
-	GetArtistUsers(ctx context.Context, artistID int32) ([]GetArtistUsersRow, error)
 	GetChicagoEventsCountWithArtistSearch(ctx context.Context, arg GetChicagoEventsCountWithArtistSearchParams) (int64, error)
 	GetChicagoEventsWithArtistSearch(ctx context.Context, arg GetChicagoEventsWithArtistSearchParams) ([]GetChicagoEventsWithArtistSearchRow, error)
 	GetConcertEventByID(ctx context.Context, id string) (GetConcertEventByIDRow, error)
@@ -71,24 +44,11 @@ type Querier interface {
 	GetPasswordResetToken(ctx context.Context, token string) (PasswordResetToken, error)
 	GetSpotifyTokensByUser(ctx context.Context, userID uuid.UUID) (SpotifyToken, error)
 	GetUpcomingConcertEventsInCity(ctx context.Context, arg GetUpcomingConcertEventsInCityParams) ([]GetUpcomingConcertEventsInCityRow, error)
-	GetUserArtists(ctx context.Context, userID uuid.UUID) ([]GetUserArtistsRow, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
 	GetUserByUsernameWithPassword(ctx context.Context, username string) (User, error)
-	// =======================
-	// Matching helpers / reports
-	// =======================
-	GetUsersWithArtists(ctx context.Context) ([]GetUsersWithArtistsRow, error)
 	MarkPasswordResetTokenAsUsed(ctx context.Context, token string) error
-	PairwiseArtistSimilarityByIDs(ctx context.Context, arg PairwiseArtistSimilarityByIDsParams) (int32, error)
-	// =======================
-	// New similarity APIs (artist + set)
-	// =======================
-	PairwiseArtistSimilarityByNames(ctx context.Context, arg PairwiseArtistSimilarityByNamesParams) (PairwiseArtistSimilarityByNamesRow, error)
-	RemoveUserArtist(ctx context.Context, arg RemoveUserArtistParams) error
-	SearchArtists(ctx context.Context, arg SearchArtistsParams) ([]Artist, error)
-	SetUserArtists(ctx context.Context, arg SetUserArtistsParams) error
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) (UpdateUserPasswordRow, error)
 	UpsertConcertArtist(ctx context.Context, arg UpsertConcertArtistParams) (ConcertArtist, error)
@@ -103,7 +63,6 @@ type Querier interface {
 	// Concert Events
 	// =======================
 	UpsertVenue(ctx context.Context, arg UpsertVenueParams) (Venue, error)
-	UserChamferSimilarity(ctx context.Context, arg UserChamferSimilarityParams) (float64, error)
 	UserExistsByEmail(ctx context.Context, email string) (bool, error)
 	UserExistsByUsername(ctx context.Context, username string) (bool, error)
 }

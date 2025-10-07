@@ -8,6 +8,7 @@ import { AuthService } from './auth.service';
 import { Subject } from 'rxjs';
 import { takeUntil, catchError } from 'rxjs/operators';
 import { of } from 'rxjs';
+import { SpotifyService } from './spotify.service';
 
 interface ChicagoEvent {
   id: string;
@@ -74,6 +75,7 @@ interface ChicagoEventsResponse {
       <div class="page-header">
         <h1>🎵 Chicago Events</h1>
         <p class="subtitle">Discover upcoming concerts and shows in the Windy City</p>
+        <!-- Spotify sync moved to Matches page -->
       </div>
 
       <!-- Search Bar -->
@@ -387,7 +389,6 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
   private currentOffset = 0;
   private readonly pageSize = 20;
   
-  private apiBaseUrl: string;
   // New filter flag
   onlyWithInterest = false;
   private ANY_INTEREST_STORAGE_KEY = 'kmm_chi_any_interest';
@@ -411,6 +412,23 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
   private readonly MAX_SCROLL_HISTORY = 5;
   showPrevFromHistory = false;
   pulseScrollTop = false;
+  // Spotify sync state
+  spotifySyncing = false;
+  spotifyStatusMessage: string | null = null;
+
+  // api base url (legacy usage in component); ensure initialization
+  private apiBaseUrl: string = window.__kmmConfig?.apiBaseUrl || 'http://localhost:8080';
+
+  startSpotifySync() {
+    if (this.spotifySyncing) { return; }
+    this.spotifySyncing = true;
+    this.spotifyStatusMessage = 'Redirecting to Spotify...';
+    this.spotifyService.beginAuth().catch(err => {
+      this.spotifyStatusMessage = 'Failed to start Spotify auth';
+      this.spotifySyncing = false;
+      console.error('Spotify auth error', err);
+    });
+  }
   private hideDelayTimer: any;
   private pendingHide = false;
   // Touch / radial menu state
@@ -422,8 +440,7 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
   private readonly SCROLL_HISTORY_KEY = 'kmm_chi_scroll_history';
   private lastHistoryPushTime = 0; // performance.now() timestamp of last accepted history entry
 
-  constructor(private http: HttpClient, private interest: ConcertInterestService, private auth: AuthService) {
-    this.apiBaseUrl = window.__kmmConfig?.apiBaseUrl || 'http://localhost:8080';
+  constructor(private http: HttpClient, private interest: ConcertInterestService, private auth: AuthService, private spotifyService: SpotifyService) {
     // Restore anyInterest flag
     try {
       const storedInterest = localStorage.getItem(this.ANY_INTEREST_STORAGE_KEY);

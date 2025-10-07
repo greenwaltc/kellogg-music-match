@@ -108,7 +108,6 @@ func main() {
 		postgresImage := get("postgresImage", "kellogg-music-match-postgres:latest")
 		// Image pull policy (was hardcoded as "Never" in multiple places)
 		imagePullPolicy := get("imagePullPolicy", "IfNotPresent")
-		musicbrainzImage := get("musicbrainzImage", "kellogg-music-match-musicbrainz:latest")
 		// Pin Flyway image to a specific version for deterministic migrations (can override via Pulumi config key `flywayImage`)
 		flywayImage := get("flywayImage", "flyway/flyway:10-alpine")
 		tracingEnabled := getBoolStr("tracingEnabled", true)
@@ -280,161 +279,6 @@ func main() {
 			return err
 		}
 
-		// Create ConfigMap for MusicBrainz data loading script only (CSV will be embedded in container)
-		musicbrainzConfigMap, err := corev1.NewConfigMap(ctx, "musicbrainz-scripts", &corev1.ConfigMapArgs{
-			Metadata: &metav1.ObjectMetaArgs{
-				Name:      pulumi.String("musicbrainz-scripts"),
-				Namespace: namespace.Metadata.Name(),
-				Labels: pulumi.StringMap{
-					"app":       pulumi.String("kmm"),
-					"component": pulumi.String("data"),
-				},
-			},
-			Data: pulumi.StringMap{
-				"load_artists.sql": pulumi.String(`-- Load MusicBrainz artists data from embedded CSV
-CREATE TEMP TABLE temp_musicbrainz_load (
-    musicbrainz_id TEXT,
-    name TEXT,
-    sort_name TEXT,
-    artist_type TEXT,
-    gender TEXT,
-    country TEXT,
-    life_span_begin TEXT,
-    life_span_end TEXT,
-    disambiguation TEXT,
-    musicbrainz_score TEXT
-);
-
--- Load data from CSV file directly from embedded location using \copy (client-side)
-\copy temp_musicbrainz_load FROM '/data/musicbrainz_artists_50k.csv' WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"', ESCAPE '"');
-
--- Insert into artists table with proper type conversions and conflict handling
--- Only proceed if we have fewer than 1000 reference artists
-DO $$
-DECLARE
-    existing_count INTEGER;
-    loaded_count INTEGER;
-BEGIN
-    SELECT COUNT(*) INTO existing_count FROM artists WHERE is_reference = TRUE;
-    
-    IF existing_count < 1000 THEN
-        INSERT INTO artists (
-            name, 
-            musicbrainz_id, 
-            sort_name, 
-            artist_type, 
-            gender, 
-            country, 
-            life_span_begin, 
-            life_span_end, 
-            disambiguation, 
-            musicbrainz_score, 
-            is_reference,
-            created_at
-        )
-        SELECT DISTINCT ON (TRIM(name))
-            TRIM(name),
-            CASE WHEN TRIM(musicbrainz_id) = '' THEN NULL ELSE TRIM(musicbrainz_id)::UUID END,
-            TRIM(sort_name),
-            TRIM(artist_type),
-            CASE WHEN TRIM(gender) = '' THEN NULL ELSE TRIM(gender) END,
-            CASE WHEN TRIM(country) = '' THEN NULL ELSE TRIM(country) END,
-            CASE WHEN TRIM(life_span_begin) = '' THEN NULL 
-                 WHEN TRIM(life_span_begin) ~ '^\d{4}$' THEN (TRIM(life_span_begin) || '-01-01')::DATE
-                 WHEN TRIM(life_span_begin) ~ '^\d{4}-\d{2}$' THEN (TRIM(life_span_begin) || '-01')::DATE
-                 ELSE TRIM(life_span_begin)::DATE END,
-            CASE WHEN TRIM(life_span_end) = '' THEN NULL 
-                 WHEN TRIM(life_span_end) ~ '^\d{4}$' THEN (TRIM(life_span_end) || '-01-01')::DATE
-                 WHEN TRIM(life_span_end) ~ '^\d{4}-\d{2}$' THEN (TRIM(life_span_end) || '-01')::DATE
-                 ELSE TRIM(life_span_end)::DATE END,
-            CASE WHEN TRIM(disambiguation) = '' THEN NULL ELSE TRIM(disambiguation) END,
-            CASE WHEN TRIM(musicbrainz_score) = '' THEN NULL ELSE TRIM(musicbrainz_score)::INTEGER END,
-            TRUE,
-            CURRENT_TIMESTAMP
-        FROM temp_musicbrainz_load
-        WHERE TRIM(musicbrainz_id) != '' AND TRIM(name) != ''
-        ORDER BY TRIM(name), musicbrainz_score DESC NULLS LAST
-        ON CONFLICT (name) DO UPDATE SET
-            musicbrainz_id = COALESCE(EXCLUDED.musicbrainz_id, artists.musicbrainz_id),
-            sort_name = COALESCE(EXCLUDED.sort_name, artists.sort_name),
-            artist_type = COALESCE(EXCLUDED.artist_type, artists.artist_type),
-            gender = COALESCE(EXCLUDED.gender, artists.gender),
-            country = COALESCE(EXCLUDED.country, artists.country),
-            life_span_begin = COALESCE(EXCLUDED.life_span_begin, artists.life_span_begin),
-            life_span_end = COALESCE(EXCLUDED.life_span_end, artists.life_span_end),
-            disambiguation = COALESCE(EXCLUDED.disambiguation, artists.disambiguation),
-            musicbrainz_score = COALESCE(EXCLUDED.musicbrainz_score, artists.musicbrainz_score),
-            is_reference = TRUE;
-        
-        SELECT COUNT(*) INTO loaded_count FROM artists WHERE is_reference = TRUE;
-        RAISE NOTICE 'Loaded % MusicBrainz reference artists (total: %)', 
-            loaded_count - existing_count, loaded_count;
-    ELSE
-        RAISE NOTICE 'MusicBrainz data already exists (% reference artists), skipping load', existing_count;
-    END IF;
-END $$;
-
-DROP TABLE temp_musicbrainz_load;`),
-				"load_data.sh": pulumi.String(`#!/bin/bash
-set -euo pipefail
-
-echo "🎵 Starting MusicBrainz data loading..."
-
-# Default/fallback values if not provided
-DB_HOST="${DB_HOST:-postgres}"
-DB_PORT="${DB_PORT:-5432}"
-DB_USER="${DB_USER:-kellogg_user}"
-DB_NAME="${DB_NAME:-kellogg_music_match}"
-
-echo "Using database $DB_USER@$DB_HOST:$DB_PORT/$DB_NAME"
-
-# Wait for database to be ready
-echo "Waiting for PostgreSQL to be ready..."
-until pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER"; do
-	echo "Waiting for postgres..."
-	sleep 2
-done
-
-# Prefer explicit PGPASSWORD but fall back to DB_PASSWORD from secret
-export PGPASSWORD="${PGPASSWORD:-${DB_PASSWORD:-}}"
-
-if [ -z "$PGPASSWORD" ]; then
-  echo "❌ No database password provided (PGPASSWORD/DB_PASSWORD). Exiting." >&2
-  exit 1
-fi
-
-# Check if data already exists
-echo "Checking if MusicBrainz data needs to be loaded..."
-count=$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -t -c "SELECT COUNT(*) FROM artists WHERE is_reference = TRUE;" | tr -d ' ')
-count=${count:-0}
-
-if [ "$count" -lt 1000 ]; then
-	echo "Loading MusicBrainz artists data..."
-	echo "Found $count existing reference artists"
-    
-	# Verify the embedded CSV data exists and load it directly
-	if [ -f "/data/musicbrainz_artists_50k.csv" ]; then
-		echo "✅ Found CSV file at /data/musicbrainz_artists_50k.csv"
-		echo "📊 File size: $(wc -l < /data/musicbrainz_artists_50k.csv) lines"
-		psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -f /scripts/load_artists.sql
-		echo "✅ MusicBrainz data loaded successfully"
-	else
-		echo "❌ CSV file not found at /data/musicbrainz_artists_50k.csv"
-		echo "📂 Available files in /data/:"
-		ls -la /data/ || echo "No /data directory found"
-		exit 1
-	fi
-else
-	echo "✅ MusicBrainz data already exists ($count reference artists), skipping load"
-fi
-
-echo "🎉 MusicBrainz data loading completed"`),
-			},
-		})
-		if err != nil {
-			return err
-		}
-
 		// Create backend deployment with enhanced database integration
 		// First, create a Secret for backend-sensitive configuration values.
 		backendSecret, err := corev1.NewSecret(ctx, "backend-secret", &corev1.SecretArgs{
@@ -528,32 +372,6 @@ echo "🎉 MusicBrainz data loading completed"`),
 									&corev1.VolumeMountArgs{
 										Name:      pulumi.String("flyway-migrations"),
 										MountPath: pulumi.String("/flyway/sql"),
-										ReadOnly:  pulumi.Bool(true),
-									},
-								},
-							},
-							&corev1.ContainerArgs{
-								Name:            pulumi.String("load-musicbrainz-data"),
-								Image:           musicbrainzImage,
-								ImagePullPolicy: imagePullPolicy,
-								Command: pulumi.StringArray{
-									pulumi.String("bash"),
-									pulumi.String("/scripts/load_data.sh"),
-								},
-								Env: corev1.EnvVarArray{
-									&corev1.EnvVarArgs{Name: pulumi.String("DB_HOST"), Value: dbHost},
-									&corev1.EnvVarArgs{Name: pulumi.String("DB_PORT"), Value: dbPort},
-									&corev1.EnvVarArgs{Name: pulumi.String("DB_USER"), Value: dbUser},
-									&corev1.EnvVarArgs{Name: pulumi.String("DB_NAME"), Value: dbName},
-								},
-								// PGPASSWORD comes from secret via EnvFrom
-								EnvFrom: corev1.EnvFromSourceArray{
-									&corev1.EnvFromSourceArgs{SecretRef: &corev1.SecretEnvSourceArgs{Name: backendSecret.Metadata.Name()}},
-								},
-								VolumeMounts: corev1.VolumeMountArray{
-									&corev1.VolumeMountArgs{
-										Name:      pulumi.String("musicbrainz-scripts"),
-										MountPath: pulumi.String("/scripts"),
 										ReadOnly:  pulumi.Bool(true),
 									},
 								},
@@ -672,13 +490,6 @@ echo "🎉 MusicBrainz data loading completed"`),
 								ConfigMap: &corev1.ConfigMapVolumeSourceArgs{
 									Name:        flywayConfigMap.Metadata.Name(),
 									DefaultMode: pulumi.Int(0644),
-								},
-							},
-							&corev1.VolumeArgs{
-								Name: pulumi.String("musicbrainz-scripts"),
-								ConfigMap: &corev1.ConfigMapVolumeSourceArgs{
-									Name:        musicbrainzConfigMap.Metadata.Name(),
-									DefaultMode: pulumi.Int(0755),
 								},
 							},
 						},

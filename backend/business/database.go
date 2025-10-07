@@ -28,20 +28,11 @@ type UserRepository interface {
 	GetUserByID(ctx context.Context, id uuid.UUID) (*sqlc.User, error)
 	UserExistsByUsername(ctx context.Context, username string) (bool, error)
 	UserExistsByEmail(ctx context.Context, email string) (bool, error)
-	GetAllUsersWithArtists(ctx context.Context) ([]sqlc.GetUsersWithArtistsRow, error)
 
-	// Artist operations
-	CreateArtist(ctx context.Context, name string) (*sqlc.Artist, error)
-	GetArtistByName(ctx context.Context, name string) (*sqlc.Artist, error)
-	SearchArtists(ctx context.Context, query string, limit int32) ([]sqlc.Artist, error)
-
-	// User-Artist relationship operations
-	SetUserArtists(ctx context.Context, userID uuid.UUID, artistNames []string) error
-	GetUserArtists(ctx context.Context, userID uuid.UUID) ([]sqlc.GetUserArtistsRow, error)
-	ClearUserArtists(ctx context.Context, userID uuid.UUID) error
+	// (Legacy manual artist operations removed in Spotify mode)
 
 	// Matching operations
-	FindSimilarUsers(ctx context.Context, username string) ([]sqlc.FindSimilarUsersRow, error)
+	// (Similar user matching removed with legacy artist system; placeholder for future Spotify-based matching)
 
 	// Feedback operations
 	CreateFeedback(ctx context.Context, userID uuid.UUID, feedbackText string) (*sqlc.Feedback, error)
@@ -245,123 +236,7 @@ func (r *PostgreSQLUserRepository) UserExistsByEmail(ctx context.Context, email 
 	return r.queries.UserExistsByEmail(ctx, email)
 }
 
-// GetAllUsersWithArtists retrieves all users with their artists for matching
-func (r *PostgreSQLUserRepository) GetAllUsersWithArtists(ctx context.Context) ([]sqlc.GetUsersWithArtistsRow, error) {
-	tr := otel.Tracer("repo.user")
-	ctx, span := tr.Start(ctx, "GetAllUsersWithArtists")
-	span.SetAttributes(attribute.String("db.system", "postgres"))
-	defer span.End()
-	return r.queries.GetUsersWithArtists(ctx)
-}
-
-// CreateArtist creates or retrieves an artist by name
-func (r *PostgreSQLUserRepository) CreateArtist(ctx context.Context, name string) (*sqlc.Artist, error) {
-	tr := otel.Tracer("repo.artist")
-	ctx, span := tr.Start(ctx, "CreateArtist")
-	span.SetAttributes(attribute.String("db.system", "postgres"), attribute.String("app.artist", name))
-	defer span.End()
-	artist, err := r.queries.CreateArtist(ctx, name)
-	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
-		return nil, err
-	}
-	return &artist, nil
-}
-
-// GetArtistByName retrieves an artist by name
-func (r *PostgreSQLUserRepository) GetArtistByName(ctx context.Context, name string) (*sqlc.Artist, error) {
-	tr := otel.Tracer("repo.artist")
-	ctx, span := tr.Start(ctx, "GetArtistByName")
-	span.SetAttributes(attribute.String("db.system", "postgres"), attribute.String("app.artist", name))
-	defer span.End()
-	artist, err := r.queries.GetArtistByName(ctx, name)
-	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
-		return nil, err
-	}
-	return &artist, nil
-}
-
-// SearchArtists performs fuzzy search for artists
-func (r *PostgreSQLUserRepository) SearchArtists(ctx context.Context, query string, limit int32) ([]sqlc.Artist, error) {
-	tr := otel.Tracer("repo.artist")
-	ctx, span := tr.Start(ctx, "SearchArtists")
-	span.SetAttributes(attribute.String("db.system", "postgres"), attribute.String("app.query", query), attribute.Int64("app.limit", int64(limit)))
-	defer span.End()
-	// Prepare fuzzy search patterns
-	fuzzyPattern := "%" + strings.ToLower(query) + "%"
-	exactQuery := strings.ToLower(query)
-	startsWithPattern := strings.ToLower(query) + "%"
-
-	return r.queries.SearchArtists(ctx, sqlc.SearchArtistsParams{
-		SearchTerm:   fuzzyPattern,      // LIKE pattern for general fuzzy matching
-		ExactMatch:   exactQuery,        // Exact match for highest priority
-		PartialMatch: startsWithPattern, // Starts with for second priority
-		Lim:          limit,             // Limit results
-	})
-}
-
-// SetUserArtists sets the complete list of artists for a user
-func (r *PostgreSQLUserRepository) SetUserArtists(ctx context.Context, userID uuid.UUID, artistNames []string) error {
-	tr := otel.Tracer("repo.user")
-	ctx, span := tr.Start(ctx, "SetUserArtists")
-	span.SetAttributes(attribute.String("db.system", "postgres"), attribute.String("app.user_id", userID.String()), attribute.Int("app.count", len(artistNames)))
-	defer span.End()
-	// First clear existing associations
-	if err := r.queries.ClearUserArtists(ctx, userID); err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
-		return err
-	}
-
-	// Set new associations
-	orderValues := make([]int32, len(artistNames))
-	for i := range orderValues {
-		orderValues[i] = int32(i + 1)
-	}
-
-	// sqlc generated SetUserArtistsParams currently exposes fields: UserID, Column2 (artist names), Column3 (ranks).
-	return r.queries.SetUserArtists(ctx, sqlc.SetUserArtistsParams{
-		UserID:      userID,
-		ArtistNames: artistNames,
-		Ranks:       orderValues,
-	})
-}
-
-// GetUserArtists retrieves all artists for a user
-func (r *PostgreSQLUserRepository) GetUserArtists(ctx context.Context, userID uuid.UUID) ([]sqlc.GetUserArtistsRow, error) {
-	tr := otel.Tracer("repo.user")
-	ctx, span := tr.Start(ctx, "GetUserArtists")
-	span.SetAttributes(attribute.String("db.system", "postgres"), attribute.String("app.user_id", userID.String()))
-	defer span.End()
-	return r.queries.GetUserArtists(ctx, userID)
-}
-
-// ClearUserArtists removes all artist associations for a user
-func (r *PostgreSQLUserRepository) ClearUserArtists(ctx context.Context, userID uuid.UUID) error {
-	tr := otel.Tracer("repo.user")
-	ctx, span := tr.Start(ctx, "ClearUserArtists")
-	span.SetAttributes(attribute.String("db.system", "postgres"), attribute.String("app.user_id", userID.String()))
-	defer span.End()
-	return r.queries.ClearUserArtists(ctx, userID)
-}
-
-// FindSimilarUsers finds users similar to the given username based on their artist preferences
-func (r *PostgreSQLUserRepository) FindSimilarUsers(ctx context.Context, username string) ([]sqlc.FindSimilarUsersRow, error) {
-	tr := otel.Tracer("repo.matching")
-	ctx, span := tr.Start(ctx, "FindSimilarUsers")
-	span.SetAttributes(attribute.String("db.system", "postgres"), attribute.String("app.username", username))
-	defer span.End()
-	// Using the Chamfer-based finder we created (ensure your queries.sql has it)
-	return r.queries.FindSimilarUsers(ctx, sqlc.FindSimilarUsersParams{
-		Username: username,
-		Lim:      20,
-		TopK:     40,
-		Alpha:    0.85,
-	})
-}
+// (FindSimilarUsers removed; legacy manual artist similarity retired. Will be reintroduced using Spotify data.)
 
 // Feedback operations
 func (r *PostgreSQLUserRepository) CreateFeedback(ctx context.Context, userID uuid.UUID, feedbackText string) (*sqlc.Feedback, error) {

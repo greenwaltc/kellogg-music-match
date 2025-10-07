@@ -21,9 +21,8 @@
 - **[K3S_LOCAL_IMAGES_GUIDE.md](K3S_LOCAL_IMAGES_GUIDE.md)** - Local Kubernetes development
 - **[KUBERNETES_MUSICBRAINZ_SETUP.md](KUBERNETES_MUSICBRAINZ_SETUP.md)** - K8s-specific setup
 
-### 🎵 **MusicBrainz Integration**
-- **[MUSICBRAINZ_INTEGRATION.md](MUSICBRAINZ_INTEGRATION.md)** - Artist database integration (47K+ artists)
-- **[MUSICBRAINZ_DOCKER_SETUP.md](MUSICBRAINZ_DOCKER_SETUP.md)** - Docker setup for MusicBrainz data
+### 🎵 **Spotify Integration (Current Focus)**
+The system now derives artist preferences from users' Spotify profiles (top artists & listening data). Legacy MusicBrainz ingestion has been retired and archived.
 
 ## Application Features
 
@@ -31,15 +30,15 @@
 1. **Chicago Events API** - 6-month event discovery with search and pagination
 2. **Music Matching** - PWO algorithm-based similarity scoring  
 3. **User Management** - Registration, authentication, and profiles
-4. **Artist Database** - 47,452 MusicBrainz artists with search
-5. **Real-time UI** - Angular frontend with infinite scroll and search
-6. **Automated Sync** - 24-hour event synchronization
+4. **Spotify Sync (In Progress)** - User-initiated Spotify profile sync with retry + status endpoints
+5. **Real-time UI** - Angular frontend (events browsing, sync status polling)
+6. **Automated Event Sync** - 24-hour Ticketmaster event synchronization
 7. **Database Management** - Flyway migrations with PostgreSQL 16
 
 ### 📈 **Current Data Status**
 - **Chicago Events**: 953+ events (September 2025 - March 2026)
-- **Artists**: 47,452 MusicBrainz records (deduplicated)
-- **Database**: 19 migration files (V001-V019)
+- **Artists**: Transitioning to on-demand Spotify-derived preference sets (legacy MusicBrainz dataset removed)
+- **Database**: 20+ migration files including cleanup of legacy artist reference tables
 - **API Endpoints**: 9 REST endpoints with OpenAPI specification
 
 ## Development Workflow

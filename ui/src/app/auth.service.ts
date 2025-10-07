@@ -134,9 +134,8 @@ export class AuthService {
    * If the user has configured favorite artists, send them to matches; otherwise to Chicago events.
    */
   postAuthLanding(): string {
-    const u = this.user();
-    if (u?.artists && u.artists.length > 0) return '/matches';
-    return '/chicago-events';
+    // Always land on matches page now; concerts can be accessed via nav
+    return '/matches';
   }
 
   forgotPassword(email: string) {

@@ -2,6 +2,7 @@ import { Component, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { MatchService } from './match.service';
+import { SpotifyService } from './spotify.service';
 import { SimilarityMeterComponent } from './similarity-meter.component';
 
 @Component({
@@ -11,6 +12,9 @@ import { SimilarityMeterComponent } from './similarity-meter.component';
   template: `
   <section>
     <h2>Your Top Music Matches</h2>
+    <div class="spotify-connect-bar">
+      <button type="button" (click)="connectSpotify()" class="spotify-btn">🎧 Connect / Sync Spotify</button>
+    </div>
     <p class="note">Tip: check back here often! As more Kellogg students register, we build better matches.</p>
     
     <!-- Loading indicator -->
@@ -89,6 +93,9 @@ import { SimilarityMeterComponent } from './similarity-meter.component';
   </section>
   `,
   styles: [`
+    .spotify-connect-bar { text-align:right; margin-top:.5rem; }
+    .spotify-btn { background:#1db954; border:none; color:#fff; padding:.55rem 1rem; border-radius:4px; cursor:pointer; font-size:.85rem; font-weight:600; }
+    .spotify-btn:hover { background:#19a34b; }
     .matches-list {
       display: flex;
       flex-direction: column;
@@ -321,9 +328,10 @@ import { SimilarityMeterComponent } from './similarity-meter.component';
   `]
 })
 export class MatchesComponent {
-  constructor(public matches: MatchService, private router: Router) {
+  constructor(public matches: MatchService, private router: Router, private spotify: SpotifyService) {
     effect(() => { if (!this.matches.matches()) { /* could redirect */ } });
     this.matches.fetchIfReady();
   }
   back(): void { this.router.navigateByUrl('/chicago-events'); }
+  async connectSpotify() { await this.spotify.beginAuth(); }
 }

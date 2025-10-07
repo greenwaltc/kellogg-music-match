@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
-	sqlc "github.com/greenwaltc/kellogg-music-match/backend/db/sqlc"
 	"github.com/greenwaltc/kellogg-music-match/backend/generated"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -151,19 +150,6 @@ func (s *AuthService) LoginUser(ctx context.Context, loginRequest generated.Logi
 		}), nil
 	}
 
-	// Get user's artists
-	artists, err := s.userRepo.GetUserArtists(ctx, dbUser.ID)
-	if err != nil {
-		// Log error but don't fail authentication
-		artists = []sqlc.GetUserArtistsRow{}
-	}
-
-	// Convert to string slice
-	artistNames := make([]string, len(artists))
-	for i, artist := range artists {
-		artistNames[i] = artist.Name
-	}
-
 	// Convert database user to API user
 	user := &generated.User{
 		Id:             dbUser.ID.String(), // Standard UUID format with dashes
@@ -173,7 +159,7 @@ func (s *AuthService) LoginUser(ctx context.Context, loginRequest generated.Logi
 		LastName:       dbUser.LastName,
 		Program:        dbUser.Program.String,
 		GraduationYear: dbUser.GraduationYear.Int32,
-		Artists:        artistNames,
+		Artists:        []string{}, // Manual artists removed; will be populated from Spotify in future
 	}
 
 	// Generate JWT token

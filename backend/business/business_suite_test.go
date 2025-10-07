@@ -242,46 +242,7 @@ func (m *MockUserRepository) UserExistsByEmail(ctx context.Context, email string
 	return exists && ok, nil
 }
 
-func (m *MockUserRepository) GetAllUsersWithArtists(ctx context.Context) ([]sqlc.GetUsersWithArtistsRow, error) {
-	return nil, nil // Not implemented for these tests
-}
-
-func (m *MockUserRepository) CreateArtist(ctx context.Context, name string) (*sqlc.Artist, error) {
-	return nil, nil // Not implemented for these tests
-}
-
-func (m *MockUserRepository) GetArtistByName(ctx context.Context, name string) (*sqlc.Artist, error) {
-	return nil, nil // Not implemented for these tests
-}
-
-func (m *MockUserRepository) SearchArtists(ctx context.Context, query string, limit int32) ([]sqlc.Artist, error) {
-	return nil, nil // Not implemented for these tests
-}
-
-func (m *MockUserRepository) SetUserArtists(ctx context.Context, userID uuid.UUID, artistNames []string) error {
-	return nil // Not implemented for these tests
-}
-
-func (m *MockUserRepository) GetUserArtists(ctx context.Context, userID uuid.UUID) ([]sqlc.GetUserArtistsRow, error) {
-	if m.getUserArtistsError != nil {
-		return nil, m.getUserArtistsError
-	}
-	var result []sqlc.GetUserArtistsRow
-	for _, artist := range m.getUserArtistsResult {
-		result = append(result, sqlc.GetUserArtistsRow{
-			Name: artist,
-		})
-	}
-	return result, nil
-}
-
-func (m *MockUserRepository) ClearUserArtists(ctx context.Context, userID uuid.UUID) error {
-	return nil // Not implemented for these tests
-}
-
-func (m *MockUserRepository) FindSimilarUsers(ctx context.Context, username string) ([]sqlc.FindSimilarUsersRow, error) {
-	return nil, nil // Not implemented for these tests
-}
+// FindSimilarUsers removed with legacy similarity system; no-op placeholder omitted.
 
 func (m *MockUserRepository) SaveFeedback(ctx context.Context, userID uuid.UUID, feedback string) (*sqlc.Feedback, error) {
 	return nil, nil // Not implemented for these tests

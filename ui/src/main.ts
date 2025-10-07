@@ -23,14 +23,14 @@ declare global {
 
 const routes: Routes = [
   { path: '', component: LoginComponent, canActivate: [loginRedirectGuard] },
-  { path: 'artists', component: ArtistsComponent, canActivate: [authGuard] },
+  { path: 'login', redirectTo: '', pathMatch: 'full' },
   { path: 'matches', component: MatchesComponent, canActivate: [authGuard] },
   { path: 'feedback', component: FeedbackComponent, canActivate: [authGuard] },
   { path: 'roadmap', component: RoadmapComponent, canActivate: [authGuard] },
   { path: 'chicago-events', component: ChicagoEventsComponent, canActivate: [authGuard] },
-  { path: 'spotify/connect', component: SpotifyConnectComponent, canActivate: [authGuard] },
   { path: 'spotify/callback', component: SpotifyCallbackComponent },
   { path: '**', redirectTo: '' }
+  // Artists & standalone Spotify connect page removed (Spotify connect now on Matches page)
 ];
 
 // Wait for config to load before bootstrapping Angular

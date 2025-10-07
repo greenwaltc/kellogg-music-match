@@ -38,141 +38,30 @@ DELETE FROM users WHERE id = sqlc.arg(id);
 SELECT * FROM users ORDER BY created_at;
 
 -- =======================
--- Artists
--- =======================
-
--- name: CreateArtist :one
-INSERT INTO artists (name)
-VALUES (sqlc.arg(name))
-ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
-RETURNING *;
-
--- name: GetArtistByName :one
-SELECT * FROM artists WHERE name = sqlc.arg(name) LIMIT 1;
-
--- name: GetArtistByID :one
-SELECT * FROM artists WHERE id = sqlc.arg(id) LIMIT 1;
-
--- name: GetAllArtists :many
-SELECT * FROM artists ORDER BY name;
-
--- name: SearchArtists :many
-SELECT * FROM artists 
-WHERE LOWER(name) LIKE LOWER(sqlc.arg(search_term)) 
-ORDER BY 
-  CASE 
-    WHEN LOWER(name) = LOWER(sqlc.arg(exact_match)) THEN 1
-    WHEN LOWER(name) LIKE LOWER(sqlc.arg(partial_match)) THEN 2
-    ELSE 3
-  END,
-  LENGTH(name),
-  name
-LIMIT sqlc.arg(lim);
-
--- =======================
--- User-Artist relations
--- =======================
-
--- FIX: conflict target must be a unique/PK constraint. Your table has PK (user_id, artist_id)
--- name: AddUserArtist :exec
-INSERT INTO user_artists (user_id, artist_id, rank)
-VALUES (sqlc.arg(user_id)::uuid, sqlc.arg(artist_id)::int, sqlc.arg(rank)::int)
-ON CONFLICT (user_id, artist_id) DO UPDATE SET rank = EXCLUDED.rank;
-
--- name: RemoveUserArtist :exec
-DELETE FROM user_artists WHERE user_id = sqlc.arg(user_id) AND artist_id = sqlc.arg(artist_id);
-
--- name: ClearUserArtists :exec
-DELETE FROM user_artists WHERE user_id = sqlc.arg(user_id);
-
--- name: GetUserArtists :many
-SELECT a.id, a.name, a.created_at
-FROM artists a
-JOIN user_artists ua ON a.id = ua.artist_id
-WHERE ua.user_id = sqlc.arg(user_id)
-ORDER BY ua.rank;
-
--- name: GetArtistUsers :many
-SELECT u.id, u.username, u.email, u.first_name, u.last_name, u.created_at, u.updated_at
-FROM users u
-JOIN user_artists ua ON u.id = ua.user_id
-WHERE ua.artist_id = sqlc.arg(artist_id)
-ORDER BY u.username;
-
--- name: SetUserArtists :exec
-WITH new_artists AS (
-  INSERT INTO artists (name)
-  SELECT unnest(sqlc.arg(artist_names)::text[])
-  ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
-  RETURNING id, name
-),
- ranked_artists AS (
-  SELECT 
-    a.id,
-    a.name,
-    (sqlc.arg(ranks)::int[])[array_position(sqlc.arg(artist_names)::text[], a.name)] as rank
-  FROM new_artists a
-)
-INSERT INTO user_artists (user_id, artist_id, rank)
-SELECT sqlc.arg(user_id)::uuid, id, rank FROM ranked_artists
-ON CONFLICT (user_id, artist_id) DO UPDATE SET rank = EXCLUDED.rank;
-
--- =======================
 -- Matching helpers / reports
 -- =======================
 
--- name: GetUsersWithArtists :many
-SELECT 
-    u.id, u.username, u.email, u.first_name, u.last_name,
-    COALESCE(array_agg(a.name) FILTER (WHERE a.name IS NOT NULL), '{}') as artist_names
-FROM users u
-LEFT JOIN user_artists ua ON u.id = ua.user_id
-LEFT JOIN artists a ON ua.artist_id = a.id
-GROUP BY u.id, u.username, u.email, u.first_name, u.last_name
-ORDER BY u.username;
+-- (Removed) GetUsersWithArtists: legacy manual artist relationship removed
+-- Returning empty artist array per user now handled in application layer if needed
+
 -- =======================
 -- New similarity APIs (artist + set)
 -- =======================
 
--- name: PairwiseArtistSimilarityByNames :one
-SELECT
-  a1.name AS name1,
-  a2.name AS name2,
-  1.0 - artist_distance(a1.id, a2.id) AS similarity
-FROM artists a1
-JOIN artists a2 ON TRUE
-WHERE a1.name = sqlc.arg(name1)
-  AND a2.name = sqlc.arg(name2);
+-- (Removed) PairwiseArtistSimilarityByNames: depends on legacy artists table
+SELECT sqlc.arg(name1)::text AS name1, sqlc.arg(name2)::text AS name2, 0.0::float8 AS similarity;
 
--- name: PairwiseArtistSimilarityByIDs :one
-SELECT 1.0 - artist_distance(sqlc.arg(artist1_id)::int, sqlc.arg(artist2_id)::int) AS similarity;
+-- (Removed) PairwiseArtistSimilarityByIDs: legacy artist_distance no longer applicable
+SELECT 0.0::float8 AS similarity;
 
--- name: ChamferSimilarityByNames :one
-WITH s1 AS (
-  SELECT COALESCE(array_agg(id), '{}'::int[]) AS ids
-  FROM artists
-  WHERE name = ANY(sqlc.arg(artist_names_list1)::text[])
-),
-s2 AS (
-  SELECT COALESCE(array_agg(id), '{}'::int[]) AS ids
-  FROM artists
-  WHERE name = ANY(sqlc.arg(artist_names_list2)::text[])
-)
-SELECT chamfer_similarity_artists(
-  (SELECT ids FROM s1),
-  (SELECT ids FROM s2)
-) AS similarity;
+-- (Removed) ChamferSimilarityByNames: fallback returns 0
+SELECT 0.0::float8 AS similarity;
 
--- name: ChamferSimilarityByIDs :one
-SELECT chamfer_similarity_artists(sqlc.arg(artist_ids_list1)::int[], sqlc.arg(artist_ids_list2)::int[]) AS similarity;
+-- (Removed) ChamferSimilarityByIDs
+SELECT 0.0::float8 AS similarity;
 
--- name: UserChamferSimilarity :one
-SELECT user_chamfer_similarity(
-  sqlc.arg(user1_id)::uuid,
-  sqlc.arg(user2_id)::uuid,
-  sqlc.arg(top_k)::int,
-  sqlc.arg(alpha)::float8
-) AS similarity;
+-- (Removed) UserChamferSimilarity: legacy function
+SELECT 0.0::float8 AS similarity;
 
 -- =======================
 -- Nearest neighbors (Chamfer-based)
@@ -181,85 +70,20 @@ SELECT user_chamfer_similarity(
 
 -- :username => the anchor profile
 -- :limit_n  => how many matches to return
--- name: FindSimilarUsers :many
--- Performance optimizations:
--- 1) Restrict candidates to users who share at least 1 artist with the target (uses idx_user_artists_artist_user)
--- 2) Compute distances first and LIMIT to top-N before fetching per-user artist arrays
--- 3) Limit returned artist list to top_k via a lateral subquery to reduce memory/CPU
-WITH target AS (
-  SELECT id AS target_id, program AS target_program, graduation_year AS target_grad
-  FROM users
-  WHERE users.username = sqlc.arg(username)
-),
-base_list AS (
-  -- ensure target has at least one artist; otherwise return no rows
-  SELECT 1 FROM user_artists ua JOIN target t ON ua.user_id = t.target_id LIMIT 1
-),
-target_artists AS (
-  SELECT ua.artist_id
-  FROM user_artists ua
-  JOIN target t ON ua.user_id = t.target_id
-),
-candidates AS (
-  -- users with at least one overlapping artist with the target
-  SELECT ua.user_id AS candidate_id
-  FROM user_artists ua
-  JOIN target_artists ta USING (artist_id)
-  GROUP BY ua.user_id
-),
-scored AS (
-  SELECT
-    u.id,
-    u.username,
-    u.first_name,
-    u.last_name,
-    u.program,
-    u.graduation_year,
-    s.d AS distance
-  FROM users u
-  JOIN candidates c ON c.candidate_id = u.id
-  JOIN target t ON TRUE
-  CROSS JOIN LATERAL (
-    SELECT user_chamfer_distance(
-             u.id,
-             t.target_id,
-             sqlc.arg(top_k)::int,     -- top_k
-             sqlc.arg(alpha)::float8   -- alpha
-           ) AS d
-  ) AS s
-  WHERE u.username <> sqlc.arg(username)
-    AND EXISTS (SELECT 1 FROM base_list)
-  ORDER BY
-    s.d ASC,
-    (u.program = t.target_program) DESC,
-    (u.graduation_year = t.target_grad) DESC
-  LIMIT sqlc.arg(lim)
-)
-SELECT
-  sc.username,
-  sc.first_name,
-  sc.last_name,
-  sc.program,
-  sc.graduation_year,
-  COALESCE(al.artists, '{}'::text[]) AS artists,
-  sc.distance AS distance,
-  (1.0 - sc.distance)::int AS similarity
-FROM scored sc
-LEFT JOIN LATERAL (
-  SELECT array_agg(sub.name) AS artists
-  FROM (
-    SELECT a.name
-    FROM user_artists ua
-    JOIN artists a ON a.id = ua.artist_id
-    WHERE ua.user_id = sc.id
-    ORDER BY ua.rank
-    LIMIT sqlc.arg(top_k)::int
-  ) sub
-) al ON TRUE
-ORDER BY
-  sc.distance ASC,
-  (sc.program = (SELECT target_program FROM target)) DESC,
-  (sc.graduation_year = (SELECT target_grad FROM target)) DESC;
+-- Simplified stub version now that legacy manual artist similarity is removed.
+-- Returns other users with a constant distance (1.0 -> similarity 0) until Spotify-based
+-- preference matching is implemented. Lim parameter controls max rows returned.
+SELECT u.username,
+       u.first_name,
+       u.last_name,
+       u.program,
+       u.graduation_year,
+       '{}'::text[] AS artists,
+       1.0::float8 AS distance
+FROM users u
+WHERE u.username <> sqlc.arg(username)
+ORDER BY u.created_at DESC
+LIMIT sqlc.arg(lim);
 
 -- (If you also want the :by-user-id variant, keep your FindSimilarUsersChamferByUserID below unchanged.)
 

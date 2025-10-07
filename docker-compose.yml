@@ -42,35 +42,6 @@ services:
         condition: service_healthy
     restart: "no"  # Only run once to migrate
 
-  # MusicBrainz data loader service
-  musicbrainz-loader:
-    build:
-      context: .
-      dockerfile: Dockerfile.musicbrainz
-    container_name: kmm-musicbrainz-loader
-    environment:
-      PGHOST: postgres
-      PGPORT: 5432
-      PGDATABASE: kellogg_music_match
-      PGUSER: kellogg_user
-      PGPASSWORD: kellogg_secure_pass_2024
-    volumes:
-      - ./scripts:/scripts:ro
-      - ./musicbrainz_artists_50k_deduplicated.csv:/data/musicbrainz_artists.csv:ro
-    command: >
-      bash -c "
-        echo 'Waiting for database migrations to complete...' &&
-        sleep 10 &&
-        echo 'Loading MusicBrainz artists data (deduplicated)...' &&
-        python3 /scripts/load_musicbrainz_artists.py /data/musicbrainz_artists.csv --connection-string postgresql://kellogg_user:kellogg_secure_pass_2024@postgres:5432/kellogg_music_match &&
-        echo 'MusicBrainz data loading completed successfully!'
-      "
-    depends_on:
-      flyway:
-        condition: service_completed_successfully
-      postgres:
-        condition: service_healthy
-    restart: "no"  # Only run once to load data
 
   backend:
     build:
@@ -106,8 +77,6 @@ services:
       SENDGRID_API_KEY: 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
     depends_on:
       flyway:
-        condition: service_completed_successfully
-      musicbrainz-loader:
         condition: service_completed_successfully
       postgres:
         condition: service_healthy

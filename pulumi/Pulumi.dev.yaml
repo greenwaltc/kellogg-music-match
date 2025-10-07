@@ -96,7 +96,6 @@ config:
   kellogg-music-match:backendImage: "kellogg-music-match-backend:latest"
   kellogg-music-match:uiImage: "kellogg-music-match-ui:latest"
   kellogg-music-match:postgresImage: "kellogg-music-match-postgres:latest"
-  kellogg-music-match:musicbrainzImage: "kellogg-music-match-musicbrainz:latest"
   kellogg-music-match:flywayImage: "flyway/flyway:latest"
   # ---------------------------------------------------------------------------
   # Replicas

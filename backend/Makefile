@@ -18,7 +18,6 @@ help: ## Show this help message
 	@echo ""
 	@echo "API Features:"
 	@echo "  - Chicago Events API (/chicago/events) with 6-month event range"
-	@echo "  - Artist search with MusicBrainz database (47K+ artists)"
 	@echo "  - Music matching with PWO similarity algorithm"
 	@echo "  - User authentication and profile management"
 	@echo ""

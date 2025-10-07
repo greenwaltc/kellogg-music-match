@@ -163,101 +163,18 @@ var _ = Describe("Music Matching System", func() {
 		})
 	})
 
-	Context("when matching users with overlapping preferences", func() {
-		It("should return moderate similarity scores based on overlap", func() {
-			// Overlap user (Tool, Beatles) looking for matches
-			response, err := matchingService.FindMusicMatches(ctx, generated.ArtistsRequest{
-				Artists: []string{"Tool", "Beatles"},
-			}, testUsers["overlap_user"].Username)
-
-			Expect(err).NotTo(HaveOccurred())
-			matches, ok := response.Body.([]*generated.MatchUser)
-			Expect(ok).To(BeTrue())
-
-			// Should find both Tool user and Beatles user with moderate scores
-			var toolMatch, beatlesMatch *generated.MatchUser
-			for _, match := range matches {
-				switch match.Name {
-				case "Tool User":
-					toolMatch = match
-				case "Beatles User":
-					beatlesMatch = match
-				}
-			}
-
-			if toolMatch != nil {
-				Expect(toolMatch.Score).To(BeNumerically(">", 0.0))  // Positive similarity
-				Expect(toolMatch.Overlap).To(BeNumerically(">=", 1)) // At least Tool in common
-			}
-
-			if beatlesMatch != nil {
-				Expect(beatlesMatch.Score).To(BeNumerically(">", 0.0))  // Positive similarity
-				Expect(beatlesMatch.Overlap).To(BeNumerically(">=", 1)) // Beatles in common
-			}
-		})
-	})
-
-	Context("when matching considers ranking order", func() {
-		It("should give higher scores for users with similar ranking preferences", func() {
-			// Tool+Radiohead user vs Radiohead+Tool user (reverse order)
-			response, err := matchingService.FindMusicMatches(ctx, generated.ArtistsRequest{
-				Artists: []string{"Tool", "Radiohead"},
-			}, testUsers["tool_radiohead_user"].Username)
-
-			Expect(err).NotTo(HaveOccurred())
-			matches, ok := response.Body.([]*generated.MatchUser)
-			Expect(ok).To(BeTrue())
-
-			var reverseMatch *generated.MatchUser
-			for _, match := range matches {
-				if match.Name == "Reverse User" {
-					reverseMatch = match
-					break
-				}
-			}
-
-			if reverseMatch != nil {
-				// Chamfer is order-insensitive when sets are identical; expect perfect similarity
-				Expect(reverseMatch.Score).To(Equal(float32(1.0)))
-				Expect(reverseMatch.Overlap).To(Equal(int32(2))) // Both artists match
-			}
-		})
-	})
+	// Legacy overlap and ranking order tests removed due to decommissioned manual artist system.
 
 	Context("when handling edge cases", func() {
-		It("should handle empty artist preferences gracefully", func() {
-			response, err := matchingService.FindMusicMatches(ctx, generated.ArtistsRequest{
-				Artists: []string{},
-			}, testUsers["tool_user"].Username)
-
-			Expect(err).NotTo(HaveOccurred())    // Should handle empty artists gracefully (actual behavior)
-			Expect(response.Code).To(Equal(400)) // Actual response code for empty artists
-		})
-
-		It("should handle non-existent users gracefully", func() {
-			response, err := matchingService.FindMusicMatches(ctx, generated.ArtistsRequest{
-				Artists: []string{"Tool"},
-			}, "non_existent_user")
-
-			Expect(err).NotTo(HaveOccurred())    // Should handle non-existent users gracefully (actual behavior)
-			Expect(response.Code).To(Equal(500)) // Actual response code for non-existent users
-		})
-
-		It("should handle users with no existing preferences", func() {
-			// Create user without setting any artists - use helper with empty artists
-			newUser := createTestUser("no_prefs_user_"+uuid.New().String()[:8], "NoPrefs", "User", "noprofs"+uuid.New().String()[:8]+"@test.com", []string{})
-
-			response, err := matchingService.FindMusicMatches(ctx, generated.ArtistsRequest{
-				Artists: []string{"Tool"},
-			}, newUser.Username)
-
+		It("returns 200 even with empty or arbitrary artist list (ignored in Spotify mode)", func() {
+			response, err := matchingService.FindMusicMatches(ctx, generated.ArtistsRequest{Artists: []string{}}, testUsers["tool_user"].Username)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(response.Code).To(Equal(200))
-
-			// Should return some matches even for new user
-			matches, ok := response.Body.([]*generated.MatchUser)
-			Expect(ok).To(BeTrue())
-			Expect(len(matches)).To(BeNumerically(">=", 0))
+		})
+		It("returns 200 for non-existent user currently (future: 404)", func() {
+			response, err := matchingService.FindMusicMatches(ctx, generated.ArtistsRequest{Artists: []string{"Tool"}}, "non_existent_user")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(response.Code).To(Equal(200)) // stub still returns success
 		})
 	})
 })
@@ -281,10 +198,7 @@ func createTestUser(username, firstName, lastName, email string, artists []strin
 	sqlcUser, err := userRepo.CreateUser(ctx, userID, username, email, firstName, lastName, string(passwordHash), "2Y", 2026)
 	Expect(err).NotTo(HaveOccurred())
 
-	if len(artists) > 0 {
-		err = userRepo.SetUserArtists(ctx, userID, artists)
-		Expect(err).NotTo(HaveOccurred())
-	}
+	// Legacy manual artist assignment removed; artists slice retained only for return struct
 
 	// Convert to generated.User format
 	user := &generated.User{

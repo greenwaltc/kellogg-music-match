@@ -31,7 +31,6 @@ config:
   kellogg-music-match:ingressSkipWait: "true"
   kellogg-music-match:jwtExpiryHours: "24"
   kellogg-music-match:jwtRefreshHours: "720"
-  kellogg-music-match:musicbrainzImage: kellogg-music-match-musicbrainz:latest
   kellogg-music-match:otelCollectorCpuLimit: 500m
   kellogg-music-match:otelCollectorCpuRequest: 100m
   kellogg-music-match:otelCollectorImage: otel/opentelemetry-collector:0.103.1
