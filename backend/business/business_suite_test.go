@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	business "github.com/greenwaltc/kellogg-music-match/backend/business"
 	"github.com/greenwaltc/kellogg-music-match/backend/business/concert"
 	sqlc "github.com/greenwaltc/kellogg-music-match/backend/db/sqlc"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -291,4 +292,12 @@ func (m *MockUserRepository) UpsertSpotifyTokens(ctx context.Context, userID uui
 }
 func (m *MockUserRepository) GetSpotifyTokensByUser(ctx context.Context, userID uuid.UUID) (*sqlc.SpotifyToken, error) {
 	return nil, nil
+}
+
+// Snapshot storage no-ops for tests not covering Spotify yet
+func (m *MockUserRepository) StoreSpotifyTopArtists(ctx context.Context, userID uuid.UUID, fetchedAt time.Time, rng string, items []business.SpotifyTopArtist) error {
+	return nil
+}
+func (m *MockUserRepository) StoreSpotifyTopTracks(ctx context.Context, userID uuid.UUID, fetchedAt time.Time, rng string, items []business.SpotifyTopTrack) error {
+	return nil
 }

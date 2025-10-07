@@ -60,6 +60,14 @@ services:
       DB_PASSWORD: kellogg_secure_pass_2024
       DB_SSLMODE: disable
       DEBUG_ENABLED: "false"
+      # Spotify API credentials (provide via .env; do NOT hardcode secrets)
+      # Ensure your .env file contains:
+      #   SPOTIFY_CLIENT_ID=your_spotify_app_client_id
+      #   SPOTIFY_CLIENT_SECRET=your_spotify_app_client_secret
+      # Optionally override redirect; default below matches local UI callback.
+      SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID}
+      SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET}
+      SPOTIFY_REDIRECT_URI: ${SPOTIFY_REDIRECT_URI:-http://localhost:4200/spotify/callback}
       # Ticketmaster API configuration
       TICKETMASTER_CONSUMER_KEY: 3RVuRqbo6iLpQj0iEG6UUAZiWa2Z5Y0O
       TICKETMASTER_CONSUMER_SECRET: EzfZFlmQwTHXIrsb

@@ -14,6 +14,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -49,12 +50,43 @@ type UserRepository interface {
 	// Spotify token operations
 	UpsertSpotifyTokens(ctx context.Context, userID uuid.UUID, accessToken string, refreshTokenEncrypted []byte, expiresAt time.Time, scope string, tokenType string) error
 	GetSpotifyTokensByUser(ctx context.Context, userID uuid.UUID) (*sqlc.SpotifyToken, error)
+
+	// Spotify preference snapshot operations
+	StoreSpotifyTopArtists(ctx context.Context, userID uuid.UUID, fetchedAt time.Time, rng string, items []SpotifyTopArtist) error
+	StoreSpotifyTopTracks(ctx context.Context, userID uuid.UUID, fetchedAt time.Time, rng string, items []SpotifyTopTrack) error
 }
 
 // PostgreSQLUserRepository implements UserRepository using pgxpool
 type PostgreSQLUserRepository struct {
 	pool    *pgxpool.Pool
 	queries *sqlc.Queries
+}
+
+// Pool returns underlying pgx pool (primarily for integration tests)
+func (r *PostgreSQLUserRepository) Pool() *pgxpool.Pool { return r.pool }
+
+// Domain snapshot structs (lean, kept in business layer)
+type SpotifyTopArtist struct {
+	Rank            int32
+	SpotifyArtistID string
+	Name            string
+	Genres          []string
+	Popularity      *int32
+	ImageURL        *string
+}
+
+type SpotifyTopTrack struct {
+	Rank           int32
+	SpotifyTrackID string
+	Name           string
+	ArtistNames    []string
+	ArtistIDs      []string
+	AlbumName      *string
+	AlbumID        *string
+	Popularity     *int32
+	PreviewURL     *string
+	DurationMS     *int32
+	ImageURL       *string
 }
 
 // NewPostgreSQLUserRepository creates a new repository backed by pgx/v5
@@ -363,4 +395,77 @@ func (r *PostgreSQLUserRepository) GetSpotifyTokensByUser(ctx context.Context, u
 		return nil, err
 	}
 	return &tok, nil
+}
+
+// StoreSpotifyTopArtists inserts/updates a snapshot for the given range & timestamp.
+// Uses the same ON CONFLICT pattern as the sqlc query definition (duplicated here to avoid regeneration dependency during dev).
+func (r *PostgreSQLUserRepository) StoreSpotifyTopArtists(ctx context.Context, userID uuid.UUID, fetchedAt time.Time, rng string, items []SpotifyTopArtist) error {
+	if rng == "" {
+		rng = "medium_term"
+	}
+	batch := &pgx.Batch{}
+	// We keep statement text small; ON CONFLICT ensures idempotency per rank.
+	for _, it := range items {
+		var popularity interface{} = nil
+		if it.Popularity != nil {
+			popularity = *it.Popularity
+		}
+		var img interface{} = nil
+		if it.ImageURL != nil {
+			img = *it.ImageURL
+		}
+		batch.Queue(`INSERT INTO spotify_top_artist_snapshots (user_id, fetched_at, range, item_rank, spotify_artist_id, name, genres, popularity, image_url)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+ON CONFLICT (user_id, range, item_rank) DO UPDATE SET spotify_artist_id=EXCLUDED.spotify_artist_id, name=EXCLUDED.name, genres=EXCLUDED.genres, popularity=EXCLUDED.popularity, image_url=EXCLUDED.image_url, fetched_at=EXCLUDED.fetched_at`,
+			userID, fetchedAt, rng, it.Rank, it.SpotifyArtistID, it.Name, it.Genres, popularity, img)
+	}
+	br := r.pool.SendBatch(ctx, batch)
+	defer br.Close()
+	for range items {
+		if _, err := br.Exec(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *PostgreSQLUserRepository) StoreSpotifyTopTracks(ctx context.Context, userID uuid.UUID, fetchedAt time.Time, rng string, items []SpotifyTopTrack) error {
+	if rng == "" {
+		rng = "medium_term"
+	}
+	batch := &pgx.Batch{}
+	for _, it := range items {
+		var albumName, albumID, preview, img interface{}
+		var popularity, duration interface{}
+		if it.AlbumName != nil {
+			albumName = *it.AlbumName
+		}
+		if it.AlbumID != nil {
+			albumID = *it.AlbumID
+		}
+		if it.PreviewURL != nil {
+			preview = *it.PreviewURL
+		}
+		if it.ImageURL != nil {
+			img = *it.ImageURL
+		}
+		if it.Popularity != nil {
+			popularity = *it.Popularity
+		}
+		if it.DurationMS != nil {
+			duration = *it.DurationMS
+		}
+		batch.Queue(`INSERT INTO spotify_top_track_snapshots (user_id, fetched_at, range, item_rank, spotify_track_id, name, artist_names, artist_ids, album_name, album_id, popularity, preview_url, duration_ms, image_url)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+ON CONFLICT (user_id, range, item_rank) DO UPDATE SET spotify_track_id=EXCLUDED.spotify_track_id, name=EXCLUDED.name, artist_names=EXCLUDED.artist_names, artist_ids=EXCLUDED.artist_ids, album_name=EXCLUDED.album_name, album_id=EXCLUDED.album_id, popularity=EXCLUDED.popularity, preview_url=EXCLUDED.preview_url, duration_ms=EXCLUDED.duration_ms, image_url=EXCLUDED.image_url, fetched_at=EXCLUDED.fetched_at`,
+			userID, fetchedAt, rng, it.Rank, it.SpotifyTrackID, it.Name, it.ArtistNames, it.ArtistIDs, albumName, albumID, popularity, preview, duration, img)
+	}
+	br := r.pool.SendBatch(ctx, batch)
+	defer br.Close()
+	for range items {
+		if _, err := br.Exec(); err != nil {
+			return err
+		}
+	}
+	return nil
 }

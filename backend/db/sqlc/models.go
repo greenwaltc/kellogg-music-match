@@ -9,6 +9,35 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+// Artists table containing both user-submitted and MusicBrainz reference artists
+type Artist struct {
+	ID               int32              `json:"id"`
+	Name             string             `json:"name"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	MusicbrainzID    pgtype.UUID        `json:"musicbrainz_id"`
+	SortName         pgtype.Text        `json:"sort_name"`
+	ArtistType       pgtype.Text        `json:"artist_type"`
+	Gender           pgtype.Text        `json:"gender"`
+	Country          pgtype.Text        `json:"country"`
+	LifeSpanBegin    pgtype.Date        `json:"life_span_begin"`
+	LifeSpanEnd      pgtype.Date        `json:"life_span_end"`
+	Disambiguation   pgtype.Text        `json:"disambiguation"`
+	MusicbrainzScore pgtype.Int4        `json:"musicbrainz_score"`
+	IsReference      pgtype.Bool        `json:"is_reference"`
+}
+
+type ArtistListenerCount struct {
+	ArtistID   int32 `json:"artist_id"`
+	NListeners int64 `json:"n_listeners"`
+}
+
+type ArtistNeighbor struct {
+	A         int32              `json:"a"`
+	B         int32              `json:"b"`
+	Distance  float64            `json:"distance"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
 // Artists/performers separate from MusicBrainz artists table
 type ConcertArtist struct {
 	ID        string           `json:"id"`
@@ -65,6 +94,20 @@ type PasswordResetToken struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
+type ReferenceArtist struct {
+	ID               int32       `json:"id"`
+	Name             string      `json:"name"`
+	SortName         pgtype.Text `json:"sort_name"`
+	ArtistType       pgtype.Text `json:"artist_type"`
+	Gender           pgtype.Text `json:"gender"`
+	Country          pgtype.Text `json:"country"`
+	LifeSpanBegin    pgtype.Date `json:"life_span_begin"`
+	LifeSpanEnd      pgtype.Date `json:"life_span_end"`
+	Disambiguation   pgtype.Text `json:"disambiguation"`
+	MusicbrainzScore pgtype.Int4 `json:"musicbrainz_score"`
+	MusicbrainzID    pgtype.UUID `json:"musicbrainz_id"`
+}
+
 // Per-user Spotify OAuth tokens (refresh token encrypted at rest)
 type SpotifyToken struct {
 	UserID      uuid.UUID `json:"user_id"`
@@ -77,6 +120,41 @@ type SpotifyToken struct {
 	TokenType pgtype.Text        `json:"token_type"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+// Snapshot of a user's Spotify top artists at a given sync time.
+type SpotifyTopArtistSnapshot struct {
+	ID        uuid.UUID          `json:"id"`
+	UserID    uuid.UUID          `json:"user_id"`
+	FetchedAt pgtype.Timestamptz `json:"fetched_at"`
+	// Spotify time range: short_term, medium_term, long_term
+	Range           string      `json:"range"`
+	ItemRank        int32       `json:"item_rank"`
+	SpotifyArtistID string      `json:"spotify_artist_id"`
+	Name            string      `json:"name"`
+	Genres          []string    `json:"genres"`
+	Popularity      pgtype.Int4 `json:"popularity"`
+	ImageUrl        pgtype.Text `json:"image_url"`
+}
+
+// Snapshot of a user's Spotify top tracks at a given sync time.
+type SpotifyTopTrackSnapshot struct {
+	ID        uuid.UUID          `json:"id"`
+	UserID    uuid.UUID          `json:"user_id"`
+	FetchedAt pgtype.Timestamptz `json:"fetched_at"`
+	// Spotify time range: short_term, medium_term, long_term
+	Range          string      `json:"range"`
+	ItemRank       int32       `json:"item_rank"`
+	SpotifyTrackID string      `json:"spotify_track_id"`
+	Name           string      `json:"name"`
+	ArtistNames    []string    `json:"artist_names"`
+	ArtistIds      []string    `json:"artist_ids"`
+	AlbumName      pgtype.Text `json:"album_name"`
+	AlbumID        pgtype.Text `json:"album_id"`
+	Popularity     pgtype.Int4 `json:"popularity"`
+	PreviewUrl     pgtype.Text `json:"preview_url"`
+	DurationMs     pgtype.Int4 `json:"duration_ms"`
+	ImageUrl       pgtype.Text `json:"image_url"`
 }
 
 type User struct {
@@ -94,6 +172,13 @@ type User struct {
 	GraduationYear pgtype.Int4 `json:"graduation_year"`
 }
 
+type UserArtist struct {
+	UserID    uuid.UUID          `json:"user_id"`
+	ArtistID  int32              `json:"artist_id"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	Rank      int16              `json:"rank"`
+}
+
 // User interest (INTERESTED, GOING, LOOKING_FOR_GROUP) for concert events
 type UserConcertEventInterest struct {
 	UserID  uuid.UUID `json:"user_id"`
@@ -104,6 +189,43 @@ type UserConcertEventInterest struct {
 	Note      pgtype.Text        `json:"note"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+type UserSubmittedArtist struct {
+	ID        int32              `json:"id"`
+	Name      string             `json:"name"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type VCurrentSpotifyTopArtist struct {
+	ID              uuid.UUID          `json:"id"`
+	UserID          uuid.UUID          `json:"user_id"`
+	FetchedAt       pgtype.Timestamptz `json:"fetched_at"`
+	Range           string             `json:"range"`
+	ItemRank        int32              `json:"item_rank"`
+	SpotifyArtistID string             `json:"spotify_artist_id"`
+	Name            string             `json:"name"`
+	Genres          []string           `json:"genres"`
+	Popularity      pgtype.Int4        `json:"popularity"`
+	ImageUrl        pgtype.Text        `json:"image_url"`
+}
+
+type VCurrentSpotifyTopTrack struct {
+	ID             uuid.UUID          `json:"id"`
+	UserID         uuid.UUID          `json:"user_id"`
+	FetchedAt      pgtype.Timestamptz `json:"fetched_at"`
+	Range          string             `json:"range"`
+	ItemRank       int32              `json:"item_rank"`
+	SpotifyTrackID string             `json:"spotify_track_id"`
+	Name           string             `json:"name"`
+	ArtistNames    []string           `json:"artist_names"`
+	ArtistIds      []string           `json:"artist_ids"`
+	AlbumName      pgtype.Text        `json:"album_name"`
+	AlbumID        pgtype.Text        `json:"album_id"`
+	Popularity     pgtype.Int4        `json:"popularity"`
+	PreviewUrl     pgtype.Text        `json:"preview_url"`
+	DurationMs     pgtype.Int4        `json:"duration_ms"`
+	ImageUrl       pgtype.Text        `json:"image_url"`
 }
 
 // Concert venues with location information

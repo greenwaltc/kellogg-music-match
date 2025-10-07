@@ -9,6 +9,7 @@ import (
 	"github.com/greenwaltc/kellogg-music-match/backend/business"
 	"github.com/greenwaltc/kellogg-music-match/backend/business/spotify"
 	"github.com/greenwaltc/kellogg-music-match/backend/generated"
+	"github.com/greenwaltc/kellogg-music-match/backend/logger"
 )
 
 // AuthAPIServiceWrapper wraps business logic to implement OpenAPI service interface
@@ -96,11 +97,12 @@ func (w *MatchingAPIServiceWrapper) SyncSpotify(ctx context.Context, body genera
 	user, _ := GetUserFromContext(ctx)
 	username := user.Username
 	job := w.spotifyService.StartSync(ctx, username, body.Code, body.State)
-	// Perform (stub) token exchange early; errors could mark job failed (future enhancement)
-	accessToken, refreshToken, expiresIn, err := w.spotifyService.ExchangeCodeForTokens(ctx, body.Code)
+	// Attempt token exchange (PKCE supported if client provided code_verifier)
+	accessToken, refreshToken, expiresIn, err := w.spotifyService.ExchangeCodeForTokens(ctx, body.Code, body.CodeVerifier)
 	if err != nil {
 		job.Status = spotify.StatusFailed
 		job.Message = "Token exchange failed"
+		logger.L().Error("spotify.sync.token_exchange.error", "err", err, "user", username)
 		return generated.Response(500, generated.ErrorResponse{Message: job.Message, CreatedAt: time.Now().UTC()}), nil
 	}
 	if user != nil && user.UserID != "" {
@@ -110,6 +112,8 @@ func (w *MatchingAPIServiceWrapper) SyncSpotify(ctx context.Context, body genera
 				job.Message = "Persist tokens failed"
 				return generated.Response(500, generated.ErrorResponse{Message: job.Message, CreatedAt: time.Now().UTC()}), nil
 			}
+			// Provide token info to background ingestion job
+			w.spotifyService.SetJobTokens(username, uid, accessToken, refreshToken, expiresIn)
 		}
 	}
 	// Immediately mark job status as pending/syncing response
@@ -155,7 +159,7 @@ func (w *MatchingAPIServiceWrapper) RetrySpotifySync(ctx context.Context, body g
 		}
 		return generated.Response(500, generated.ErrorResponse{Message: "Retry failed", CreatedAt: time.Now().UTC()}), nil
 	}
-	accessToken, refreshToken, expiresIn, err2 := w.spotifyService.ExchangeCodeForTokens(ctx, body.Code)
+	accessToken, refreshToken, expiresIn, err2 := w.spotifyService.ExchangeCodeForTokens(ctx, body.Code, body.CodeVerifier)
 	if err2 == nil && user != nil && user.UserID != "" {
 		if uid, perr := uuid.Parse(user.UserID); perr == nil {
 			_ = w.spotifyService.PersistTokens(ctx, uid, accessToken, refreshToken, expiresIn, "")

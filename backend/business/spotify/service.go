@@ -2,11 +2,19 @@ package spotify
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/greenwaltc/kellogg-music-match/backend/business"
 	"github.com/greenwaltc/kellogg-music-match/backend/business/crypto"
 	"github.com/greenwaltc/kellogg-music-match/backend/logger"
 )
@@ -31,16 +39,27 @@ type SyncJob struct {
 	AccessToken  string
 	RefreshToken string
 	ExpiresAt    *time.Time
+	UserID       uuid.UUID
 }
 
 // Service coordinates Spotify sync logic (stub implementation)
 type Service struct {
-	mu   sync.Mutex
-	jobs map[string]*SyncJob // keyed by username
-	// map of username -> time last started; used for simple rate limiting
-	lastStart map[string]time.Time
-	store     TokenStore
-	encKey    string
+	mu                sync.Mutex
+	jobs              map[string]*SyncJob // keyed by username
+	lastStart         map[string]time.Time
+	store             TokenStore
+	encKey            string
+	httpClient        *http.Client
+	clientID          string
+	clientSecret      string
+	redirectURI       string
+	apiBase           string
+	tokenURL          string
+	tokenWaitInterval time.Duration
+	tokenWaitTimeout  time.Duration
+
+	// test hook overrides
+	fetchOverride func(ctx context.Context, username, rng string) ([]business.SpotifyTopArtist, []business.SpotifyTopTrack, error)
 }
 
 var ErrSyncInProgress = errors.New("sync already in progress")
@@ -52,17 +71,68 @@ const cooldown = 5 * time.Second
 // Cancelled status (extended)
 const StatusCancelled = "cancelled"
 
-// Minimum seconds after finish to allow restart without hitting cooldown
-const postFinishGrace = 0 * time.Second
-
 // TokenStore defines persistence needed for Spotify tokens (subset of repository)
 type TokenStore interface {
 	UpsertSpotifyTokens(ctx context.Context, userID uuid.UUID, accessToken string, refreshTokenEncrypted []byte, expiresAt time.Time, scope string, tokenType string) error
+	StoreSpotifyTopArtists(ctx context.Context, userID uuid.UUID, fetchedAt time.Time, rng string, items []business.SpotifyTopArtist) error
+	StoreSpotifyTopTracks(ctx context.Context, userID uuid.UUID, fetchedAt time.Time, rng string, items []business.SpotifyTopTrack) error
+}
+
+// Functional options
+type Option func(*Service)
+
+func WithHTTPClient(c *http.Client) Option {
+	return func(s *Service) {
+		if c != nil {
+			s.httpClient = c
+		}
+	}
+}
+func WithSpotifyCredentials(clientID, clientSecret, redirectURI string) Option {
+	return func(s *Service) {
+		s.clientID = clientID
+		s.clientSecret = clientSecret
+		s.redirectURI = redirectURI
+	}
+}
+func WithBaseURLs(apiBase, tokenURL string) Option {
+	return func(s *Service) {
+		if apiBase != "" {
+			s.apiBase = apiBase
+		}
+		if tokenURL != "" {
+			s.tokenURL = tokenURL
+		}
+	}
+}
+func WithTokenWait(interval, timeout time.Duration) Option {
+	return func(s *Service) {
+		if interval > 0 {
+			s.tokenWaitInterval = interval
+		}
+		if timeout > 0 {
+			s.tokenWaitTimeout = timeout
+		}
+	}
 }
 
 // NewService constructs a spotify Service. If store is nil, persistence is disabled (tokens stay in-memory only)
-func NewService(store TokenStore, encryptionKey string) *Service {
-	return &Service{jobs: make(map[string]*SyncJob), lastStart: make(map[string]time.Time), store: store, encKey: encryptionKey}
+func NewService(store TokenStore, encryptionKey string, opts ...Option) *Service {
+	s := &Service{
+		jobs:              make(map[string]*SyncJob),
+		lastStart:         make(map[string]time.Time),
+		store:             store,
+		encKey:            encryptionKey,
+		httpClient:        &http.Client{Timeout: 15 * time.Second},
+		apiBase:           "https://api.spotify.com/v1",
+		tokenURL:          "https://accounts.spotify.com/api/token",
+		tokenWaitInterval: 150 * time.Millisecond,
+		tokenWaitTimeout:  3 * time.Second,
+	}
+	for _, o := range opts {
+		o(s)
+	}
+	return s
 }
 
 // StartSync registers a new sync job (or restarts if previous finished)
@@ -108,35 +178,107 @@ func (s *Service) GetStatus(username string) *SyncJob {
 	return &SyncJob{Status: StatusComplete, Progress: 100, Message: "No active job"}
 }
 
+// runJob transitions through states and performs (stub) ingestion of Spotify top items.
+// Real implementation would call Spotify Web API; here we generate placeholder data and persist.
 func (s *Service) runJob(username string) {
-	stages := []int32{5, 25, 55, 80, 100}
-	interval := 800 * time.Millisecond
-	for i, p := range stages {
-		time.Sleep(interval)
+	// Wait for tokens
+	waited := time.Duration(0)
+	for {
 		s.mu.Lock()
 		job := s.jobs[username]
 		if job == nil {
 			s.mu.Unlock()
 			return
 		}
-		if job.Status == StatusCancelled { // stop progression
-			logger.L().Info("spotify.sync.cancelled", "user", username)
+		if job.Status == StatusCancelled {
 			s.mu.Unlock()
 			return
 		}
-		if i == 0 {
+		if job.AccessToken != "" {
 			job.Status = StatusInProgress
+			job.Progress = 5
+			s.mu.Unlock()
+			break
 		}
-		job.Progress = p
-		if p == 100 {
-			job.Status = StatusComplete
-			finished := time.Now().UTC()
-			job.FinishedAt = &finished
-			job.Message = "Sync finished"
+		s.mu.Unlock()
+		if waited >= s.tokenWaitTimeout {
+			s.mu.Lock()
+			if job := s.jobs[username]; job != nil {
+				job.Status = StatusFailed
+				job.Message = "Timed out waiting for token exchange"
+				finished := time.Now().UTC()
+				job.FinishedAt = &finished
+			}
+			s.mu.Unlock()
+			return
 		}
-		logger.L().Info("spotify.sync.progress", "user", username, "progress", p, "status", job.Status)
+		time.Sleep(s.tokenWaitInterval)
+		waited += s.tokenWaitInterval
+	}
+
+	ranges := []string{"short_term", "medium_term", "long_term"}
+	perRangeProgress := int32((100 - 5) / int32(len(ranges)))
+	succeeded := []string{}
+	failed := []string{}
+	for i, rng := range ranges {
+		var artists []business.SpotifyTopArtist
+		var tracks []business.SpotifyTopTrack
+		var err error
+		if s.fetchOverride != nil {
+			artists, tracks, err = s.fetchOverride(context.Background(), username, rng)
+		} else {
+			artists, tracks, err = s.fetchTopItems(context.Background(), username, rng)
+		}
+		if err != nil {
+			logger.L().Error("spotify.sync.fetch.error", "user", username, "range", rng, "err", err)
+			failed = append(failed, rng+":"+err.Error())
+		} else {
+			succeeded = append(succeeded, rng)
+			if s.store != nil {
+				s.mu.Lock()
+				job := s.jobs[username]
+				userID := uuid.Nil
+				if job != nil {
+					userID = job.UserID
+				}
+				s.mu.Unlock()
+				if userID != uuid.Nil {
+					fetchedAt := time.Now().UTC()
+					if err := s.store.StoreSpotifyTopArtists(context.Background(), userID, fetchedAt, rng, artists); err != nil {
+						logger.L().Error("spotify.sync.persist.artists.error", "err", err)
+					}
+					if err := s.store.StoreSpotifyTopTracks(context.Background(), userID, fetchedAt, rng, tracks); err != nil {
+						logger.L().Error("spotify.sync.persist.tracks.error", "err", err)
+					}
+				}
+			}
+		}
+		s.mu.Lock()
+		if job := s.jobs[username]; job != nil && job.Status == StatusInProgress {
+			job.Progress = 5 + perRangeProgress*int32(i+1)
+		}
 		s.mu.Unlock()
 	}
+	// Finalize status
+	s.mu.Lock()
+	if job := s.jobs[username]; job != nil && (job.Status == StatusInProgress) {
+		finished := time.Now().UTC()
+		job.FinishedAt = &finished
+		if len(succeeded) == 0 {
+			job.Status = StatusFailed
+			job.Message = "All ranges failed"
+		} else {
+			job.Status = StatusComplete
+			job.Progress = 100
+			if len(failed) > 0 {
+				job.Message = fmt.Sprintf("Partial success. Succeeded: %v Failed: %v", succeeded, failed)
+			} else {
+				job.Message = "Sync finished"
+			}
+		}
+		logger.L().Info("spotify.sync.complete", "user", username, "succeeded", succeeded, "failed", failed)
+	}
+	s.mu.Unlock()
 }
 
 // RetrySync allows restarting a sync only if previous job is in a terminal state (failed, cancelled, complete)
@@ -159,11 +301,51 @@ func (s *Service) RetrySync(ctx context.Context, username string, code, state st
 	return job, nil
 }
 
-// ExchangeCodeForTokens is a stub representing the server-side code->token exchange.
-// In a real implementation this would call Spotify's /api/token endpoint with client secret.
-func (s *Service) ExchangeCodeForTokens(ctx context.Context, code string) (accessToken string, refreshToken string, expiresIn int, err error) {
-	// Stub: return synthetic values
-	return "stub_access_token", "stub_refresh_token", 3600, nil
+// ExchangeCodeForTokens performs the authorization code exchange against Spotify Accounts service.
+// Supports optional PKCE by supplying a non-empty codeVerifier.
+func (s *Service) ExchangeCodeForTokens(ctx context.Context, code string, codeVerifier string) (string, string, int, error) {
+	if s.clientID == "" || s.clientSecret == "" || s.redirectURI == "" {
+		return "", "", 0, errors.New("spotify credentials not configured")
+	}
+	form := url.Values{}
+	form.Set("grant_type", "authorization_code")
+	form.Set("code", code)
+	form.Set("redirect_uri", s.redirectURI)
+	if codeVerifier != "" { // PKCE
+		form.Set("code_verifier", codeVerifier)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.tokenURL, strings.NewReader(form.Encode()))
+	if err != nil {
+		return "", "", 0, err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.SetBasicAuth(s.clientID, s.clientSecret)
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return "", "", 0, err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != 200 {
+		snippet := string(body)
+		if len(snippet) > 300 {
+			snippet = snippet[:300] + "..."
+		}
+		// Log detailed error server-side but return generic to caller.
+		logger.L().Error("spotify.token.exchange.failed", "status", resp.StatusCode, "body", snippet)
+		return "", "", 0, fmt.Errorf("token exchange failed status=%d", resp.StatusCode)
+	}
+	var parsed struct {
+		AccessToken  string `json:"access_token"`
+		RefreshToken string `json:"refresh_token"`
+		ExpiresIn    int    `json:"expires_in"`
+		Scope        string `json:"scope"`
+		TokenType    string `json:"token_type"`
+	}
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return "", "", 0, err
+	}
+	return parsed.AccessToken, parsed.RefreshToken, parsed.ExpiresIn, nil
 }
 
 // PersistTokens encrypts and stores tokens if a store and encryption key are configured.
@@ -201,4 +383,177 @@ func (s *Service) CancelSync(username string) bool {
 		return true
 	}
 	return false
+}
+
+// SetJobTokens populates an existing job (created by StartSync) with token info and userID.
+// Called by the HTTP wrapper after successful token exchange & persistence.
+func (s *Service) SetJobTokens(username string, userID uuid.UUID, accessToken, refreshToken string, expiresIn int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	job, ok := s.jobs[username]
+	if !ok {
+		return
+	}
+	job.AccessToken = accessToken
+	job.RefreshToken = refreshToken
+	if expiresIn > 0 {
+		exp := time.Now().UTC().Add(time.Duration(expiresIn) * time.Second)
+		job.ExpiresAt = &exp
+	}
+	job.UserID = userID
+}
+
+// ----- Spotify API fetch helpers -----
+type spotifyArtist struct {
+	ID         string   `json:"id"`
+	Name       string   `json:"name"`
+	Genres     []string `json:"genres"`
+	Popularity *int     `json:"popularity"`
+}
+type spotifyTrack struct {
+	ID         string          `json:"id"`
+	Name       string          `json:"name"`
+	DurationMS *int            `json:"duration_ms"`
+	Popularity *int            `json:"popularity"`
+	Artists    []spotifyArtist `json:"artists"`
+}
+
+// fetchTopItems gets top artists & tracks for a single time range
+func (s *Service) fetchTopItems(ctx context.Context, username string, rng string) ([]business.SpotifyTopArtist, []business.SpotifyTopTrack, error) {
+	s.mu.Lock()
+	job := s.jobs[username]
+	token := ""
+	if job != nil {
+		token = job.AccessToken
+	}
+	s.mu.Unlock()
+	if token == "" {
+		return nil, nil, errors.New("missing access token")
+	}
+	artistsResp, err := s.fetchAll(ctx, token, fmt.Sprintf("%s/me/top/artists?time_range=%s&limit=50", s.apiBase, rng))
+	if err != nil {
+		return nil, nil, err
+	}
+	tracksResp, err := s.fetchAll(ctx, token, fmt.Sprintf("%s/me/top/tracks?time_range=%s&limit=50", s.apiBase, rng))
+	if err != nil {
+		return nil, nil, err
+	}
+	artists := []business.SpotifyTopArtist{}
+	for i, a := range artistsResp.Artists {
+		var pop *int32
+		if a.Popularity != nil {
+			p := int32(*a.Popularity)
+			pop = &p
+		}
+		artists = append(artists, business.SpotifyTopArtist{Rank: int32(i + 1), SpotifyArtistID: a.ID, Name: a.Name, Genres: a.Genres, Popularity: pop})
+	}
+	tracks := []business.SpotifyTopTrack{}
+	for i, t := range tracksResp.Tracks {
+		var pop *int32
+		if t.Popularity != nil {
+			p := int32(*t.Popularity)
+			pop = &p
+		}
+		var dur *int32
+		if t.DurationMS != nil {
+			d := int32(*t.DurationMS)
+			dur = &d
+		}
+		artistNames := []string{}
+		artistIDs := []string{}
+		for _, ar := range t.Artists {
+			artistNames = append(artistNames, ar.Name)
+			artistIDs = append(artistIDs, ar.ID)
+		}
+		tracks = append(tracks, business.SpotifyTopTrack{Rank: int32(i + 1), SpotifyTrackID: t.ID, Name: t.Name, ArtistNames: artistNames, ArtistIDs: artistIDs, Popularity: pop, DurationMS: dur})
+	}
+	return artists, tracks, nil
+}
+
+// unified paging (Spotify returns next URL if more pages)
+type topArtistsPayload struct {
+	Items []spotifyArtist `json:"items"`
+	Next  *string         `json:"next"`
+}
+type topTracksPayload struct {
+	Items []spotifyTrack `json:"items"`
+	Next  *string        `json:"next"`
+}
+
+func (s *Service) fetchAll(ctx context.Context, token, firstURL string) (struct {
+	Artists []spotifyArtist
+	Tracks  []spotifyTrack
+}, error) {
+	result := struct {
+		Artists []spotifyArtist
+		Tracks  []spotifyTrack
+	}{}
+	// Determine entity from URL path
+	isArtists := strings.Contains(firstURL, "/artists")
+	nextURL := firstURL
+	for nextURL != "" {
+		attempts := 0
+		for {
+			attempts++
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, nextURL, nil)
+			if err != nil {
+				return result, err
+			}
+			req.Header.Set("Authorization", "Bearer "+token)
+			resp, err := s.httpClient.Do(req)
+			if err != nil {
+				return result, err
+			}
+			body, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			if resp.StatusCode == 429 { // rate limited
+				retryAfter := time.Duration(0)
+				if ra := resp.Header.Get("Retry-After"); ra != "" {
+					if secs, err := strconv.Atoi(ra); err == nil {
+						retryAfter = time.Duration(secs) * time.Second
+					}
+				}
+				if retryAfter == 0 {
+					retryAfter = time.Duration(attempts) * 500 * time.Millisecond
+				}
+				if attempts >= 3 {
+					return result, fmt.Errorf("spotify api rate limited after retries status=429 body=%s", string(body))
+				}
+				time.Sleep(retryAfter)
+				continue
+			}
+			if resp.StatusCode != 200 {
+				return result, fmt.Errorf("spotify api error status=%d body=%s", resp.StatusCode, string(body))
+			}
+			if isArtists {
+				var p topArtistsPayload
+				if err := json.Unmarshal(body, &p); err != nil {
+					return result, err
+				}
+				result.Artists = append(result.Artists, p.Items...)
+				if p.Next != nil {
+					nextURL = *p.Next
+				} else {
+					nextURL = ""
+				}
+			} else {
+				var p topTracksPayload
+				if err := json.Unmarshal(body, &p); err != nil {
+					return result, err
+				}
+				result.Tracks = append(result.Tracks, p.Items...)
+				if p.Next != nil {
+					nextURL = *p.Next
+				} else {
+					nextURL = ""
+				}
+			}
+			break
+		}
+		// Safety cap (in case of loop) - should not exceed 5 pages
+		if len(result.Artists)+len(result.Tracks) > 250 {
+			break
+		}
+	}
+	return result, nil
 }

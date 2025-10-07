@@ -241,6 +241,45 @@ ON CONFLICT (user_id) DO UPDATE SET
 -- name: GetSpotifyTokensByUser :one
 SELECT * FROM spotify_tokens WHERE user_id = sqlc.arg(user_id) LIMIT 1;
 
+-- =======================
+-- Spotify Top Items
+-- =======================
+
+-- name: DeleteSpotifyTopArtistSnapshotForRange :exec
+DELETE FROM spotify_top_artist_snapshots 
+WHERE user_id = sqlc.arg(user_id) AND range = sqlc.arg(range) AND fetched_at < sqlc.arg(fetched_at_cutoff);
+
+-- name: InsertSpotifyTopArtistSnapshot :exec
+INSERT INTO spotify_top_artist_snapshots (user_id, fetched_at, range, item_rank, spotify_artist_id, name, genres, popularity, image_url)
+VALUES (sqlc.arg(user_id), sqlc.arg(fetched_at), sqlc.arg(range), sqlc.arg(item_rank), sqlc.arg(spotify_artist_id), sqlc.arg(name), sqlc.arg(genres), sqlc.arg(popularity), sqlc.arg(image_url))
+ON CONFLICT (user_id, range, item_rank) DO UPDATE SET
+  spotify_artist_id = EXCLUDED.spotify_artist_id,
+  name = EXCLUDED.name,
+  genres = EXCLUDED.genres,
+  popularity = EXCLUDED.popularity,
+  image_url = EXCLUDED.image_url,
+  fetched_at = EXCLUDED.fetched_at;
+
+-- name: DeleteSpotifyTopTrackSnapshotForRange :exec
+DELETE FROM spotify_top_track_snapshots 
+WHERE user_id = sqlc.arg(user_id) AND range = sqlc.arg(range) AND fetched_at < sqlc.arg(fetched_at_cutoff);
+
+-- name: InsertSpotifyTopTrackSnapshot :exec
+INSERT INTO spotify_top_track_snapshots (user_id, fetched_at, range, item_rank, spotify_track_id, name, artist_names, artist_ids, album_name, album_id, popularity, preview_url, duration_ms, image_url)
+VALUES (sqlc.arg(user_id), sqlc.arg(fetched_at), sqlc.arg(range), sqlc.arg(item_rank), sqlc.arg(spotify_track_id), sqlc.arg(name), sqlc.arg(artist_names), sqlc.arg(artist_ids), sqlc.arg(album_name), sqlc.arg(album_id), sqlc.arg(popularity), sqlc.arg(preview_url), sqlc.arg(duration_ms), sqlc.arg(image_url))
+ON CONFLICT (user_id, range, item_rank) DO UPDATE SET
+  spotify_track_id = EXCLUDED.spotify_track_id,
+  name = EXCLUDED.name,
+  artist_names = EXCLUDED.artist_names,
+  artist_ids = EXCLUDED.artist_ids,
+  album_name = EXCLUDED.album_name,
+  album_id = EXCLUDED.album_id,
+  popularity = EXCLUDED.popularity,
+  preview_url = EXCLUDED.preview_url,
+  duration_ms = EXCLUDED.duration_ms,
+  image_url = EXCLUDED.image_url,
+  fetched_at = EXCLUDED.fetched_at;
+
 
 -- name: GetEventsForArtist :many
 SELECT 

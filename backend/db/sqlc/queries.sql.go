@@ -137,6 +137,42 @@ func (q *Queries) DeleteOldConcertEvents(ctx context.Context, cutoffDate pgtype.
 	return err
 }
 
+const deleteSpotifyTopArtistSnapshotForRange = `-- name: DeleteSpotifyTopArtistSnapshotForRange :exec
+
+DELETE FROM spotify_top_artist_snapshots 
+WHERE user_id = $1 AND range = $2 AND fetched_at < $3
+`
+
+type DeleteSpotifyTopArtistSnapshotForRangeParams struct {
+	UserID          uuid.UUID          `json:"user_id"`
+	Range           string             `json:"range"`
+	FetchedAtCutoff pgtype.Timestamptz `json:"fetched_at_cutoff"`
+}
+
+// =======================
+// Spotify Top Items
+// =======================
+func (q *Queries) DeleteSpotifyTopArtistSnapshotForRange(ctx context.Context, arg DeleteSpotifyTopArtistSnapshotForRangeParams) error {
+	_, err := q.db.Exec(ctx, deleteSpotifyTopArtistSnapshotForRange, arg.UserID, arg.Range, arg.FetchedAtCutoff)
+	return err
+}
+
+const deleteSpotifyTopTrackSnapshotForRange = `-- name: DeleteSpotifyTopTrackSnapshotForRange :exec
+DELETE FROM spotify_top_track_snapshots 
+WHERE user_id = $1 AND range = $2 AND fetched_at < $3
+`
+
+type DeleteSpotifyTopTrackSnapshotForRangeParams struct {
+	UserID          uuid.UUID          `json:"user_id"`
+	Range           string             `json:"range"`
+	FetchedAtCutoff pgtype.Timestamptz `json:"fetched_at_cutoff"`
+}
+
+func (q *Queries) DeleteSpotifyTopTrackSnapshotForRange(ctx context.Context, arg DeleteSpotifyTopTrackSnapshotForRangeParams) error {
+	_, err := q.db.Exec(ctx, deleteSpotifyTopTrackSnapshotForRange, arg.UserID, arg.Range, arg.FetchedAtCutoff)
+	return err
+}
+
 const deleteUser = `-- name: DeleteUser :exec
 DELETE FROM users WHERE id = $1
 `
@@ -1158,6 +1194,99 @@ func (q *Queries) GetUserByUsernameWithPassword(ctx context.Context, username st
 		&i.GraduationYear,
 	)
 	return i, err
+}
+
+const insertSpotifyTopArtistSnapshot = `-- name: InsertSpotifyTopArtistSnapshot :exec
+INSERT INTO spotify_top_artist_snapshots (user_id, fetched_at, range, item_rank, spotify_artist_id, name, genres, popularity, image_url)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+ON CONFLICT (user_id, range, item_rank) DO UPDATE SET
+  spotify_artist_id = EXCLUDED.spotify_artist_id,
+  name = EXCLUDED.name,
+  genres = EXCLUDED.genres,
+  popularity = EXCLUDED.popularity,
+  image_url = EXCLUDED.image_url,
+  fetched_at = EXCLUDED.fetched_at
+`
+
+type InsertSpotifyTopArtistSnapshotParams struct {
+	UserID          uuid.UUID          `json:"user_id"`
+	FetchedAt       pgtype.Timestamptz `json:"fetched_at"`
+	Range           string             `json:"range"`
+	ItemRank        int32              `json:"item_rank"`
+	SpotifyArtistID string             `json:"spotify_artist_id"`
+	Name            string             `json:"name"`
+	Genres          []string           `json:"genres"`
+	Popularity      pgtype.Int4        `json:"popularity"`
+	ImageUrl        pgtype.Text        `json:"image_url"`
+}
+
+func (q *Queries) InsertSpotifyTopArtistSnapshot(ctx context.Context, arg InsertSpotifyTopArtistSnapshotParams) error {
+	_, err := q.db.Exec(ctx, insertSpotifyTopArtistSnapshot,
+		arg.UserID,
+		arg.FetchedAt,
+		arg.Range,
+		arg.ItemRank,
+		arg.SpotifyArtistID,
+		arg.Name,
+		arg.Genres,
+		arg.Popularity,
+		arg.ImageUrl,
+	)
+	return err
+}
+
+const insertSpotifyTopTrackSnapshot = `-- name: InsertSpotifyTopTrackSnapshot :exec
+INSERT INTO spotify_top_track_snapshots (user_id, fetched_at, range, item_rank, spotify_track_id, name, artist_names, artist_ids, album_name, album_id, popularity, preview_url, duration_ms, image_url)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+ON CONFLICT (user_id, range, item_rank) DO UPDATE SET
+  spotify_track_id = EXCLUDED.spotify_track_id,
+  name = EXCLUDED.name,
+  artist_names = EXCLUDED.artist_names,
+  artist_ids = EXCLUDED.artist_ids,
+  album_name = EXCLUDED.album_name,
+  album_id = EXCLUDED.album_id,
+  popularity = EXCLUDED.popularity,
+  preview_url = EXCLUDED.preview_url,
+  duration_ms = EXCLUDED.duration_ms,
+  image_url = EXCLUDED.image_url,
+  fetched_at = EXCLUDED.fetched_at
+`
+
+type InsertSpotifyTopTrackSnapshotParams struct {
+	UserID         uuid.UUID          `json:"user_id"`
+	FetchedAt      pgtype.Timestamptz `json:"fetched_at"`
+	Range          string             `json:"range"`
+	ItemRank       int32              `json:"item_rank"`
+	SpotifyTrackID string             `json:"spotify_track_id"`
+	Name           string             `json:"name"`
+	ArtistNames    []string           `json:"artist_names"`
+	ArtistIds      []string           `json:"artist_ids"`
+	AlbumName      pgtype.Text        `json:"album_name"`
+	AlbumID        pgtype.Text        `json:"album_id"`
+	Popularity     pgtype.Int4        `json:"popularity"`
+	PreviewUrl     pgtype.Text        `json:"preview_url"`
+	DurationMs     pgtype.Int4        `json:"duration_ms"`
+	ImageUrl       pgtype.Text        `json:"image_url"`
+}
+
+func (q *Queries) InsertSpotifyTopTrackSnapshot(ctx context.Context, arg InsertSpotifyTopTrackSnapshotParams) error {
+	_, err := q.db.Exec(ctx, insertSpotifyTopTrackSnapshot,
+		arg.UserID,
+		arg.FetchedAt,
+		arg.Range,
+		arg.ItemRank,
+		arg.SpotifyTrackID,
+		arg.Name,
+		arg.ArtistNames,
+		arg.ArtistIds,
+		arg.AlbumName,
+		arg.AlbumID,
+		arg.Popularity,
+		arg.PreviewUrl,
+		arg.DurationMs,
+		arg.ImageUrl,
+	)
+	return err
 }
 
 const markPasswordResetTokenAsUsed = `-- name: MarkPasswordResetTokenAsUsed :exec

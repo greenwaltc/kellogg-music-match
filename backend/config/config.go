@@ -109,6 +109,7 @@ type SpotifyConfig struct {
 	ClientID        string
 	ClientSecret    string
 	RefreshTokenKey string
+	RedirectURI     string
 }
 
 // Load creates a new Config instance from environment variables
@@ -186,6 +187,7 @@ func Load() *Config {
 			ClientID:        getEnvWithDefault("SPOTIFY_CLIENT_ID", "spotify-client-id"),
 			ClientSecret:    getEnvWithDefault("SPOTIFY_CLIENT_SECRET", "spotify-client-secret"),
 			RefreshTokenKey: getEnvWithDefault("SPOTIFY_REFRESH_TOKEN_KEY", ""),
+			RedirectURI:     getEnvWithDefault("SPOTIFY_REDIRECT_URI", "http://localhost:4200/spotify/callback"),
 		},
 	}
 }

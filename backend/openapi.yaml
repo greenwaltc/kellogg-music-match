@@ -941,6 +941,11 @@ components:
           type: string
           description: Original anti-CSRF state value previously generated for the auth request
           minLength: 8
+        code_verifier:
+          type: string
+          description: PKCE code_verifier corresponding to the original code_challenge (S256)
+          minLength: 43
+          maxLength: 128
       required:
         - code
         - state

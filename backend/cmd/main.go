@@ -86,8 +86,12 @@ func main() {
 	matchingService := business.NewMatchingServiceWithConfig(userRepo, matchingEngine, &cfg.Artist)
 	feedbackService := business.NewFeedbackService(userRepo)
 
-	// Initialize Spotify service (stubbed sync + token exchange placeholder)
-	spotifyService := spotify.NewService(userRepo, cfg.Spotify.RefreshTokenKey) // with token persistence
+	// Initialize Spotify service with real token exchange support (HTTP client + credentials)
+	spotifyService := spotify.NewService(
+		userRepo,
+		cfg.Spotify.RefreshTokenKey,
+		spotify.WithSpotifyCredentials(cfg.Spotify.ClientID, cfg.Spotify.ClientSecret, cfg.Spotify.RedirectURI),
+	)
 
 	// Initialize concert API service (will be enhanced with repository if available)
 	var concertAPIService *business.ConcertAPIService

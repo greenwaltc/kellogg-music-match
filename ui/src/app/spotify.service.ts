@@ -96,9 +96,9 @@ export class SpotifyService {
     const codeVerifier = localStorage.getItem('spotify_code_verifier') || '';
     return from(this.cfg.getConfig()).pipe(
       switchMap(cfg => {
-        const redirectUri = cfg.spotifyRedirectUri && cfg.spotifyRedirectUri.trim().length > 0 ? cfg.spotifyRedirectUri : this.fallbackRedirectUri;
-        // Backend expects code/state only at /sync/spotify; codeVerifier & redirectUri remain client-side.
-        return this.http.post(this.api.url('/sync/spotify'), { code, state });
+    const redirectUri = cfg.spotifyRedirectUri && cfg.spotifyRedirectUri.trim().length > 0 ? cfg.spotifyRedirectUri : this.fallbackRedirectUri;
+    // Backend now also accepts optional PKCE code_verifier.
+    return this.http.post(this.api.url('/sync/spotify'), { code, state, code_verifier: codeVerifier });
       }),
       tap({
         next: () => {

@@ -25,6 +25,11 @@ type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteExpiredPasswordResetTokens(ctx context.Context) error
 	DeleteOldConcertEvents(ctx context.Context, cutoffDate pgtype.Timestamp) error
+	// =======================
+	// Spotify Top Items
+	// =======================
+	DeleteSpotifyTopArtistSnapshotForRange(ctx context.Context, arg DeleteSpotifyTopArtistSnapshotForRangeParams) error
+	DeleteSpotifyTopTrackSnapshotForRange(ctx context.Context, arg DeleteSpotifyTopTrackSnapshotForRangeParams) error
 	DeleteUser(ctx context.Context, id uuid.UUID) error
 	DeleteUserConcertEventInterest(ctx context.Context, arg DeleteUserConcertEventInterestParams) error
 	DeleteUserPasswordResetTokens(ctx context.Context, userID uuid.UUID) error
@@ -48,6 +53,8 @@ type Querier interface {
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
 	GetUserByUsernameWithPassword(ctx context.Context, username string) (User, error)
+	InsertSpotifyTopArtistSnapshot(ctx context.Context, arg InsertSpotifyTopArtistSnapshotParams) error
+	InsertSpotifyTopTrackSnapshot(ctx context.Context, arg InsertSpotifyTopTrackSnapshotParams) error
 	MarkPasswordResetTokenAsUsed(ctx context.Context, token string) error
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) (UpdateUserPasswordRow, error)
