@@ -66,6 +66,89 @@ paths:
                 required:
                   - status
                   - time
+
+  /sync/spotify:
+    post:
+      tags:
+        - Matching
+      summary: Trigger a Spotify data sync for the authenticated user
+      description: |
+        Begins an asynchronous (currently stubbed) sync of the user's Spotify profile and top artists.
+        Returns 202 while work begins. A separate status endpoint can be polled for completion.
+      operationId: syncSpotify
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SpotifySyncStartRequest'
+            examples:
+              sample:
+                summary: Example sync start payload
+                value:
+                  code: "AQD123exampleAuthCode"
+                  state: "randomStateValue16"
+      responses:
+        '202':
+          description: Sync started (stubbed success)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpotifySyncAcceptedResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /sync/spotify/status:
+    get:
+      tags:
+        - Matching
+      summary: Get current Spotify sync status
+      description: |
+        Poll for the state of a previously initiated Spotify sync.
+        Stub implementation always reports "complete" after initial delay.
+      operationId: getSpotifySyncStatus
+      responses:
+        '200':
+          description: Current sync status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [pending, in_progress, complete]
+                  message:
+                    type: string
+                required:
+                  - status
+              examples:
+                complete:
+                  value:
+                    status: complete
+                    message: "Sync finished"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /concerts/{eventId}/interest:
     post:
       tags:
@@ -843,6 +926,34 @@ paths:
 
 components:
   schemas:
+    SpotifySyncStartRequest:
+      type: object
+      description: Payload sent by the frontend after redirect carrying the authorization code & original state
+      properties:
+        code:
+          type: string
+          description: Spotify authorization code received on redirect
+          minLength: 1
+        state:
+          type: string
+          description: Original anti-CSRF state value previously generated for the auth request
+          minLength: 8
+      required:
+        - code
+        - state
+
+    SpotifySyncAcceptedResponse:
+      type: object
+      description: Acknowledgement that the sync process has begun
+      properties:
+        status:
+          type: string
+          example: syncing
+        message:
+          type: string
+          example: Spotify sync accepted
+      required:
+        - status
     User:
       type: object
       description: User profile information
@@ -1079,6 +1190,11 @@ components:
           type: string
           description: Human-readable error description
           example: "username already exists"
+        created_at:
+          type: string
+          format: date-time
+          description: Timestamp when the error occurred
+          example: "2025-10-06T12:00:00Z"
       required:
         - message
         - created_at

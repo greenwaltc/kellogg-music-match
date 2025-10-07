@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { ApiBaseService } from './api-base.service';
 import { HttpClient } from '@angular/common/http';
 import { Observable, from } from 'rxjs';
-import { switchMap } from 'rxjs/operators';
+import { switchMap, tap } from 'rxjs/operators';
 import { ConfigService } from './config.service';
 
 // Lightweight PKCE + state handling for Spotify Authorization Code with PKCE.
@@ -52,6 +52,8 @@ export class SpotifyService {
     const codeVerifier = this.randomString(64);
     localStorage.setItem('spotify_auth_state', state);
     localStorage.setItem('spotify_code_verifier', codeVerifier);
+    // Also store state in a short-lived SameSite=Lax cookie as fallback if localStorage is unavailable on return
+    document.cookie = `spotify_auth_state=${state}; Max-Age=600; Path=/; SameSite=Lax`;
     const codeChallenge = this.base64UrlEncode(await this.sha256(codeVerifier));
 
     // Explicit, single encoding to avoid both no-encoding and double-encoding scenarios.
@@ -78,15 +80,42 @@ export class SpotifyService {
   // Exchange code for token via backend (backend will hold client secret)
   exchangeCode(code: string, state: string): Observable<any> {
     const storedState = localStorage.getItem('spotify_auth_state');
-    if (!storedState || storedState !== state) {
-      return from(Promise.reject(new Error('State mismatch')));
+    const cookieState = this.getCookie('spotify_auth_state');
+    if (!storedState) {
+      if (cookieState && cookieState === state) {
+        console.warn('[SpotifyAuth] localStorage state missing but cookie fallback matched. Proceeding.');
+      } else {
+        console.warn('[SpotifyAuth] Missing stored state. incoming state=', state, 'cookieState=', cookieState);
+        return from(Promise.reject(new Error('Spotify session expired (no stored state). Please try connecting again.')));
+      }
+    }
+    if (storedState && storedState !== state) {
+      console.warn('[SpotifyAuth] State mismatch. stored=', storedState, 'incoming=', state, 'cookieState=', cookieState);
+      return from(Promise.reject(new Error('State mismatch (likely multiple authorization attempts). Please retry.')));
     }
     const codeVerifier = localStorage.getItem('spotify_code_verifier') || '';
     return from(this.cfg.getConfig()).pipe(
       switchMap(cfg => {
         const redirectUri = cfg.spotifyRedirectUri && cfg.spotifyRedirectUri.trim().length > 0 ? cfg.spotifyRedirectUri : this.fallbackRedirectUri;
         return this.http.post(this.api.url('/spotify/oauth/callback'), { code, codeVerifier, redirectUri });
+      }),
+      tap({
+        next: () => {
+          // Clear sensitive PKCE artifacts after successful exchange
+          localStorage.removeItem('spotify_auth_state');
+          localStorage.removeItem('spotify_code_verifier');
+          // Clear cookie fallback
+            document.cookie = 'spotify_auth_state=; Max-Age=0; Path=/; SameSite=Lax';
+        },
+        error: () => {
+          // On error, keep them for potential retry / diagnostics
+        }
       })
     );
+  }
+
+  private getCookie(name: string): string | null {
+    const match = document.cookie.match(new RegExp('(^|; )' + name.replace(/([.*+?^${}()|[\\]\\])/g, '\\$1') + '=([^;]*)'));
+    return match ? decodeURIComponent(match[2]) : null;
   }
 }

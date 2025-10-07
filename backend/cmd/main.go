@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"net/http"
+	"time"
+	"fmt"
 
 	"github.com/greenwaltc/kellogg-music-match/backend/business"
 	"github.com/greenwaltc/kellogg-music-match/backend/business/concert"
@@ -156,12 +158,30 @@ func main() {
 
 	router := generated.NewRouter(AuthenticationAPIController, HealthAPIController, MatchingAPIController, FeedbackAPIController, ConcertsAPIController)
 
+	// In-memory stub sync state (simple global; single-process dev usage)
+	var spotifySyncState struct {
+		status string
+		lastStart time.Time
+	}
+	spotifySyncState.status = "complete"
+
+	// Wrap generated router; we still provide a manual status endpoint not yet modeled in spec (left as-is)
+	mux := http.NewServeMux()
+	mux.Handle("/", router)
+	mux.HandleFunc("/sync/spotify/status", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet { w.WriteHeader(http.StatusMethodNotAllowed); return }
+		if _, ok := GetUserFromContext(r.Context()); !ok { http.Error(w, "unauthorized", http.StatusUnauthorized); return }
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, `{"status":"%s","message":""}`, spotifySyncState.status)
+	})
+
 	// Initialize JWT middleware
 	jwtMiddleware := NewJWTMiddleware(jwtService)
 
 	// Wrap router with middleware layers (innermost to outermost)
 	// Compose middleware: otelhttp -> jwt -> router
-	otelWrapped := otelhttp.NewHandler(router, "http.server")
+	otelWrapped := otelhttp.NewHandler(mux, "http.server")
 	protectedRouter := jwtMiddleware.Middleware(otelWrapped)
 	corsRouter := corsMiddleware(cfg)(protectedRouter)
 
