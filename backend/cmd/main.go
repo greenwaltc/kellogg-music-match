@@ -2,9 +2,9 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
-	"fmt"
 
 	"github.com/greenwaltc/kellogg-music-match/backend/business"
 	"github.com/greenwaltc/kellogg-music-match/backend/business/concert"
@@ -160,7 +160,7 @@ func main() {
 
 	// In-memory stub sync state (simple global; single-process dev usage)
 	var spotifySyncState struct {
-		status string
+		status    string
 		lastStart time.Time
 	}
 	spotifySyncState.status = "complete"
@@ -169,8 +169,14 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("/", router)
 	mux.HandleFunc("/sync/spotify/status", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet { w.WriteHeader(http.StatusMethodNotAllowed); return }
-		if _, ok := GetUserFromContext(r.Context()); !ok { http.Error(w, "unauthorized", http.StatusUnauthorized); return }
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		if _, ok := GetUserFromContext(r.Context()); !ok {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, `{"status":"%s","message":""}`, spotifySyncState.status)
