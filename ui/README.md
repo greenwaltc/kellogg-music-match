@@ -147,13 +147,13 @@ src/
 │   ├── password-validators.ts   # Custom password validation logic
 │   └── theme.service.ts         # Dark/light theme support
 ├── environments/               # Environment configurations
-└── styles.css                 # Global styling
+└── styles.scss                # Global styling (SCSS root, imports partials)
 ```
 
 ## Customization
 - **Max Artists**: Modify `maxArtists` in `artists.component.ts`
 - **Password Rules**: Update validation in `password-validators.ts`  
-- **Styling**: Shared styles in component CSS files and `src/styles.css`
+- **Styling**: Shared styles in component styles and `src/styles.scss` with feature partials under `src/styles/`
 - **Themes**: Dark/light theme toggle via `theme.service.ts`
 
 ## Build & Deploy

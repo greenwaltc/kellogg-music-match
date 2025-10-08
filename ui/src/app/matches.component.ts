@@ -12,7 +12,7 @@ import { TooltipDirective } from './tooltip.directive';
   standalone: true,
   imports: [CommonModule, FormsModule, SimilarityMeterComponent, TooltipDirective],
   template: `
-  <section>
+  <section class="matches-page">
     <h2>Your Top Music Matches</h2>
     <div class="controls-bar">
       <label>
