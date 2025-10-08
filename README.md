@@ -1,6 +1,6 @@
 # 🎵 Kellogg Music Match
 
-A professional full-stack music taste matching application designed for Kellogg students, featuring Go backend with Ticketmaster integration, Angular frontend, PostgreSQL database with scientific PWO distance metric, and automated infrastructure deployment.
+A professional full-stack music taste matching application for Kellogg students. It features a Go backend, Angular frontend, PostgreSQL database, real-time concert discovery, and a **rank-weighted overlap similarity engine** with Spotify time‑range awareness. (The original scientific PWO distance PostgreSQL function is still available for historical/analytical comparison but is no longer used for live match scoring.)
 
 ├── pulumi/              # Infrastructure as Code (Pulumi)
 ├── database/            # Flyway migrations and configuration
@@ -13,24 +13,26 @@ A professional full-stack music taste matching application designed for Kellogg 
 - **Go 1.23+** with OpenAPI-generated server
 - **Clean Architecture** - Generated code separated from business logic
 - **Ticketmaster Integration** - Concert discovery API with dependency inversion
-- **PostgreSQL Integration** - Flyway migrations with scientific PWO distance function
+- **PostgreSQL Integration** - Flyway migrations (legacy PWO distance function retained for analysis)
+- **Rank-Weighted Overlap Similarity Engine** (current production scorer with per-overlap theoretical max normalization)
+- **Spotify Time Range Support** (`short_term`, `medium_term`, `long_term`) + configurable defaults
+- **Configurable Limits** (`limit`, `overlapsLimit`, server-side caps to prevent abuse)
+- **In-Memory Similarity Cache** (30s TTL; auto-invalidated on new Spotify artist snapshot)
 - **UserRepository Interface** - Clean abstraction layer for database operations
-- **PWO Distance Metric** - Position-Weighted Overlap algorithm for scientifically accurate music matching
-- **REST API** with authentication, user management, music matching, and concert discovery
-- **Comprehensive Testing** - Unit tests + Ginkgo behavioral tests with PWO algorithm validation (43 passing tests)
-- **Docker** containerization with multi-stage builds
+- **REST API** with auth, user management, music matching, concert discovery
+- **Comprehensive Testing** - Unit + Ginkgo behavioral tests (normalization, overlap truncation, time range, JWT, password reset, etc.)
+- **Docker** multi-stage builds
 
 ### 🗄️ Database
-- **PostgreSQL 16** with **PWO distance function** for position-weighted overlap calculations
-- **Scientific Similarity Calculations** - Custom `pwo_distance` function with position-weighted overlap algorithm
+- **PostgreSQL 16** with legacy `pwo_distance` (kept for benchmarking) and supporting artist/user schema
+- **Rank/Overlap Source Data** – Spotify top artists persisted per time range to drive Go-level similarity
 - **SQLC Integration** - Type-safe Go code generated from SQL queries
-- **Flyway Migrations** - Professional database versioning and migration management (V019 current)
+- **Flyway Migrations** - Professional database versioning (V019 current)
 - **MusicBrainz Integration** - 47,452 artist records loaded and deduplicated
 - **UserRepository Interface** - Clean abstraction layer for database operations
 - **UUID Support** - Proper UUID format with performance indexes
-- **User Management** - Complete profile support including program and graduation year
-- **Music Matching** - Artist relationships with PWO-based similarity scoring
-- **Performance Optimized** - Comprehensive indexes and foreign key constraints
+- **User Management** - Complete profile including program and graduation year
+- **Performance Optimized** - Indexes and FK constraints for matching + events queries
 
 ### 🎨 Frontend  
 - **Angular 17+** with reactive forms and modern UI
@@ -62,7 +64,45 @@ A professional full-stack music taste matching application designed for Kellogg 
 - **K3s Support** - Local Kubernetes development with image import scripts
 - **Automated provisioning** and configuration management
 
-## 🚀 Quick Start\n\n### Prerequisites\n- **Go 1.23+**\n- **Node.js 18+** \n- **Docker & Docker Compose**\n- **PostgreSQL client tools** (optional, for direct database access)\n- **Make**\n- **Ticketmaster API Key** (see [TICKETMASTER_INTEGRATION.md](TICKETMASTER_INTEGRATION.md))\n\n### 1. Initial Setup\n```bash\n# Clone and setup the project\ngit clone https://github.com/greenwaltc/kellogg-music-match.git\ncd kellogg-music-match\n\n# Build and start full environment\nmake dev\n```\n\n### 2. Configure Ticketmaster API (Optional)\n```bash\n# Set your Ticketmaster API credentials\nexport TICKETMASTER_CONSUMER_KEY=\"your_key_here\"\nexport TICKETMASTER_CONSUMER_SECRET=\"your_secret_here\"\n```\n\n### 3. Access the Application\n- **Frontend**: http://localhost:4200\n- **Backend API**: http://localhost:8080 \n- **Health Check**: http://localhost:8080/health\n- **Database**: localhost:5432 (user: kellogg_user)\n\n### 4. Development Commands\n```bash\n# Run tests (43 passing tests)\nmake test\n\n# Check application health\nmake status\n\n# Stop services\nmake docker-stop\n\n# Clean up everything\nmake clean\n```"
+## 🚀 Quick Start
+
+### Prerequisites
+- **Go 1.23+**
+- **Node.js 18+** 
+- **Docker & Docker Compose**
+- **PostgreSQL client tools** (optional)
+- **Make**
+- **Ticketmaster API Key** (see [TICKETMASTER_INTEGRATION.md](TICKETMASTER_INTEGRATION.md))
+
+### 1. Initial Setup
+```bash
+# Clone and setup the project
+git clone https://github.com/greenwaltc/kellogg-music-match.git
+cd kellogg-music-match
+
+# Build and start full environment
+make dev
+```
+
+### 2. Configure Ticketmaster API (Optional)
+```bash
+export TICKETMASTER_CONSUMER_KEY="your_key_here"
+export TICKETMASTER_CONSUMER_SECRET="your_secret_here"
+```
+
+### 3. Access the Application
+- **Frontend**: http://localhost:4200
+- **Backend API**: http://localhost:8080 
+- **Health Check**: http://localhost:8080/health
+- **Database**: localhost:5432 (user: kellogg_user)
+
+### 4. Development Commands
+```bash
+make test        # Run all tests
+make status      # Application health information
+make docker-stop # Stop containers
+make clean       # Remove build artifacts
+```
 
 ### 3. Access the Application
 - **Frontend:** http://localhost:4200
@@ -199,21 +239,17 @@ The application uses PostgreSQL with a comprehensive schema including:
 - **Constraints**: Data integrity with foreign keys, check constraints, and unique indexes
 
 ### Database Architecture
-- **UserRepository Interface**: Clean abstraction layer separating business logic from database operations
-- **Flyway Migration System**: Professional database versioning with incremental schema updates (V001-V019)
-- **PWO Distance Function**: PostgreSQL function implementing Position-Weighted Overlap algorithm:
-  - **Position-Weighted Overlap (PWO)**: Scientific similarity metric considering both artist overlap and positional importance
-  - **Configurable Alpha Parameter**: Controls position sensitivity in overlap calculations
-  - **Distance Values**: 0.0 (identical lists) to 1.0 (completely different)
-  - **Similarity Calculation**: 1.0 - pwo_distance for intuitive scoring (higher = more similar)
-- **Type Safety**: SQLC generates type-safe Go structs and methods from SQL queries
+- **UserRepository Interface**: Clean abstraction layer
+- **Flyway Migration System**: Incremental versioning (V001-V019)
+- **Legacy PWO Function**: Still present for analytical/historical comparison; production similarity now in Go layer (rank-weighted overlap normalization)
+- **Type Safety**: SQLC generated structs and query methods
 - **Environment Variables**: Configurable connection parameters (DB_HOST, DB_PORT, DB_NAME, etc.)
 
 ### Sample Data
 The development database includes:
 - **Test Users**: Configurable through registration with full profile support
-- **Music Preferences**: User-artist relationships for testing PWO similarity calculations
-- **PWO Distance Function**: PostgreSQL function for Position-Weighted Overlap calculations
+- **Music Preferences**: User-artist relationships persisted for Spotify-derived ranks
+- **Legacy PWO Function**: Available if you want to benchmark against prior distance-based scoring
 
 ### Database Connection
 ```bash
@@ -233,9 +269,9 @@ Password: [from kubernetes secret]
 ```
 
 ### Database Files
-- **`backend/db/schema/migrations/`**: Flyway migration files (V001 through V019)
+-- **`backend/db/schema/migrations/`**: Flyway migration files (V001 through V019)
   - `V001__initial.sql`: Core database structure with users, artists tables
-  - `V010__pwo_metric.sql`: PWO distance function implementation
+  - `V010__pwo_metric.sql`: Legacy PWO distance function implementation (not used for current scoring)
   - `V011-V012__musicbrainz_artists.sql`: MusicBrainz integration (47,452 artists)
   - `V019__fix_musicbrainz_upsert_function.sql`: Latest migration
 - **`backend/db/queries/queries.sql`**: SQLC query definitions for type-safe Go code generation
@@ -271,18 +307,46 @@ Content-Type: application/json
 }
 ```
 
-#### Music Matching
-```bash
-# Find Music Matches (PWO Algorithm)
-POST /findMusicMatches
-Content-Type: application/json
-X-User-Username: testuser
-{
-  "artists": ["The Beatles", "Taylor Swift", "Drake"]
-}
+#### Music Matching (Rank-Weighted Overlap)
+Consumes stored Spotify top artists for the requesting user; request body is ignored (kept only for backward compatibility).
 
-# Response includes PWO similarity scores (0.0-1.0, higher = more similar)
+```bash
+POST /findMusicMatches?range=medium_term&limit=10&overlapsLimit=5
+X-User-Username: testuser
+Content-Type: application/json
+{}
 ```
+
+Query Parameters:
+- `range` (optional) one of `short_term|medium_term|long_term` (default configured server-side)
+- `limit` (optional) maximum users to return (server-capped)
+- `overlapsLimit` (optional) truncate overlapping artist list per match
+
+Scoring Overview:
+1. Raw weight per overlapping artist = `1 / (anchorRank + otherRank)`
+2. Theoretical max for that overlap if both had the better rank = `1 / (2 * min(anchorRank, otherRank))`
+3. Sum raw weights → rawSimilarity; sum theoretical maxima → maxPossible
+4. Normalized score = `rawSimilarity / maxPossible` clamped to [0,1]
+
+Response (example):
+```json
+[
+  {
+    "name": "Alice Johnson",
+    "program": "2Y",
+    "graduationYear": 2025,
+    "overlap": 7,
+    "score": 0.83,
+    "artists": ["Phoebe Bridgers", "Taylor Swift", "Radiohead"],
+    "overlaps": [
+      { "name": "Phoebe Bridgers", "anchorRank": 1, "otherRank": 2 },
+      { "name": "Taylor Swift",    "anchorRank": 2, "otherRank": 1 }
+    ]
+  }
+]
+```
+
+See [docs/music_matching.md](docs/music_matching.md) for deeper discussion and comparison to the legacy PWO distance.
 
 #### Artist Search
 ```bash

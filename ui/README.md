@@ -22,8 +22,12 @@ Angular standalone (v17+) application for Kellogg student registration, authenti
 
 ### 🎵 Music Features  
 - **Artist Management**: Dynamic list (1–10 artists) with add/remove functionality
-- **Music Matching**: Find users with similar taste via POST /findMusicMatches
-- **Match Results**: Display top 5 closest matching users with overlap scores
+- **Music Matching**: Find users with similar taste via Spotify-derived top artists (body currently ignored)
+- **Time Range Toggle**: `short`, `medium`, `long` term Spotify ranges (persisted in localStorage + URL param)
+- **Match Limits**: Adjustable `limit` (users) and `overlapsLimit` (max overlapping artists shown per match)
+- **Structured Overlaps**: Each overlap includes `name`, `anchorRank`, `otherRank` (rank metadata for richer UI)
+- **Skeleton Loading**: Shimmer placeholders reduce layout shift while fetching
+- **Reduced Motion Support**: Animations suppressed when `prefers-reduced-motion` is set
 
 ### 🎨 User Experience
 - **Real-time Validation**: Immediate feedback on all form inputs
@@ -90,24 +94,34 @@ The frontend integrates with the Go backend API for all data operations.
 
 ### Music Endpoints
 
-**POST /findMusicMatches?range=medium_term&limit=10**
+**POST /findMusicMatches?range=medium_term&limit=10&overlapsLimit=5**
 ```json
-{ "artists": ["Taylor Swift", "The Beatles", "Radiohead"] }
+{}
 ```
 
 Query Parameters:
-- `range` (optional, enum: short_term | medium_term | long_term, default medium_term) – Spotify time range used for similarity.
-- `limit` (optional, 1-50, default 10) – maximum number of matches to return.
+- `range` (optional) short_term | medium_term | long_term (default from backend config)
+- `limit` (optional) number of users (server-capped)
+- `overlapsLimit` (optional) truncate overlap list per user match
 
-Body is still accepted but currently ignored for Spotify-based similarity; maintained for backward compatibility.
-
-Response: Array of matches with overlap and normalized score:
+Response (example – truncated overlaps):
 ```json
 [
-  { "name": "Alice Johnson", "overlap": 2, "score": 0.75 },
-  { "name": "Bob Smith", "overlap": 1, "score": 0.45 }
+  {
+    "name": "Alice Johnson",
+    "overlap": 7,
+    "score": 0.83,
+    "overlaps": [
+      { "name": "Phoebe Bridgers", "anchorRank": 1, "otherRank": 2 },
+      { "name": "Taylor Swift",    "anchorRank": 2, "otherRank": 1 }
+    ]
+  }
 ]
 ```
+
+Notes:
+- Request body is currently ignored (kept only for backward compatibility); Spotify top artists drive similarity.
+- Scores are normalized rank-weighted overlap values in [0,1].
 
 ## Configuration
 
@@ -147,13 +161,13 @@ src/
 │   ├── password-validators.ts   # Custom password validation logic
 │   └── theme.service.ts         # Dark/light theme support
 ├── environments/               # Environment configurations
-└── styles.scss                # Global styling (SCSS root, imports partials)
+└── styles.scss                # Global styling (SCSS root; imports feature partials like styles/_matches.scss)
 ```
 
 ## Customization
 - **Max Artists**: Modify `maxArtists` in `artists.component.ts`
 - **Password Rules**: Update validation in `password-validators.ts`  
-- **Styling**: Shared styles in component styles and `src/styles.scss` with feature partials under `src/styles/`
+- **Styling**: Global SCSS root + feature partials (e.g., `src/styles/_matches.scss`) replacing earlier monolithic styles
 - **Themes**: Dark/light theme toggle via `theme.service.ts`
 
 ## Build & Deploy
@@ -190,11 +204,11 @@ docker run -d -p 4200:80 \
 - **Build**: Angular CLI with production optimizations
 
 ## Future Enhancements
-- **Testing**: Add comprehensive unit tests (Jest/Jasmine) for components and services
-- **Loading States**: Implement skeleton screens and loading indicators
-- **Form Enhancements**: Auto-complete for artist names, drag-and-drop reordering
-- **Social Features**: User profiles, friend connections, playlist sharing
-- **Accessibility**: WCAG compliance, screen reader support, keyboard navigation
-- **Performance**: Lazy loading, virtual scrolling for large lists
-- **PWA Features**: Offline support, push notifications, app installation
-- **Analytics**: User interaction tracking and usage metrics
+- **Testing**: Broader unit/integration coverage for new range + overlaps controls
+- **Artist Autocomplete**: Spotify/MusicBrainz powered suggestions
+- **Drag Reorder**: Manual ordering of preferred artists
+- **Expanded Accessibility**: Additional ARIA roles & focus management
+- **Virtual Scrolling**: For large match result sets (beyond pagination)
+- **PWA Features**: Offline shell + install prompt
+- **Dual Scoring Display**: Optional legacy PWO comparison badge
+- **Analytics**: Interaction metrics for algorithm tuning

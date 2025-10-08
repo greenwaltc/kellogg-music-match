@@ -1,12 +1,12 @@
 # Kellogg Music Match Backend
 
-A Go backend server with consolidated PostgreSQL database schema, SQLC type-safe queries, OpenAPI specification, scientific similarity calculations, Chicago Events integration, and comprehensive behavioral testing for Kellogg student music matching.
+A Go backend server featuring PostgreSQL + SQLC, OpenAPI-generated transport layer, a rank‑weighted overlap music similarity engine with Spotify time‑range support, Chicago Events (Ticketmaster) integration, in‑memory similarity caching, and comprehensive behavioral + normalization testing.
 
 ## 🏗️ Architecture
 
 - **`generated/`** - OpenAPI generated code (controllers, models, routing)
 - **`business/`** - Custom business logic (authentication, matching, database repository, concert integration)  
-  - **`matching.go`** - Music matching engine with hybrid similarity calculations
+   - **`matching.go`** - Music matching engine (rank-weighted overlap + normalization)
   - **`database.go`** - UserRepository implementation with enhanced PostgreSQL integration
   - **`chicago_events_api.go`** - Chicago Events API with search and pagination
   - **`concert/`** - Complete Ticketmaster integration with sync service and event management
@@ -22,9 +22,9 @@ A Go backend server with consolidated PostgreSQL database schema, SQLC type-safe
 - **`sqlc.yaml`** - SQLC configuration
 - **`Makefile`** - Build automation and development tasks with enhanced database management
 
-## 🗄️ Enhanced Database Integration
+## 🗄️ Database Integration
 
-The backend uses a consolidated PostgreSQL setup with scientific extensions and Kellogg-specific enhancements:
+The backend uses PostgreSQL with Flyway-style historical migrations (legacy scientific functions retained for analysis) and Spotify-derived artist rank storage.
 
 ### Consolidated Schema Features
 - **Single Initial Schema**: `db/schema/001_initial.sql` replaces 9 migration files
@@ -33,13 +33,10 @@ The backend uses a consolidated PostgreSQL setup with scientific extensions and 
 - **Graduation Year Constraints**: Validation for years 2025-2030
 - **Enhanced SQLC Integration**: Optimized queries for Go code generation
 
-### Scientific Database Features
-- **Custom PostgreSQL 15 Image**: Built with plpython3u extension and scientific libraries (scipy, numpy)
-- **Spearman Distance Function**: PostgreSQL function implementing hybrid similarity algorithm:
-  - **Jaccard Similarity** (70% weight): Measures artist overlap between users
-  - **Positional Correlation** (30% weight): Considers ranking/order of shared artists
-  - **Distance Values**: 0 (identical), 0.7 (subset), 2.0 (no overlap)
-- **Text Array Support**: Custom handling for PostgreSQL TEXT[] arrays in Go using pq.StringArray
+### Legacy Scientific Features (Historical)
+- **Custom PostgreSQL Image**: Earlier builds included plpython3u + numpy/scipy for experimental distance functions.
+- **PWO / Hybrid Distance Functions**: Retained migrations provide legacy position-weighted or hybrid (Jaccard + positional) distance calculations no longer used in production scoring.
+- **Why Deprecated**: Current approach needs structured overlap rank metadata and flexible normalization best implemented in Go.
 
 ### Repository Pattern
 - **UserRepository Interface**: Clean abstraction for database operations
@@ -50,9 +47,9 @@ The backend uses a consolidated PostgreSQL setup with scientific extensions and 
 
 ### Database Features
 - **User Management**: Registration, authentication with bcrypt password hashing
-- **Music Preferences**: Normalized artist storage and user-artist relationships  
-- **Scientific Matching Algorithm**: Music taste similarity calculations using hybrid Jaccard + positional correlation
-- **Custom Distance Function**: PostgreSQL plpython3u function for accurate similarity scoring
+- **Spotify Snapshot Storage**: Persisted top artists per time range for matching
+- **Rank-Weighted Similarity**: Implemented in Go with per-overlap theoretical max normalization
+- **Structured Overlaps**: Both anchor & other ranks returned to caller
 - **Transaction Support**: Proper error handling and data consistency
 - **Performance Optimization**: Indexes and optimized queries for common operations
 
@@ -198,23 +195,20 @@ make test-quick  # Fast unit tests only
 ```
 
 #### 2. **Ginkgo Behavioral Tests**
-Comprehensive behavioral testing using Ginkgo v2 + Gomega for algorithm validation:
+Behavioral + algorithm validation (normalization, truncation, range isolation) using Ginkgo v2 + Gomega:
 ```bash
 make test-ginkgo  # Run behavioral tests
 ```
 
-**Test Coverage:**
-- **Music Matching Algorithm**: Validates Jaccard similarity calculations
-- **Edge Cases**: Empty lists, normalization, caller exclusion
-- **Database Function Alignment**: Tests scenarios matching PostgreSQL distance function
-- **Scientific Accuracy**: Validates similarity scores for known test cases
+**Test Coverage Highlights:**
+- **Normalization Bounds**: Score clamped to [0,1] even with asymmetric ranks
+- **Overlap Ordering & Truncation**: Ensures consistent `overlapsLimit` behavior
+- **Range Isolation**: Separate caches & queries per Spotify time range
+- **Identical Preferences**: Score = 1 with full overlap set
+- **Edge Cases**: Empty overlaps suppressed, caller excluded
 
-#### 3. **Algorithm Validation Tests**
-Specific tests that validate the hybrid similarity algorithm behavior:
-- **Identical Preferences**: Score ≥ 0.9 for identical artist lists
-- **Subset Relationships**: Score ≈ 0.5 for subset cases like {Tool} vs {Tool, Radiohead}
-- **No Overlap**: No matches returned for completely different preferences
-- **Partial Overlap**: Correct Jaccard calculations (e.g., 1/3 ≈ 0.33)
+#### 3. **Normalization & Overlap Tests**
+Focused specs confirm rank-weighted formula correctness and per-overlap theoretical maxima.
 
 ### Testing Setup
 ```bash
@@ -290,19 +284,22 @@ When you update `openapi.yaml`:
 
 The `generate` target safely regenerates all OpenAPI code while preserving your custom business logic.
 
-## 🌐 API Endpoints
+## 🌐 API Endpoints (Selected)
 
 - **Health Check:** `GET /health`
 - **User Registration:** `POST /register`
 - **User Login:** `POST /login`
-- **Find Music Matches:** `POST /findMusicMatches`
+- **Find Music Matches:** `POST /findMusicMatches?range=medium_term&limit=10&overlapsLimit=5`
+   - Uses stored Spotify top artists (request body ignored)
+   - Query params control user limit, overlap truncation, and time range
+   - Response includes structured overlaps: `[ { name, anchorRank, otherRank }, ... ]`
 
 Full API documentation is available in `openapi.yaml` or generate HTML docs with:
 ```bash
 make openapi-docs
 ```
 
-## 🧪 Testing
+## 🧪 Testing (Quick Reference)
 
 ```bash
 # Run all tests
@@ -347,6 +344,11 @@ This installs:
 - All custom code should have tests
 - Run `make format` before committing
 - Validate with `make check` before pushing
+
+## 🔄 Similarity Caching
+In-memory TTL cache (30s) keyed by `spotify:{userID}:{range}:{limit}:{overlapsLimit}`. Automatically invalidated after new Spotify snapshot ingestion via repository hook.
+
+See `docs/music_matching.md` for full algorithm rationale and legacy comparison.
 
 ## 🤝 Contributing
 
