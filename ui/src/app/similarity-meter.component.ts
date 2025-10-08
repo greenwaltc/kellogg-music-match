@@ -1,12 +1,13 @@
 import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { TooltipDirective } from './tooltip.directive';
 
 @Component({
   selector: 'app-similarity-meter',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, TooltipDirective],
   template: `
-    <div class="similarity-meter">
+  <div class="similarity-meter" appTooltip="Score = SUM(1/(anchor_rank+other_rank)) / SUM(1/(2*best_rank)) (clamped 0-1). Overlap = count of shared artists. See docs: https://github.com/greenwaltc/kellogg-music-match#similarity" tabindex="0">
       <div class="meter-container">
         <div class="meter-bar">
           <div 
@@ -19,7 +20,7 @@ import { CommonModule } from '@angular/common';
         </div>
         <div class="meter-labels">
           <span class="score-text">{{ (score * 100) | number:'1.0-1' }}% match</span>
-          <span class="overlap-text">{{ overlap }} shared artists</span>
+          <span class="overlap-text"> {{ overlap }} shared artists</span>
         </div>
       </div>
       <div class="similarity-circle" 
@@ -64,6 +65,7 @@ import { CommonModule } from '@angular/common';
       align-items: center;
       gap: 1rem;
       margin: 0.5rem 0;
+      position: relative;
     }
 
     .meter-container {

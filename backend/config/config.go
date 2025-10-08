@@ -59,6 +59,7 @@ type MatchingConfig struct {
 	DefaultLimit  int
 	MaxLimit      int
 	AllowedRanges []string
+	MaxOverlaps   int // safety cap for overlapsLimit (0 = no cap)
 }
 
 // TicketmasterConfig holds Ticketmaster API configuration
@@ -156,6 +157,7 @@ func Load() *Config {
 			DefaultLimit:  getEnvIntWithDefault("MATCHING_DEFAULT_LIMIT", 10),
 			MaxLimit:      getEnvIntWithDefault("MATCHING_MAX_LIMIT", 50),
 			AllowedRanges: []string{"short_term", "medium_term", "long_term"},
+			MaxOverlaps:   getEnvIntWithDefault("MATCHING_MAX_OVERLAPS", 100),
 		},
 		Ticketmaster: TicketmasterConfig{
 			ConsumerKey:     getEnvWithDefault("TICKETMASTER_CONSUMER_KEY", ""),

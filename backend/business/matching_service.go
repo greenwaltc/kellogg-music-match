@@ -142,7 +142,7 @@ func (s *MatchingService) SimilarityCacheStats() *SimilarityCacheStats {
 }
 
 // FindMusicMatches implements music matching business logic
-func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest generated.ArtistsRequest, xUserUsername string, rng string, limit int32) (generated.ImplResponse, error) {
+func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest generated.ArtistsRequest, xUserUsername string, rng string, limit int32, overlapsLimit ...int32) (generated.ImplResponse, error) {
 	if xUserUsername == "" {
 		return generated.Response(http.StatusBadRequest, generated.ErrorResponse{Message: "username header is required"}), nil
 	}
@@ -176,7 +176,19 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 		limit = int32(max)
 	}
 
-	cacheKey := fmt.Sprintf("spotify:%s:%s:%d", user.ID.String(), rng, limit)
+	// Determine overlaps limit (optional variadic for backward compatibility in tests not yet updated)
+	var ovLimit int32 = 0
+	if len(overlapsLimit) > 0 {
+		ovLimit = overlapsLimit[0]
+		if ovLimit < 0 { // negative treated as 0 (no limit)
+			ovLimit = 0
+		}
+		if cfg.Matching.MaxOverlaps > 0 && int(ovLimit) > cfg.Matching.MaxOverlaps {
+			ovLimit = int32(cfg.Matching.MaxOverlaps)
+		}
+	}
+
+	cacheKey := fmt.Sprintf("spotify:%s:%s:%d:%d", user.ID.String(), rng, limit, ovLimit)
 	// Cache lookup (guard against nil cache for safety if constructed elsewhere)
 	if s.cache != nil {
 		if matches, ok := s.cache.get(cacheKey); ok {
@@ -192,12 +204,9 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 	matches := make([]*generated.MatchUser, 0, len(similar))
 	for _, sim := range similar {
 		fullName := strings.TrimSpace(sim.FirstName + " " + sim.LastName)
-		// Build artist overlap names (limit maybe 10 to avoid UI overload)
+		// Build artist overlap names (no artificial cap; UI handles pagination/scroll)
 		artistNames := make([]string, 0, len(sim.Overlaps))
-		for i, ov := range sim.Overlaps {
-			if i >= 10 { // hard cap
-				break
-			}
+		for _, ov := range sim.Overlaps {
 			artistNames = append(artistNames, ov.Name)
 		}
 		// Overlap count = number of shared artists
@@ -247,14 +256,35 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 		if overlapCount == 0 {
 			continue
 		}
-		matches = append(matches, &generated.MatchUser{
+		mu := &generated.MatchUser{
 			Name:           fullName,
 			Program:        program,
 			GraduationYear: gradYear,
 			Overlap:        overlapCount,
 			Score:          score,
 			Artists:        artistNames,
-		})
+			Overlaps: func() []generated.MatchUserOverlapsInner {
+				// We stream through original sim.Overlaps preserving order (already sorted by rank sum in SQL)
+				// Apply optional truncation if ovLimit > 0
+				count := len(sim.Overlaps)
+				if ovLimit > 0 && int(ovLimit) < count {
+					count = int(ovLimit)
+				}
+				out := make([]generated.MatchUserOverlapsInner, 0, count)
+				for i, ov := range sim.Overlaps {
+					if i >= count {
+						break
+					}
+					// Only include sane positive ranks
+					if ov.AnchorRank <= 0 || ov.OtherRank <= 0 {
+						continue
+					}
+					out = append(out, generated.MatchUserOverlapsInner{Name: ov.Name, AnchorRank: int32(ov.AnchorRank), OtherRank: int32(ov.OtherRank)})
+				}
+				return out
+			}(),
+		}
+		matches = append(matches, mu)
 	}
 
 	// Fallback: if no matches, keep prior playful placeholder (but must satisfy constraints => Overlap>=1). We'll skip adding placeholder if zero because spec would reject Overlap 0.

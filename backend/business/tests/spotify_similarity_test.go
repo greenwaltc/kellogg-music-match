@@ -68,7 +68,7 @@ var _ = Describe("Spotify Similarity via MatchingService", func() {
 		})
 
 		// Invoke matching using anchor username (artistsRequest ignored now)
-		resp, err := svc.FindMusicMatches(ctx, generated.ArtistsRequest{Artists: []string{"placeholder"}}, anchorUsername, "medium_term", 10)
+		resp, err := svc.FindMusicMatches(ctx, generated.ArtistsRequest{Artists: []string{"placeholder"}}, anchorUsername, "medium_term", 10, 0)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(resp.Code).To(Equal(200))
 		list, ok := resp.Body.([]*generated.MatchUser)

@@ -59,7 +59,7 @@ var _ = Describe("Spotify Similarity Normalization", func() {
 			{"art3", "Artist Three"}, // rank 3 both (identical)
 		})
 
-		resp, err := svc.FindMusicMatches(ctx, generated.ArtistsRequest{Artists: []string{"ignored"}}, anchor, "medium_term", 5)
+		resp, err := svc.FindMusicMatches(ctx, generated.ArtistsRequest{Artists: []string{"ignored"}}, anchor, "medium_term", 5, 0)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(resp.Code).To(Equal(200))
 		list, ok := resp.Body.([]*generated.MatchUser)

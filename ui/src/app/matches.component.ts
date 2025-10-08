@@ -1,26 +1,78 @@
-import { Component, effect } from '@angular/core';
+import { Component, effect, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { MatchService } from './match.service';
 import { SpotifyService } from './spotify.service';
 import { SimilarityMeterComponent } from './similarity-meter.component';
+import { TooltipDirective } from './tooltip.directive';
 
 @Component({
   selector: 'app-matches',
   standalone: true,
-  imports: [CommonModule, SimilarityMeterComponent],
+  imports: [CommonModule, FormsModule, SimilarityMeterComponent, TooltipDirective],
   template: `
   <section>
     <h2>Your Top Music Matches</h2>
+    <div class="controls-bar">
+      <label>
+        Results Limit:
+        <select [(ngModel)]="limit" (change)="onLimitChange()">
+          <option *ngFor="let opt of limitOptions" [value]="opt">{{ opt }}</option>
+        </select>
+      </label>
+      <label>
+        Overlaps Limit:
+        <select [(ngModel)]="overlapsLimit" (change)="onOverlapsLimitChange()" appTooltip="Max overlap entries per match (server may cap)">
+          <option [ngValue]="null">All</option>
+          <option *ngFor="let opt of overlapsLimitOptions" [value]="opt">{{ opt }}</option>
+        </select>
+      </label>
+      <label>
+        Debounce (ms):
+        <input type="number" min="0" max="3000" [(ngModel)]="debounceMs" (change)="onDebounceChange()" class="debounce-input" />
+      </label>
+      <button type="button" class="reset-btn" (click)="resetControls()" appTooltip="Reset limit & debounce to defaults (50 / 400ms)">Reset</button>
+      <div class="range-toggle" role="group" aria-label="Time Range">
+        <button type="button" 
+                *ngFor="let r of ranges" 
+                (click)="selectRange(r.value)" 
+                [class.active]="range===r.value" 
+                [attr.aria-pressed]="range===r.value"
+                class="range-btn" 
+                appTooltip="{{ r.tooltip }}">
+          {{ r.label }}
+        </button>
+      </div>
+      <div class="range-subtitle">Listening window: <strong>{{ rangeLabel() }}</strong>
+        <span class="info-icon small" appTooltip="Spotify provides 3 windows for your top artists:\nShort term ≈ last 4 weeks\nMedium term ≈ last 6 months\nLong term ≈ several years (weighted toward the past year)\nSelecting a different window recalculates overlap & rank positions." aria-label="Spotify time range info">i</span>
+      </div>
+    </div>
     <div class="spotify-connect-bar">
       <button type="button" (click)="connectSpotify()" class="spotify-btn">🎧 Connect / Sync Spotify</button>
     </div>
     <p class="note">Tip: check back here often! As more Kellogg students register, we build better matches.</p>
     
-    <!-- Loading indicator -->
-    <div *ngIf="matches.loading()" class="loading-container">
+    <!-- Loading indicators -->
+    <div *ngIf="matches.loading() && !matches.matches()" class="loading-container">
       <div class="loading-spinner"></div>
       <p class="loading-text">Finding your music matches...</p>
+    </div>
+    <div *ngIf="matches.loading() && matches.matches()" class="skeleton-list" aria-label="Loading updated matches">
+      <div class="skeleton-card" *ngFor="let s of skeletonArray">
+        <div class="skeleton-header">
+          <div class="sk-block sk-title shimmer"></div>
+          <div class="sk-meter shimmer"></div>
+        </div>
+        <div class="skeleton-body">
+          <div class="sk-tags">
+            <span class="sk-tag shimmer" *ngFor="let t of tagSkeleton"></span>
+          </div>
+            <div class="sk-stats">
+              <div class="sk-stat shimmer" *ngFor="let st of statSkeleton"></div>
+            </div>
+        </div>
+      </div>
     </div>
     
     <ng-container *ngIf="!matches.loading() && matches.matches() as list; else noFetchYet">
@@ -43,14 +95,24 @@ import { SimilarityMeterComponent } from './similarity-meter.component';
             
             <div class="match-details">
               <div class="artists-section">
-                <h4>Favorite Artists</h4>
+                <h4 class="artists-title">Artists in Common <span class="info-icon" appTooltip="Tuples (#A/#B) show rank positions: #A = your rank, #B = their rank.">?</span></h4>
                 <div class="artists-grid">
                   <span 
-                    *ngFor="let artist of match.artists" 
+                    *ngFor="let artist of visibleArtists(match)" 
                     class="artist-tag"
                     [class.crush-artist]="match.name === 'Your Kellogg MBA Crush'">
-                    {{ artist }}
+                    {{ formatArtist(artist) }}
                   </span>
+                </div>
+                <div class="artist-actions" *ngIf="match.artists.length > artistsPerPage">
+                  <button type="button" class="toggle-btn" (click)="toggleShowAll(match)">
+                    {{ isShowAll(match) ? 'Show Less' : 'Show All (' + match.artists.length + ')' }}
+                  </button>
+                </div>
+                <div class="artist-pagination" *ngIf="!isShowAll(match) && match.artists.length > artistsPerPage">
+                  <button type="button" (click)="prevArtists(match)" [disabled]="artistPage(match)===0">Prev</button>
+                  <span class="page-indicator">{{ artistPage(match)+1 }} / {{ totalArtistPages(match) }}</span>
+                  <button type="button" (click)="nextArtists(match)" [disabled]="artistPage(match) >= totalArtistPages(match)-1">Next</button>
                 </div>
               </div>
               
@@ -91,247 +153,159 @@ import { SimilarityMeterComponent } from './similarity-meter.component';
       <button type="button" (click)="back()">Back</button>
     </div>
   </section>
-  `,
-  styles: [`
-    .spotify-connect-bar { text-align:right; margin-top:.5rem; }
-    .spotify-btn { background:#1db954; border:none; color:#fff; padding:.55rem 1rem; border-radius:4px; cursor:pointer; font-size:.85rem; font-weight:600; }
-    .spotify-btn:hover { background:#19a34b; }
-    .matches-list {
-      display: flex;
-      flex-direction: column;
-      gap: 1.5rem;
-      margin: 1.5rem 0;
-    }
-
-    .match-card {
-      background: #fff;
-      border: 1px solid #e0e0e0;
-      border-radius: 12px;
-      padding: 1.5rem;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .match-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-    }
-
-    .match-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 1rem;
-      padding-bottom: 1rem;
-      border-bottom: 1px solid #f0f0f0;
-    }
-
-    .match-name {
-      margin: 0;
-      font-size: 1.25rem;
-      font-weight: 600;
-      color: #2c3e50;
-    }
-
-    .match-details {
-      display: grid;
-      grid-template-columns: 2fr 1fr;
-      gap: 1.5rem;
-      align-items: start;
-    }
-
-    .artists-section h4 {
-      margin: 0 0 0.75rem 0;
-      font-size: 1rem;
-      font-weight: 600;
-      color: #34495e;
-    }
-
-    .artists-grid {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-    }
-
-    .artist-tag {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 0.375rem 0.75rem;
-      border-radius: 20px;
-      font-size: 0.875rem;
-      font-weight: 500;
-      white-space: nowrap;
-      transition: transform 0.2s ease;
-    }
-
-    .artist-tag:hover {
-      transform: scale(1.05);
-    }
-
-    .match-stats {
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-
-    .stat {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .stat-label {
-      font-size: 0.875rem;
-      color: #7f8c8d;
-      font-weight: 500;
-    }
-
-    .stat-value {
-      font-size: 0.875rem;
-      font-weight: 600;
-      color: #2c3e50;
-    }
-
-    .empty-msg {
-      text-align: center;
-      color: #7f8c8d;
-      font-style: italic;
-      padding: 2rem;
-      background: #f8f9fa;
-      border-radius: 8px;
-      margin: 1rem 0;
-    }
-
-    .note {
-      text-align: center;
-      color: #6c757d;
-      font-size: 0.875rem;
-      margin: 1.5rem 0;
-      padding: 1rem;
-      background: #e8f4f8;
-      border-left: 4px solid #17a2b8;
-      border-radius: 4px;
-    }
-
-    .loading-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 3rem 1rem;
-      margin: 2rem 0;
-    }
-
-    .loading-spinner {
-      width: 40px;
-      height: 40px;
-      border: 4px solid #f3f3f3;
-      border-top: 4px solid #667eea;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin-bottom: 1rem;
-    }
-
-    .loading-text {
-      color: #6c757d;
-      font-size: 1rem;
-      font-weight: 500;
-      margin: 0;
-      text-align: center;
-    }
-
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-
-    .actions {
-      text-align: center;
-      margin-top: 2rem;
-    }
-
-    .actions button {
-      background: #6c757d;
-      color: white;
-      border: none;
-      padding: 0.75rem 2rem;
-      border-radius: 6px;
-      font-size: 1rem;
-      cursor: pointer;
-      transition: background-color 0.2s ease;
-    }
-
-    .match-card.crush-card {
-      background: linear-gradient(135deg, #ffe6f0 0%, #fff0f5 100%);
-      border: 2px solid #ff69b4;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .match-card.crush-card::before {
-      content: '💕';
-      position: absolute;
-      top: 10px;
-      right: 15px;
-      font-size: 1.5rem;
-      opacity: 0.7;
-    }
-
-    .crush-message {
-      background: #ffe6f0;
-      border: 1px solid #ff69b4;
-      border-radius: 8px;
-      padding: 0.75rem;
-      margin: 0.5rem 0 1rem 0;
-      text-align: center;
-    }
-
-    .sorry-note {
-      margin: 0;
-      color: #d63384;
-      font-weight: 500;
-      font-style: italic;
-    }
-
-    .artist-tag.crush-artist {
-      background: linear-gradient(135deg, #ff69b4 0%, #ff1493 100%);
-      color: white;
-    }
-
-    .match-card.crush-card .match-name {
-      color: #d63384;
-      position: relative;
-    }
-
-    .match-card.crush-card .match-name::after {
-      content: ' 💘';
-      font-size: 0.8em;
-    }
-
-    @media (max-width: 768px) {
-      .match-header {
-        flex-direction: column;
-        gap: 1rem;
-        align-items: stretch;
-      }
-
-      .match-details {
-        grid-template-columns: 1fr;
-        gap: 1rem;
-      }
-
-      .artists-grid {
-        max-height: 100px;
-        overflow-y: auto;
-      }
-    }
-  `]
+  `
 })
-export class MatchesComponent {
+export class MatchesComponent implements OnInit, OnDestroy {
+  limitOptions = [10,20,30,40,50];
+  overlapsLimitOptions = [5,10,15,20,30,40,50];
+  limit = 50;
+  overlapsLimit: number | null = null;
+  range: 'short_term' | 'medium_term' | 'long_term' = 'medium_term';
+  ranges = [
+    { value: 'short_term' as const, label: 'Last 4 Weeks', tooltip: 'Short-term listening (past ~4 weeks)' },
+    { value: 'medium_term' as const, label: 'Last 6 Months', tooltip: 'Medium-term listening (past ~6 months)' },
+    { value: 'long_term' as const, label: 'Last Year', tooltip: 'Long-term listening (past year+)' }
+  ];
+  skeletonArray = Array.from({length:3});
+  tagSkeleton = Array.from({length:10});
+  statSkeleton = Array.from({length:4});
+  // Maintain per-match pagination state keyed by match name (assuming uniqueness for UI purposes)
+  private artistPages: Record<string, number> = {};
+  private showAll: Record<string, boolean> = {};
+  artistsPerPage = 25;
+  showRankInfo = false;
+  private limitDebounce: any;
+  debounceMs = 400;
+
   constructor(public matches: MatchService, private router: Router, private spotify: SpotifyService) {
     effect(() => { if (!this.matches.matches()) { /* could redirect */ } });
     this.matches.fetchIfReady();
   }
+  ngOnInit(): void {
+    // URL query params override stored prefs (deep-link)
+    const urlParams = new URLSearchParams(window.location.search);
+    const qRange = urlParams.get('range');
+    if (qRange === 'short_term' || qRange === 'medium_term' || qRange === 'long_term') {
+      this.range = qRange;
+    }
+    const qLimit = urlParams.get('limit');
+    if (qLimit) {
+      const ln = parseInt(qLimit, 10);
+      if (!isNaN(ln) && this.limitOptions.includes(ln)) this.limit = ln;
+    }
+    const qOv = urlParams.get('overlapsLimit');
+    if (qOv) {
+      const ov = parseInt(qOv, 10);
+      if (!isNaN(ov) && ov > 0) this.overlapsLimit = ov;
+    }
+    const stored = localStorage.getItem('kmmMatchLimit');
+    if (stored) {
+      const num = parseInt(stored, 10);
+      if (this.limitOptions.includes(num)) {
+        this.limit = num;
+        // Refetch with stored limit if different from default
+        if (num !== 50) {
+          this.refetch();
+        }
+      }
+    }
+    const storedDb = localStorage.getItem('kmmMatchLimitDebounceMs');
+    if (storedDb) {
+      const d = parseInt(storedDb, 10);
+      if (!isNaN(d) && d >= 0 && d <= 3000) this.debounceMs = d;
+    }
+    const storedOv = localStorage.getItem('kmmOverlapsLimit');
+    if (storedOv) {
+      const ov = parseInt(storedOv, 10);
+      if (!isNaN(ov) && ov > 0) this.overlapsLimit = ov;
+    }
+    const storedRange = localStorage.getItem('kmmMatchRange');
+    if (storedRange === 'short_term' || storedRange === 'medium_term' || storedRange === 'long_term') {
+      this.range = storedRange;
+    }
+  }
+  refetch() { this.matches.fetch(this.range, this.limit, this.overlapsLimit); }
+  private updateUrlState() {
+    const params = new URLSearchParams();
+    params.set('range', this.range);
+    params.set('limit', String(this.limit));
+    if (this.overlapsLimit) params.set('overlapsLimit', String(this.overlapsLimit));
+    history.replaceState({}, '', this.router.url.split('?')[0] + '?' + params.toString());
+  }
+  selectRange(r: 'short_term'|'medium_term'|'long_term') {
+    if (this.range === r) return;
+    this.range = r;
+    localStorage.setItem('kmmMatchRange', r);
+    if (this.matches.loading()) {
+      // defer until loading ends
+      const wait = setInterval(() => {
+        if (!this.matches.loading()) { clearInterval(wait); this.refetch(); }
+      }, 150);
+    } else {
+      // small debounce to allow rapid toggling without spamming network
+      if (this.limitDebounce) clearTimeout(this.limitDebounce);
+      this.limitDebounce = setTimeout(() => this.refetch(), 180);
+    }
+  }
+  rangeLabel(): string {
+    switch (this.range) {
+      case 'short_term': return 'last 4 weeks';
+      case 'medium_term': return 'last 6 months';
+      case 'long_term': return 'long-term (year+)';
+    }
+  }
+  onLimitChange() {
+    localStorage.setItem('kmmMatchLimit', this.limit.toString());
+    if (this.limitDebounce) clearTimeout(this.limitDebounce);
+    this.limitDebounce = setTimeout(() => { this.updateUrlState(); this.refetch(); }, this.debounceMs);
+  }
+  onDebounceChange() {
+    if (this.debounceMs < 0) this.debounceMs = 0;
+    if (this.debounceMs > 3000) this.debounceMs = 3000;
+    localStorage.setItem('kmmMatchLimitDebounceMs', this.debounceMs.toString());
+  }
+  resetControls() {
+    this.limit = 50;
+    this.overlapsLimit = null;
+    this.debounceMs = 400;
+    localStorage.setItem('kmmMatchLimit', this.limit.toString());
+    localStorage.setItem('kmmMatchLimitDebounceMs', this.debounceMs.toString());
+    localStorage.removeItem('kmmOverlapsLimit');
+    this.updateUrlState();
+    this.refetch();
+  }
+  onOverlapsLimitChange() {
+    if (this.overlapsLimit !== null && this.overlapsLimit <= 0) this.overlapsLimit = 5;
+    if (this.overlapsLimit !== null) {
+      localStorage.setItem('kmmOverlapsLimit', this.overlapsLimit.toString());
+    } else {
+      localStorage.removeItem('kmmOverlapsLimit');
+    }
+    this.updateUrlState();
+    this.refetch();
+  }
   back(): void { this.router.navigateByUrl('/chicago-events'); }
   async connectSpotify() { await this.spotify.beginAuth(); }
+
+  artistPage(match: any): number { return this.artistPages[match.name] || 0; }
+  totalArtistPages(match: any): number { return Math.ceil(match.artists.length / this.artistsPerPage); }
+  visibleArtists(match: any): any[] {
+    const source = (match.overlaps && match.overlaps.length) ? match.overlaps.map((o: any) => ({ name: o.name, anchorRank: o.anchorRank, otherRank: o.otherRank })) : match.artists;
+    if (this.isShowAll(match)) return source;
+    const page = this.artistPage(match);
+    const start = page * this.artistsPerPage;
+    return source.slice(start, start + this.artistsPerPage);
+  }
+  nextArtists(match: any) { const p = this.artistPage(match); if (p < this.totalArtistPages(match)-1) { this.artistPages[match.name] = p+1; } }
+  prevArtists(match: any) { const p = this.artistPage(match); if (p > 0) { this.artistPages[match.name] = p-1; } }
+  toggleShowAll(match: any) { this.showAll[match.name] = !this.showAll[match.name]; }
+  isShowAll(match: any): boolean { return !!this.showAll[match.name]; }
+  formatArtist(a: any): string {
+    if (!a) return '';
+    if (typeof a === 'string') return a;
+    const name = a.name || '';
+    if (a.anchorRank && a.otherRank) return `${name} (#${a.anchorRank}/${a.otherRank})`;
+    return name;
+  }
+  ngOnDestroy(): void { if (this.limitDebounce) clearTimeout(this.limitDebounce); }
 }

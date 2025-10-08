@@ -55,7 +55,7 @@ var _ = Describe("Spotify Similarity Ordering", func() {
 		_ = makeUser("tiny_overlap", []string{"a4"})                   // tiny
 		_ = makeUser("no_overlap", []string{"z1", "z2"})               // will not contribute
 
-		resp, err := svc.FindMusicMatches(ctx, generated.ArtistsRequest{Artists: []string{"ignored"}}, anchor, "medium_term", 10)
+		resp, err := svc.FindMusicMatches(ctx, generated.ArtistsRequest{Artists: []string{"ignored"}}, anchor, "medium_term", 10, 0)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(resp.Code).To(Equal(200))
 		list, ok := resp.Body.([]*generated.MatchUser)

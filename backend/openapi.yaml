@@ -643,7 +643,15 @@ paths:
             minimum: 1
             maximum: 50
             default: 10
-          description: Maximum number of similar users to return.
+          description: Maximum number of similar users to return. Default raised to 50 for richer initial match discovery.
+        - name: overlapsLimit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+          description: Optional cap on number of overlapping artists (with rank metadata) returned per match. If omitted, all overlaps are returned.
       requestBody:
         required: true
         content:
@@ -668,8 +676,7 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/MatchUser'
-                maxItems: 5
-                description: Up to 5 best matching users, sorted by score
+                description: Array of matching users (client may request up to 50 via limit parameter)
               examples:
                 withMatches:
                   summary: Found matching users
@@ -1227,6 +1234,31 @@ components:
           items:
             type: string
           example: ["The Beatles", "Radiohead", "Led Zeppelin"]
+        overlaps:
+          type: array
+          description: Detailed overlapping Spotify top artists including rank positions (anchor vs other user)
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                description: Artist display name
+              anchorRank:
+                type: integer
+                description: Rank position for the authenticated (anchor) user
+                minimum: 1
+              otherRank:
+                type: integer
+                description: Rank position for the matched (other) user
+                minimum: 1
+            required: [name, anchorRank, otherRank]
+          example:
+            - name: "Radiohead"
+              anchorRank: 2
+              otherRank: 1
+            - name: "Pink Floyd"
+              anchorRank: 5
+              otherRank: 3
       required:
         - name
         - program

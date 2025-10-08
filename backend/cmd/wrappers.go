@@ -78,14 +78,14 @@ func NewMatchingAPIServiceWrapper(matchingService *business.MatchingService, spo
 }
 
 // FindMusicMatches delegates to business logic
-func (w *MatchingAPIServiceWrapper) FindMusicMatches(ctx context.Context, artistsRequest generated.ArtistsRequest, xUserUsername string, range_ string, limit int32) (generated.ImplResponse, error) {
+func (w *MatchingAPIServiceWrapper) FindMusicMatches(ctx context.Context, artistsRequest generated.ArtistsRequest, xUserUsername string, range_ string, limit int32, overlapsLimit int32) (generated.ImplResponse, error) {
 	if user, ok := GetUserFromContext(ctx); ok && user.Username != "" {
-		return w.matchingService.FindMusicMatches(ctx, artistsRequest, user.Username, range_, limit)
+		return w.matchingService.FindMusicMatches(ctx, artistsRequest, user.Username, range_, limit, overlapsLimit)
 	}
 	if xUserUsername != "" {
-		return w.matchingService.FindMusicMatches(ctx, artistsRequest, xUserUsername, range_, limit)
+		return w.matchingService.FindMusicMatches(ctx, artistsRequest, xUserUsername, range_, limit, overlapsLimit)
 	}
-	return w.matchingService.FindMusicMatches(ctx, artistsRequest, "", range_, limit)
+	return w.matchingService.FindMusicMatches(ctx, artistsRequest, "", range_, limit, overlapsLimit)
 }
 
 // Add SyncSpotify and GetSpotifySyncStatus to satisfy generated.MatchingAPIServicer
