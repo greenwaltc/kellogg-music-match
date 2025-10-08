@@ -564,7 +564,10 @@ export class ArtistsComponent implements OnInit {
     this.matches.loading.set(true); this.error.set(null); this.matches.clear();
   const username = this.auth.user()?.username;
   const headers = username ? new HttpHeaders({ 'X-User-Username': username }) : undefined;
-  this.http.post<MatchUser[]>(this.url('/findMusicMatches'), { artists }, { headers }).subscribe({
+  const range = 'medium_term';
+  const limit = 10;
+  const qp = new URLSearchParams({ range, limit: limit.toString() }).toString();
+  this.http.post<MatchUser[]>(this.url(`/findMusicMatches?${qp}`), { artists }, { headers }).subscribe({
       next: (res: any) => { this.matches.set(res); this.router.navigateByUrl('/matches'); },
       error: (err: any) => { this.matches.loading.set(false); this.error.set(this.extractError(err) + ' Please try again later.'); }
     });

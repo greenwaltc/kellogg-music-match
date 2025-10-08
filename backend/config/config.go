@@ -12,6 +12,7 @@ type Config struct {
 	Database     DatabaseConfig
 	CORS         CORSConfig
 	Artist       ArtistConfig
+	Matching     MatchingConfig
 	Ticketmaster TicketmasterConfig
 	Debug        DebugConfig
 	Telemetry    TelemetryConfig
@@ -50,6 +51,14 @@ type ArtistConfig struct {
 	MaxNameLength   int
 	SearchMaxLength int
 	SearchLimit     int
+}
+
+// MatchingConfig holds matching service defaults
+type MatchingConfig struct {
+	DefaultRange  string
+	DefaultLimit  int
+	MaxLimit      int
+	AllowedRanges []string
 }
 
 // TicketmasterConfig holds Ticketmaster API configuration
@@ -141,6 +150,12 @@ func Load() *Config {
 			MaxNameLength:   getEnvIntWithDefault("ARTIST_MAX_NAME_LENGTH", 240),
 			SearchMaxLength: getEnvIntWithDefault("ARTIST_SEARCH_MAX_LENGTH", 240),
 			SearchLimit:     getEnvIntWithDefault("ARTIST_SEARCH_LIMIT", 10),
+		},
+		Matching: MatchingConfig{
+			DefaultRange:  getEnvWithDefault("MATCHING_DEFAULT_RANGE", "medium_term"),
+			DefaultLimit:  getEnvIntWithDefault("MATCHING_DEFAULT_LIMIT", 10),
+			MaxLimit:      getEnvIntWithDefault("MATCHING_MAX_LIMIT", 50),
+			AllowedRanges: []string{"short_term", "medium_term", "long_term"},
 		},
 		Ticketmaster: TicketmasterConfig{
 			ConsumerKey:     getEnvWithDefault("TICKETMASTER_CONSUMER_KEY", ""),

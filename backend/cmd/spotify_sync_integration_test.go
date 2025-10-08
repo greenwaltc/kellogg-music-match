@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -15,6 +16,9 @@ import (
 type dummyMatching struct{}
 
 func TestSyncSpotifyFlow(t *testing.T) {
+	if os.Getenv("SPOTIFY_CLIENT_ID") == "" || os.Getenv("SPOTIFY_CLIENT_SECRET") == "" {
+		t.Skip("skipping Spotify sync integration test: SPOTIFY_CLIENT_ID/SECRET not set")
+	}
 	// Build dependencies
 	spotifyService := spotify.NewService(nil, "")            // disable persistence for integration test
 	matchingService := business.NewMatchingService(nil, nil) // may be nil-safe for our purposes (if not, we’d adjust)

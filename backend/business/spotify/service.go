@@ -250,6 +250,8 @@ func (s *Service) runJob(username string) {
 					if err := s.store.StoreSpotifyTopTracks(context.Background(), userID, fetchedAt, rng, tracks); err != nil {
 						logger.L().Error("spotify.sync.persist.tracks.error", "err", err)
 					}
+				} else {
+					logger.L().Warn("spotify.sync.persist.skipped.missing_user_id", "user", username, "range", rng)
 				}
 			}
 		}

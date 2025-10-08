@@ -90,12 +90,18 @@ The frontend integrates with the Go backend API for all data operations.
 
 ### Music Endpoints
 
-**POST /findMusicMatches**
+**POST /findMusicMatches?range=medium_term&limit=10**
 ```json
 { "artists": ["Taylor Swift", "The Beatles", "Radiohead"] }
 ```
 
-Response: Array of up to 5 matches with overlap scores:
+Query Parameters:
+- `range` (optional, enum: short_term | medium_term | long_term, default medium_term) – Spotify time range used for similarity.
+- `limit` (optional, 1-50, default 10) – maximum number of matches to return.
+
+Body is still accepted but currently ignored for Spotify-based similarity; maintained for backward compatibility.
+
+Response: Array of matches with overlap and normalized score:
 ```json
 [
   { "name": "Alice Johnson", "overlap": 2, "score": 0.75 },

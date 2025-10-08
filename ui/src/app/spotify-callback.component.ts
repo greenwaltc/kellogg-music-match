@@ -3,6 +3,8 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { SpotifyService } from './spotify.service';
 import { HttpClient } from '@angular/common/http';
+import { ApiBaseService } from './api-base.service';
+import { MatchService } from './match.service';
 
 @Component({
   selector: 'app-spotify-callback',
@@ -52,7 +54,7 @@ export class SpotifyCallbackComponent implements OnInit {
   cancelling = false;
   origCode: string | null = null;
   origState: string | null = null;
-  constructor(private route: ActivatedRoute, private router: Router, private spotify: SpotifyService, private http: HttpClient) {}
+  constructor(private route: ActivatedRoute, private router: Router, private spotify: SpotifyService, private http: HttpClient, private api: ApiBaseService, private matches: MatchService) {}
   ngOnInit(): void {
     const code = this.route.snapshot.queryParamMap.get('code');
     const state = this.route.snapshot.queryParamMap.get('state') || '';
@@ -86,7 +88,7 @@ export class SpotifyCallbackComponent implements OnInit {
       this.syncing = false;
       return;
     }
-    this.http.get<{status:string; progress?: number; message?: string}>('/api/sync/spotify/status').subscribe({
+  this.http.get<{status:string; progress?: number; message?: string}>(this.api.url('/sync/spotify/status')).subscribe({
       next: (res) => {
         this.status = res.status;
         if (typeof res.progress === 'number') { this.progress = res.progress; }
@@ -94,6 +96,9 @@ export class SpotifyCallbackComponent implements OnInit {
         if (res.status === 'complete') {
           this.phase = 'done';
           this.syncing = false;
+          // Refresh matches now that Spotify data is persisted
+          this.matches.clear();
+          this.matches.fetch('medium_term', 10);
           this.router.navigate(['/matches']);
         } else if (res.status === 'failed' || res.status === 'cancelled') {
           this.phase = 'done';
@@ -108,7 +113,7 @@ export class SpotifyCallbackComponent implements OnInit {
 
   cancel() {
     this.cancelling = true;
-    this.http.delete('/api/sync/spotify').subscribe({
+  this.http.delete(this.api.url('/sync/spotify')).subscribe({
       next: () => { this.status = 'cancelled'; this.phase = 'done'; this.syncing = false; },
       error: () => { this.cancelling = false; }
     });
@@ -121,7 +126,7 @@ export class SpotifyCallbackComponent implements OnInit {
     this.phase = 'processing';
     this.syncing = true;
     this.progress = 0;
-    this.http.post('/api/sync/spotify/retry', { code: this.origCode, state: this.origState }).subscribe({
+  this.http.post(this.api.url('/sync/spotify/retry'), { code: this.origCode, state: this.origState }).subscribe({
       next: () => this.pollStatus(0),
       error: () => { this.error = 'Retry failed'; this.phase = 'done'; this.syncing = false; }
     });

@@ -25,14 +25,29 @@ type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteExpiredPasswordResetTokens(ctx context.Context) error
 	DeleteOldConcertEvents(ctx context.Context, cutoffDate pgtype.Timestamp) error
-	// =======================
-	// Spotify Top Items
-	// =======================
 	DeleteSpotifyTopArtistSnapshotForRange(ctx context.Context, arg DeleteSpotifyTopArtistSnapshotForRangeParams) error
 	DeleteSpotifyTopTrackSnapshotForRange(ctx context.Context, arg DeleteSpotifyTopTrackSnapshotForRangeParams) error
 	DeleteUser(ctx context.Context, id uuid.UUID) error
 	DeleteUserConcertEventInterest(ctx context.Context, arg DeleteUserConcertEventInterestParams) error
 	DeleteUserPasswordResetTokens(ctx context.Context, userID uuid.UUID) error
+	// =======================
+	// Spotify Top Items
+	// =======================
+	// Given an anchor user (user_id) and a Spotify time range, compute similarity to other users
+	// based on overlapping top artists in the latest snapshot for that range per user.
+	// Similarity uses a rank-weighted reciprocal scheme: weight = 1 / (r_anchor + r_other)
+	// and aggregated similarity = SUM(weights) over all overlapping artist_ids.
+	// Returns top N other users ordered by descending similarity. Ties resolved by created_at asc.
+	// Also returns the overlapping artist names and their anchor/other ranks encoded as JSON.
+	// Parameters:
+	//   user_id UUID          -> anchor user
+	//   range   TEXT          -> spotify range ('short_term'|'medium_term'|'long_term')
+	//   limit_n INT           -> maximum similar users to return
+	// Notes:
+	//   * We restrict snapshots to only the most recent fetched_at per user per range using the views.
+	//   * We filter out users with zero overlap.
+	//   * JSON structure for overlaps: [{"spotify_artist_id":"...","name":"...","anchor_rank":1,"other_rank":2}]
+	FindTopNSimilarUsersBySpotifyArtists(ctx context.Context, arg FindTopNSimilarUsersBySpotifyArtistsParams) ([]FindTopNSimilarUsersBySpotifyArtistsRow, error)
 	GetAllFeedback(ctx context.Context, lim int32) ([]GetAllFeedbackRow, error)
 	GetAllUsers(ctx context.Context) ([]User, error)
 	GetChicagoEventsCountWithArtistSearch(ctx context.Context, arg GetChicagoEventsCountWithArtistSearchParams) (int64, error)

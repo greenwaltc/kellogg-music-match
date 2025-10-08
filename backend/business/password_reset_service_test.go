@@ -129,6 +129,11 @@ func (m *EnhancedMockUserRepository) GetSpotifyTokensByUser(ctx context.Context,
 	return nil, nil
 }
 
+// Similarity method stub
+func (m *EnhancedMockUserRepository) FindSimilarUsersBySpotifyTopArtists(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]business.SimilarUserResult, error) {
+	return []business.SimilarUserResult{}, nil
+}
+
 var _ = Describe("PasswordResetService", func() {
 	var (
 		service          *business.PasswordResetService

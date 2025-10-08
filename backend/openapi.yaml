@@ -627,6 +627,23 @@ paths:
           example: "student123"
           deprecated: true
           description: LEGACY user identifier header (deprecated; JWT claims now authoritative and this header will be removed).
+        - name: range
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [short_term, medium_term, long_term]
+            default: medium_term
+          description: Spotify time range window used for similarity if Spotify data present.
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+          description: Maximum number of similar users to return.
       requestBody:
         required: true
         content:

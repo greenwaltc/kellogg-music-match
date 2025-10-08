@@ -2,6 +2,7 @@ package business
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -54,12 +55,16 @@ type UserRepository interface {
 	// Spotify preference snapshot operations
 	StoreSpotifyTopArtists(ctx context.Context, userID uuid.UUID, fetchedAt time.Time, rng string, items []SpotifyTopArtist) error
 	StoreSpotifyTopTracks(ctx context.Context, userID uuid.UUID, fetchedAt time.Time, rng string, items []SpotifyTopTrack) error
+
+	// Spotify similarity operations
+	FindSimilarUsersBySpotifyTopArtists(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]SimilarUserResult, error)
 }
 
 // PostgreSQLUserRepository implements UserRepository using pgxpool
 type PostgreSQLUserRepository struct {
-	pool    *pgxpool.Pool
-	queries *sqlc.Queries
+	pool                      *pgxpool.Pool
+	queries                   *sqlc.Queries
+	spotifyArtistsUpdatedHook func(uuid.UUID)
 }
 
 // Pool returns underlying pgx pool (primarily for integration tests)
@@ -87,6 +92,26 @@ type SpotifyTopTrack struct {
 	PreviewURL     *string
 	DurationMS     *int32
 	ImageURL       *string
+}
+
+// Overlap detail for a shared Spotify top artist between two users
+type SpotifyArtistOverlap struct {
+	SpotifyArtistID string `json:"spotify_artist_id"`
+	Name            string `json:"name"`
+	AnchorRank      int32  `json:"anchor_rank"`
+	OtherRank       int32  `json:"other_rank"`
+}
+
+// SimilarUserResult represents a user similar to the anchor based on Spotify top artists
+type SimilarUserResult struct {
+	UserID         uuid.UUID
+	Username       string
+	FirstName      string
+	LastName       string
+	Program        *string
+	GraduationYear *int32
+	Similarity     float64
+	Overlaps       []SpotifyArtistOverlap
 }
 
 // NewPostgreSQLUserRepository creates a new repository backed by pgx/v5
@@ -173,10 +198,7 @@ func (r *PostgreSQLUserRepository) CreateUser(ctx context.Context, id uuid.UUID,
 			String: program,
 			Valid:  program != "",
 		},
-		GraduationYear: pgtype.Int4{
-			Int32: graduationYear,
-			Valid: graduationYear > 0,
-		},
+		GraduationYear: pgtype.Int4{Int32: graduationYear, Valid: graduationYear > 0},
 	}
 
 	user, err := r.queries.CreateUser(ctx, params)
@@ -426,7 +448,16 @@ ON CONFLICT (user_id, range, item_rank) DO UPDATE SET spotify_artist_id=EXCLUDED
 			return err
 		}
 	}
+	// trigger cache invalidation hook if present
+	if r.spotifyArtistsUpdatedHook != nil {
+		r.spotifyArtistsUpdatedHook(userID)
+	}
 	return nil
+}
+
+// SetSpotifyArtistsUpdatedHook registers a callback fired after StoreSpotifyTopArtists successfully upserts data
+func (r *PostgreSQLUserRepository) SetSpotifyArtistsUpdatedHook(fn func(uuid.UUID)) {
+	r.spotifyArtistsUpdatedHook = fn
 }
 
 func (r *PostgreSQLUserRepository) StoreSpotifyTopTracks(ctx context.Context, userID uuid.UUID, fetchedAt time.Time, rng string, items []SpotifyTopTrack) error {
@@ -468,4 +499,51 @@ ON CONFLICT (user_id, range, item_rank) DO UPDATE SET spotify_track_id=EXCLUDED.
 		}
 	}
 	return nil
+}
+
+// FindSimilarUsersBySpotifyTopArtists delegates to the sqlc-generated query and converts the JSON overlaps
+func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopArtists(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]SimilarUserResult, error) {
+	if rng == "" {
+		rng = "medium_term"
+	}
+	if limit <= 0 {
+		limit = 10
+	}
+	rows, err := r.queries.FindTopNSimilarUsersBySpotifyArtists(ctx, sqlc.FindTopNSimilarUsersBySpotifyArtistsParams{
+		LimitN:       limit,
+		AnchorUserID: anchorUserID,
+		Range:        rng,
+	})
+	if err != nil {
+		return nil, err
+	}
+	results := make([]SimilarUserResult, 0, len(rows))
+	for _, row := range rows {
+		var overlaps []SpotifyArtistOverlap
+		if len(row.OverlapsJson) > 0 {
+			if err := json.Unmarshal(row.OverlapsJson, &overlaps); err != nil {
+				// If decoding fails, continue but leave overlaps empty; log for debugging.
+				fmt.Printf("WARN: failed to unmarshal overlaps_json for user %s: %v\n", row.UserID, err)
+			}
+		}
+		var program *string
+		if row.Program.Valid {
+			program = &row.Program.String
+		}
+		var gradYear *int32
+		if row.GraduationYear.Valid {
+			gradYear = &row.GraduationYear.Int32
+		}
+		results = append(results, SimilarUserResult{
+			UserID:         row.UserID,
+			Username:       row.Username,
+			FirstName:      row.FirstName,
+			LastName:       row.LastName,
+			Program:        program,
+			GraduationYear: gradYear,
+			Similarity:     row.Similarity,
+			Overlaps:       overlaps,
+		})
+	}
+	return results, nil
 }

@@ -78,18 +78,14 @@ func NewMatchingAPIServiceWrapper(matchingService *business.MatchingService, spo
 }
 
 // FindMusicMatches delegates to business logic
-func (w *MatchingAPIServiceWrapper) FindMusicMatches(ctx context.Context, artistsRequest generated.ArtistsRequest, xUserUsername string) (generated.ImplResponse, error) {
-	// Try to get user from JWT context first
+func (w *MatchingAPIServiceWrapper) FindMusicMatches(ctx context.Context, artistsRequest generated.ArtistsRequest, xUserUsername string, range_ string, limit int32) (generated.ImplResponse, error) {
 	if user, ok := GetUserFromContext(ctx); ok && user.Username != "" {
-		return w.matchingService.FindMusicMatches(ctx, artistsRequest, user.Username)
+		return w.matchingService.FindMusicMatches(ctx, artistsRequest, user.Username, range_, limit)
 	}
-
-	// Fall back to header-based auth for backward compatibility
 	if xUserUsername != "" {
-		return w.matchingService.FindMusicMatches(ctx, artistsRequest, xUserUsername)
+		return w.matchingService.FindMusicMatches(ctx, artistsRequest, xUserUsername, range_, limit)
 	}
-
-	return w.matchingService.FindMusicMatches(ctx, artistsRequest, "")
+	return w.matchingService.FindMusicMatches(ctx, artistsRequest, "", range_, limit)
 }
 
 // Add SyncSpotify and GetSpotifySyncStatus to satisfy generated.MatchingAPIServicer

@@ -2,7 +2,6 @@ package business_test
 
 import (
 	"context"
-	"testing"
 	"time"
 
 	"github.com/google/uuid"
@@ -10,14 +9,9 @@ import (
 	"github.com/greenwaltc/kellogg-music-match/backend/business/concert"
 	sqlc "github.com/greenwaltc/kellogg-music-match/backend/db/sqlc"
 	"github.com/jackc/pgx/v5/pgtype"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 )
 
-func TestBusiness(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Business Suite")
-}
+// Note: Primary Ginkgo RunSpecs invocation lives in music_matching_test.go to avoid multiple suite runs.
 
 // MockEventProvider implements concert.EventProvider for testing
 type MockEventProvider struct {
@@ -220,89 +214,51 @@ func (m *MockUserRepository) GetUserByUsernameWithPassword(ctx context.Context, 
 }
 
 func (m *MockUserRepository) GetUserByEmail(ctx context.Context, email string) (*sqlc.User, error) {
-	return nil, nil // Not implemented for these tests
+	return nil, nil
 }
-
 func (m *MockUserRepository) GetUserByID(ctx context.Context, id uuid.UUID) (*sqlc.User, error) {
-	return nil, nil // Not implemented for these tests
+	return nil, nil
 }
-
 func (m *MockUserRepository) UserExistsByUsername(ctx context.Context, username string) (bool, error) {
-	if m.userExistsByUsernameError != nil {
-		return false, m.userExistsByUsernameError
-	}
-	exists, ok := m.userExistsByUsername[username]
-	return exists && ok, nil
+	return false, nil
 }
-
 func (m *MockUserRepository) UserExistsByEmail(ctx context.Context, email string) (bool, error) {
-	if m.userExistsByEmailError != nil {
-		return false, m.userExistsByEmailError
-	}
-	exists, ok := m.userExistsByEmail[email]
-	return exists && ok, nil
+	return false, nil
 }
-
-// FindSimilarUsers removed with legacy similarity system; no-op placeholder omitted.
-
-func (m *MockUserRepository) SaveFeedback(ctx context.Context, userID uuid.UUID, feedback string) (*sqlc.Feedback, error) {
-	return nil, nil // Not implemented for these tests
+func (m *MockUserRepository) CreateFeedback(ctx context.Context, userID uuid.UUID, feedbackText string) (*sqlc.Feedback, error) {
+	return nil, nil
 }
-
-func (m *MockUserRepository) CreateFeedback(ctx context.Context, userID uuid.UUID, feedback string) (*sqlc.Feedback, error) {
-	return nil, nil // Not implemented for these tests
-}
-
 func (m *MockUserRepository) GetFeedbackByUser(ctx context.Context, userID uuid.UUID) ([]sqlc.Feedback, error) {
-	return nil, nil // Not implemented for these tests
+	return nil, nil
 }
-
-// Password Reset methods - stub implementations for existing tests
 func (m *MockUserRepository) CreatePasswordResetToken(ctx context.Context, userID uuid.UUID, token string, expiresAt time.Time) (sqlc.PasswordResetToken, error) {
-	return sqlc.PasswordResetToken{}, nil // Not implemented for these tests
+	return sqlc.PasswordResetToken{}, nil
 }
-
 func (m *MockUserRepository) GetPasswordResetToken(ctx context.Context, token string) (sqlc.PasswordResetToken, error) {
-	return sqlc.PasswordResetToken{}, nil // Not implemented for these tests
+	return sqlc.PasswordResetToken{}, nil
 }
-
-func (m *MockUserRepository) MarkPasswordResetTokenUsed(ctx context.Context, token string) error {
-	return nil // Not implemented for these tests
-}
-
 func (m *MockUserRepository) MarkPasswordResetTokenAsUsed(ctx context.Context, token string) error {
-	return nil // Not implemented for these tests
+	return nil
 }
-
-func (m *MockUserRepository) UpdateUserPassword(ctx context.Context, userID uuid.UUID, passwordHash string) (sqlc.UpdateUserPasswordRow, error) {
-	return sqlc.UpdateUserPasswordRow{}, nil // Not implemented for these tests
-}
-
-func (m *MockUserRepository) DeleteExpiredPasswordResetTokens(ctx context.Context) error {
-	return nil // Not implemented for these tests
-}
-
+func (m *MockUserRepository) DeleteExpiredPasswordResetTokens(ctx context.Context) error { return nil }
 func (m *MockUserRepository) DeleteUserPasswordResetTokens(ctx context.Context, userID uuid.UUID) error {
-	return nil // Not implemented for these tests
+	return nil
 }
-
-// Spotify token operations (unused in these tests)
+func (m *MockUserRepository) UpdateUserPassword(ctx context.Context, userID uuid.UUID, passwordHash string) (sqlc.UpdateUserPasswordRow, error) {
+	return sqlc.UpdateUserPasswordRow{}, nil
+}
 func (m *MockUserRepository) UpsertSpotifyTokens(ctx context.Context, userID uuid.UUID, accessToken string, refreshTokenEncrypted []byte, expiresAt time.Time, scope string, tokenType string) error {
 	return nil
 }
 func (m *MockUserRepository) GetSpotifyTokensByUser(ctx context.Context, userID uuid.UUID) (*sqlc.SpotifyToken, error) {
 	return nil, nil
 }
-
-// Snapshot storage no-ops for tests not covering Spotify yet
 func (m *MockUserRepository) StoreSpotifyTopArtists(ctx context.Context, userID uuid.UUID, fetchedAt time.Time, rng string, items []business.SpotifyTopArtist) error {
 	return nil
 }
 func (m *MockUserRepository) StoreSpotifyTopTracks(ctx context.Context, userID uuid.UUID, fetchedAt time.Time, rng string, items []business.SpotifyTopTrack) error {
 	return nil
 }
-
-// FindSimilarUsersBySpotifyTopArtists mock returns empty slice (tests that need real data use real repo)
 func (m *MockUserRepository) FindSimilarUsersBySpotifyTopArtists(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]business.SimilarUserResult, error) {
 	return []business.SimilarUserResult{}, nil
 }

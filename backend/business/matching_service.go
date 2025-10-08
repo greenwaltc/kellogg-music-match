@@ -4,7 +4,12 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/greenwaltc/kellogg-music-match/backend/config"
 	"github.com/greenwaltc/kellogg-music-match/backend/generated"
 )
@@ -17,46 +22,264 @@ type MatchingService struct {
 	userRepo     UserRepository
 	matching     *MatchingEngine
 	artistConfig *config.ArtistConfig
+	cache        *similarityCache
+}
+
+// (range & limit now passed explicitly; context keys deprecated)
+
+// similarityCache is a lightweight in-memory TTL cache for similarity results
+type similarityCache struct {
+	mu     sync.RWMutex
+	ttl    time.Duration
+	data   map[string]cacheEntry
+	hits   uint64
+	misses uint64
+}
+type cacheEntry struct {
+	expires time.Time
+	matches []*generated.MatchUser
+}
+
+func newSimilarityCache(ttl time.Duration) *similarityCache {
+	return &similarityCache{ttl: ttl, data: make(map[string]cacheEntry)}
+}
+func (c *similarityCache) get(key string) ([]*generated.MatchUser, bool) {
+	c.mu.RLock()
+	e, ok := c.data[key]
+	c.mu.RUnlock()
+	if !ok || time.Now().After(e.expires) {
+		atomic.AddUint64(&c.misses, 1)
+		return nil, false
+	}
+	atomic.AddUint64(&c.hits, 1)
+	return e.matches, true
+}
+func (c *similarityCache) set(key string, val []*generated.MatchUser) {
+	c.mu.Lock()
+	c.data[key] = cacheEntry{expires: time.Now().Add(c.ttl), matches: val}
+	c.mu.Unlock()
+}
+
+// invalidateUser removes all cached similarity entries for a given user ID
+func (c *similarityCache) invalidateUser(userID string) {
+	prefix := "spotify:" + userID + ":"
+	c.mu.Lock()
+	for k := range c.data {
+		if strings.HasPrefix(k, prefix) {
+			delete(c.data, k)
+		}
+	}
+	c.mu.Unlock()
+}
+
+// SimilarityCacheStats represents metrics about cache utilization
+type SimilarityCacheStats struct {
+	Hits    uint64
+	Misses  uint64
+	HitRate float64
+}
+
+func (c *similarityCache) stats() SimilarityCacheStats {
+	h := atomic.LoadUint64(&c.hits)
+	m := atomic.LoadUint64(&c.misses)
+	total := h + m
+	rate := 0.0
+	if total > 0 {
+		rate = float64(h) / float64(total)
+	}
+	return SimilarityCacheStats{Hits: h, Misses: m, HitRate: rate}
 }
 
 // NewMatchingService creates a new matching service with default config
 func NewMatchingService(userRepo UserRepository, matching *MatchingEngine) *MatchingService {
 	cfg := config.Load()
-	return &MatchingService{
+	ms := &MatchingService{
 		userRepo:     userRepo,
 		matching:     matching,
 		artistConfig: &cfg.Artist,
+		cache:        newSimilarityCache(30 * time.Second),
 	}
+	// Attempt to register invalidation hook if repository supports it
+	if pr, ok := userRepo.(*PostgreSQLUserRepository); ok {
+		pr.SetSpotifyArtistsUpdatedHook(ms.InvalidateSimilarityCache)
+	}
+	return ms
 }
 
 // NewMatchingServiceWithConfig creates a new matching service with provided config
 func NewMatchingServiceWithConfig(userRepo UserRepository, matching *MatchingEngine, artistConfig *config.ArtistConfig) *MatchingService {
-	return &MatchingService{
+	if artistConfig == nil { // defensive default
+		cfg := config.Load()
+		artistConfig = &cfg.Artist
+	}
+	ms := &MatchingService{
 		userRepo:     userRepo,
 		matching:     matching,
 		artistConfig: artistConfig,
+		cache:        newSimilarityCache(30 * time.Second),
 	}
+	if pr, ok := userRepo.(*PostgreSQLUserRepository); ok {
+		pr.SetSpotifyArtistsUpdatedHook(ms.InvalidateSimilarityCache)
+	}
+	return ms
+}
+
+// InvalidateSimilarityCache clears similarity entries for a user after new Spotify snapshot ingestion
+func (s *MatchingService) InvalidateSimilarityCache(userID uuid.UUID) {
+	if s.cache == nil {
+		return
+	}
+	s.cache.invalidateUser(userID.String())
+}
+
+// SimilarityCacheStats exposes cache metrics (hits, misses, hit rate)
+func (s *MatchingService) SimilarityCacheStats() *SimilarityCacheStats {
+	if s.cache == nil {
+		return &SimilarityCacheStats{}
+	}
+	st := s.cache.stats()
+	return &st
 }
 
 // FindMusicMatches implements music matching business logic
-func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest generated.ArtistsRequest, xUserUsername string) (generated.ImplResponse, error) {
-	fmt.Printf("DEBUG: FindMusicMatches (Spotify placeholder) user=%s ignoring manual artists payload=%v\n", xUserUsername, artistsRequest.Artists)
-
+func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest generated.ArtistsRequest, xUserUsername string, rng string, limit int32) (generated.ImplResponse, error) {
 	if xUserUsername == "" {
 		return generated.Response(http.StatusBadRequest, generated.ErrorResponse{Message: "username header is required"}), nil
 	}
 
-	// Placeholder: no similarity computation until Spotify preference ingestion implemented.
-	matches := []*generated.MatchUser{}
-	// Keep the humorous entry to preserve UI expectations if any.
-	crushMatch := &generated.MatchUser{
-		Name:           "Your Kellogg MBA Crush",
-		Program:        "2Y",
-		GraduationYear: 2026,
-		Overlap:        0,
-		Score:          0,
-		Artists:        []string{"Obscure artist 1", "Obscure artist 2", "Obscure artist 3", "Obscure artist 4"},
+	// We ignore the manual artistsRequest now and rely on stored Spotify top artists.
+	// Fetch the anchor user
+	user, err := s.userRepo.GetUserByUsername(ctx, xUserUsername)
+	if err != nil || user == nil {
+		return generated.Response(http.StatusNotFound, generated.ErrorResponse{Message: "user not found"}), nil
 	}
-	matches = append(matches, crushMatch)
+
+	// Apply defaults & validation
+	cfg := config.Load() // lightweight call; could be injected if desired
+	if rng == "" {
+		rng = cfg.Matching.DefaultRange
+	}
+	allowed := false
+	for _, ar := range cfg.Matching.AllowedRanges {
+		if rng == ar {
+			allowed = true
+			break
+		}
+	}
+	if !allowed {
+		rng = cfg.Matching.DefaultRange
+	}
+	if limit <= 0 {
+		limit = int32(cfg.Matching.DefaultLimit)
+	}
+	if max := cfg.Matching.MaxLimit; max > 0 && int(limit) > max {
+		limit = int32(max)
+	}
+
+	cacheKey := fmt.Sprintf("spotify:%s:%s:%d", user.ID.String(), rng, limit)
+	// Cache lookup (guard against nil cache for safety if constructed elsewhere)
+	if s.cache != nil {
+		if matches, ok := s.cache.get(cacheKey); ok {
+			return generated.Response(http.StatusOK, matches), nil
+		}
+	}
+	similar, err := s.userRepo.FindSimilarUsersBySpotifyTopArtists(ctx, user.ID, rng, limit)
+	if err != nil {
+		fmt.Printf("ERROR: similarity query failed: %v\n", err)
+		return generated.Response(http.StatusInternalServerError, generated.ErrorResponse{Message: "similarity query failed"}), nil
+	}
+
+	matches := make([]*generated.MatchUser, 0, len(similar))
+	for _, sim := range similar {
+		fullName := strings.TrimSpace(sim.FirstName + " " + sim.LastName)
+		// Build artist overlap names (limit maybe 10 to avoid UI overload)
+		artistNames := make([]string, 0, len(sim.Overlaps))
+		for i, ov := range sim.Overlaps {
+			if i >= 10 { // hard cap
+				break
+			}
+			artistNames = append(artistNames, ov.Name)
+		}
+		// Overlap count = number of shared artists
+		overlapCount := int32(len(sim.Overlaps))
+		// Score normalization (revised): estimate upper bound of similarity for this particular overlap set.
+		// Original version used sum(1/(2*anchor_rank)) which underestimated the true max and could inflate norm>1.
+		// We now compute a per-overlap theoretical max using the best (smallest) rank between the two users; because
+		// weight = 1/(anchor_rank + other_rank), the maximum possible weight for a given overlapping artist occurs when
+		// the poorer (higher numeric) rank is improved to match the better (lower) rank. That idealized max weight becomes
+		// 1/(best_rank + best_rank) = 1/(2*best_rank). Using best_rank ensures we never claim more than achievable if both
+		// users had identical top positions for that artist. This tightens the bound while preventing inflation.
+		var maxPossible float64
+		for _, ov := range sim.Overlaps {
+			if ov.AnchorRank <= 0 || ov.OtherRank <= 0 { // defensive guard
+				continue
+			}
+			best := ov.AnchorRank
+			if ov.OtherRank < best {
+				best = ov.OtherRank
+			}
+			maxPossible += 1.0 / float64(2*best)
+		}
+		var score float32
+		if overlapCount > 0 && maxPossible > 0 {
+			norm := sim.Similarity / maxPossible
+			if norm > 1 {
+				// Debug log to help detect any remaining edge cases causing overflow beyond 1.
+				fmt.Printf("DEBUG: normalized similarity >1 (%.4f) raw=%.6f maxPossible=%.6f overlaps=%d user=%s other=%s\n", norm, sim.Similarity, maxPossible, overlapCount, user.ID.String(), sim.UserID.String())
+				if norm > 1.0000001 { // allow tiny FP epsilon
+					norm = 1
+				} else {
+					// minor FP drift; clamp
+					norm = 1
+				}
+			}
+			score = float32(norm)
+		}
+		var gradYear int32 = 2025
+		if sim.GraduationYear != nil {
+			gradYear = *sim.GraduationYear
+		}
+		program := ""
+		if sim.Program != nil {
+			program = *sim.Program
+		}
+		// Guard against invalid data relative to OpenAPI constraints (Overlap must be >=1). Skip if none.
+		if overlapCount == 0 {
+			continue
+		}
+		matches = append(matches, &generated.MatchUser{
+			Name:           fullName,
+			Program:        program,
+			GraduationYear: gradYear,
+			Overlap:        overlapCount,
+			Score:          score,
+			Artists:        artistNames,
+		})
+	}
+
+	// Fallback: if no matches, keep prior playful placeholder (but must satisfy constraints => Overlap>=1). We'll skip adding placeholder if zero because spec would reject Overlap 0.
+	if len(matches) == 0 {
+		// fabricate a minimal self-like entry using user's own name to satisfy UI; not ideal but prevents empty list shock.
+		gradYear := int32(2025)
+		if user.GraduationYear.Valid {
+			gradYear = user.GraduationYear.Int32
+		}
+		program := ""
+		if user.Program.Valid {
+			program = user.Program.String
+		}
+		matches = append(matches, &generated.MatchUser{
+			Name:           user.FirstName + " " + user.LastName,
+			Program:        program,
+			GraduationYear: gradYear,
+			Overlap:        1,
+			Score:          0.05,
+			Artists:        []string{"(Need more Spotify data to compute real matches)"},
+		})
+	}
+
+	if s.cache != nil {
+		s.cache.set(cacheKey, matches)
+	}
 	return generated.Response(http.StatusOK, matches), nil
 }

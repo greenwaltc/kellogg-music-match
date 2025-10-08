@@ -138,7 +138,6 @@ func (q *Queries) DeleteOldConcertEvents(ctx context.Context, cutoffDate pgtype.
 }
 
 const deleteSpotifyTopArtistSnapshotForRange = `-- name: DeleteSpotifyTopArtistSnapshotForRange :exec
-
 DELETE FROM spotify_top_artist_snapshots 
 WHERE user_id = $1 AND range = $2 AND fetched_at < $3
 `
@@ -149,9 +148,6 @@ type DeleteSpotifyTopArtistSnapshotForRangeParams struct {
 	FetchedAtCutoff pgtype.Timestamptz `json:"fetched_at_cutoff"`
 }
 
-// =======================
-// Spotify Top Items
-// =======================
 func (q *Queries) DeleteSpotifyTopArtistSnapshotForRange(ctx context.Context, arg DeleteSpotifyTopArtistSnapshotForRangeParams) error {
 	_, err := q.db.Exec(ctx, deleteSpotifyTopArtistSnapshotForRange, arg.UserID, arg.Range, arg.FetchedAtCutoff)
 	return err
@@ -205,6 +201,117 @@ WHERE user_id = $1
 func (q *Queries) DeleteUserPasswordResetTokens(ctx context.Context, userID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, deleteUserPasswordResetTokens, userID)
 	return err
+}
+
+const findTopNSimilarUsersBySpotifyArtists = `-- name: FindTopNSimilarUsersBySpotifyArtists :many
+
+WITH anchor AS (
+  SELECT v.user_id AS anchor_user_id, v.item_rank AS anchor_item_rank, v.spotify_artist_id, v.name AS anchor_name
+  FROM v_current_spotify_top_artists v
+  WHERE v.user_id = $2 AND v.range = $3
+), others AS (
+  SELECT v.user_id AS other_user_id, v.item_rank AS other_item_rank, v.spotify_artist_id, v.name AS other_name
+  FROM v_current_spotify_top_artists v
+  WHERE v.user_id <> $2 AND v.range = $3
+), overlap AS (
+  SELECT o.other_user_id,
+         a.spotify_artist_id,
+         a.anchor_name AS name,
+         a.anchor_item_rank AS anchor_rank,
+         o.other_item_rank AS other_rank,
+         1.0 / (a.anchor_item_rank + o.other_item_rank)::float8 AS weight
+  FROM anchor a
+  JOIN others o USING (spotify_artist_id)
+), agg AS (
+  SELECT other_user_id,
+    SUM(weight)::float8 AS similarity,
+       jsonb_agg(jsonb_build_object(
+         'spotify_artist_id', spotify_artist_id,
+         'name', name,
+         'anchor_rank', anchor_rank,
+         'other_rank', other_rank
+       ) ORDER BY (anchor_rank + other_rank), anchor_rank, other_rank) AS overlaps_json
+  FROM overlap
+  GROUP BY other_user_id
+)
+SELECT u.id AS user_id,
+     u.username,
+     u.first_name,
+     u.last_name,
+     u.program,
+     u.graduation_year,
+     agg.similarity,
+     agg.overlaps_json
+FROM agg
+JOIN users u ON u.id = agg.other_user_id
+WHERE agg.similarity > 0
+ORDER BY agg.similarity DESC, u.created_at ASC
+LIMIT $1
+`
+
+type FindTopNSimilarUsersBySpotifyArtistsParams struct {
+	LimitN       int32     `json:"limit_n"`
+	AnchorUserID uuid.UUID `json:"anchor_user_id"`
+	Range        string    `json:"range"`
+}
+
+type FindTopNSimilarUsersBySpotifyArtistsRow struct {
+	UserID         uuid.UUID   `json:"user_id"`
+	Username       string      `json:"username"`
+	FirstName      string      `json:"first_name"`
+	LastName       string      `json:"last_name"`
+	Program        pgtype.Text `json:"program"`
+	GraduationYear pgtype.Int4 `json:"graduation_year"`
+	Similarity     float64     `json:"similarity"`
+	OverlapsJson   []byte      `json:"overlaps_json"`
+}
+
+// =======================
+// Spotify Top Items
+// =======================
+// Given an anchor user (user_id) and a Spotify time range, compute similarity to other users
+// based on overlapping top artists in the latest snapshot for that range per user.
+// Similarity uses a rank-weighted reciprocal scheme: weight = 1 / (r_anchor + r_other)
+// and aggregated similarity = SUM(weights) over all overlapping artist_ids.
+// Returns top N other users ordered by descending similarity. Ties resolved by created_at asc.
+// Also returns the overlapping artist names and their anchor/other ranks encoded as JSON.
+// Parameters:
+//
+//	user_id UUID          -> anchor user
+//	range   TEXT          -> spotify range ('short_term'|'medium_term'|'long_term')
+//	limit_n INT           -> maximum similar users to return
+//
+// Notes:
+//   - We restrict snapshots to only the most recent fetched_at per user per range using the views.
+//   - We filter out users with zero overlap.
+//   - JSON structure for overlaps: [{"spotify_artist_id":"...","name":"...","anchor_rank":1,"other_rank":2}]
+func (q *Queries) FindTopNSimilarUsersBySpotifyArtists(ctx context.Context, arg FindTopNSimilarUsersBySpotifyArtistsParams) ([]FindTopNSimilarUsersBySpotifyArtistsRow, error) {
+	rows, err := q.db.Query(ctx, findTopNSimilarUsersBySpotifyArtists, arg.LimitN, arg.AnchorUserID, arg.Range)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []FindTopNSimilarUsersBySpotifyArtistsRow{}
+	for rows.Next() {
+		var i FindTopNSimilarUsersBySpotifyArtistsRow
+		if err := rows.Scan(
+			&i.UserID,
+			&i.Username,
+			&i.FirstName,
+			&i.LastName,
+			&i.Program,
+			&i.GraduationYear,
+			&i.Similarity,
+			&i.OverlapsJson,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getAllFeedback = `-- name: GetAllFeedback :many
