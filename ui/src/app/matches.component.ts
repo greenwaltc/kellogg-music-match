@@ -5,12 +5,13 @@ import { Router } from '@angular/router';
 import { MatchService } from './match.service';
 import { SpotifyService } from './spotify.service';
 import { SimilarityMeterComponent } from './similarity-meter.component';
+import { SpotifyConnectComponent } from './spotify-connect.component';
 import { TooltipDirective } from './tooltip.directive';
 
 @Component({
   selector: 'app-matches',
   standalone: true,
-  imports: [CommonModule, FormsModule, SimilarityMeterComponent, TooltipDirective],
+  imports: [CommonModule, FormsModule, SimilarityMeterComponent, TooltipDirective, SpotifyConnectComponent],
   template: `
   <section class="matches-page">
     <h2>Your Top Music Matches</h2>
@@ -48,9 +49,7 @@ import { TooltipDirective } from './tooltip.directive';
         <span class="info-icon small" appTooltip="Spotify provides 3 windows for your top artists:\nShort term ≈ last 4 weeks\nMedium term ≈ last 6 months\nLong term ≈ several years (weighted toward the past year)\nSelecting a different window recalculates overlap & rank positions." aria-label="Spotify time range info">i</span>
       </div>
     </div>
-    <div class="spotify-connect-bar">
-      <button type="button" (click)="connectSpotify()" class="spotify-btn">🎧 Connect / Sync Spotify</button>
-    </div>
+    <app-spotify-connect (connected)="onSpotifyConnected()"></app-spotify-connect>
     <p class="note">Tip: check back here often! As more Kellogg students register, we build better matches.</p>
     
     <!-- Loading indicators -->
@@ -286,6 +285,7 @@ export class MatchesComponent implements OnInit, OnDestroy {
   }
   back(): void { this.router.navigateByUrl('/chicago-events'); }
   async connectSpotify() { await this.spotify.beginAuth(); }
+  onSpotifyConnected() { /* placeholder for future actions, e.g., refresh */ }
 
   artistPage(match: any): number { return this.artistPages[match.name] || 0; }
   totalArtistPages(match: any): number { return Math.ceil(match.artists.length / this.artistsPerPage); }

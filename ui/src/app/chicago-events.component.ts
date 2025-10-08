@@ -71,7 +71,7 @@ interface ChicagoEventsResponse {
     ])
   ],
   template: `
-    <div class="chicago-events-container">
+  <div class="chicago-events-container">
       <div class="page-header">
         <h1>🎵 Chicago Events</h1>
         <p class="subtitle">Discover upcoming concerts and shows in the Windy City</p>

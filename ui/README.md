@@ -168,6 +168,7 @@ src/
 - **Max Artists**: Modify `maxArtists` in `artists.component.ts`
 - **Password Rules**: Update validation in `password-validators.ts`  
 - **Styling**: Global SCSS root + feature partials (e.g., `src/styles/_matches.scss`) replacing earlier monolithic styles
+- **Design Tokens** (`src/styles/_tokens.scss`): Central gradients, neutral scale (`$neutral-50..900`), semantic aliases (`$color-control-*`, `$color-danger-*`, `$color-note-*`, `$color-empty-*`), elevation, radii, and `focus-ring` mixin. Imported via `@use 'styles/tokens' as *;`.
 - **Themes**: Dark/light theme toggle via `theme.service.ts`
 
 ## Build & Deploy
@@ -200,7 +201,7 @@ docker run -d -p 4200:80 \
 - **Routing**: Angular Router with authentication guards
 - **Forms**: Reactive forms with custom validators
 - **Storage**: localStorage for session persistence
-- **Styling**: CSS custom properties for theming
+- **Styling**: SCSS tokens + CSS custom properties for theming (tokens feed feature partials; themes provide runtime color surfaces).
 - **Build**: Angular CLI with production optimizations
 
 ## Future Enhancements

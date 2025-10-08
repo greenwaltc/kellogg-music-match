@@ -1,0 +1,53 @@
+// Design tokens centralization
+// Gradients
+$gradient-accent: linear-gradient(135deg,#667eea,#764ba2);
+$gradient-accent-hover: linear-gradient(135deg,#7388ef,#8252b0);
+$gradient-pink: linear-gradient(135deg,#ff69b4,#ff1493);
+$gradient-spotify: linear-gradient(135deg,#1db954,#159c45);
+$gradient-spotify-hover: linear-gradient(135deg,#21c35b,#17a24a);
+
+// Elevation
+$elevation-card: 0 2px 8px rgba(0,0,0,.08);
+$elevation-card-hover: 0 4px 16px rgba(0,0,0,.15);
+
+// Radii
+$radius-pill: 999px;
+
+// Neutral palette
+$neutral-50: #f8f9fa;
+$neutral-75: #f3f4f7;
+$neutral-100: #eef1f7;
+$neutral-150: #e0e6ef;
+$neutral-200: #d0d7e2;
+$neutral-300: #c4ccd8;
+$neutral-400: #aeb7c5;
+$neutral-500: #909cab;
+$neutral-600: #6c757d;
+$neutral-700: #4b5a72;
+$neutral-800: #2b3140;
+$neutral-900: #1c2029;
+
+// Semantic role aliases
+$color-control-bg: $neutral-100;
+$color-control-bg-hover: $neutral-150;
+$color-control-border: $neutral-200;
+$color-control-border-strong: $neutral-300;
+$color-danger-bg: #fff0f0;
+$color-danger-bg-hover: #ffe3e3;
+$color-danger-border: #ffbdbd;
+$color-danger-text: #c62828;
+$color-note-bg: rgba(0,0,0,.04);
+$color-note-bg-dark: rgba(255,255,255,.07);
+$color-empty-bg: rgba(0,0,0,.025);
+$color-empty-bg-dark: rgba(255,255,255,.05);
+$color-highlight-pill: #17a2b8;
+$color-reset-bg: #fff5f5;
+$color-reset-border: #f0b6b6;
+$color-reset-hover: #ffe3e3;
+
+// Focus helper
+@mixin focus-ring($color: var(--color-accent)) {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(106,42,185,.25);
+  border-color: $color;
+}
