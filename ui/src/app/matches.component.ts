@@ -1,4 +1,4 @@
-import { Component, effect, OnInit, OnDestroy } from '@angular/core';
+import { Component, effect, OnInit, OnDestroy, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -14,7 +14,22 @@ import { TooltipDirective } from './tooltip.directive';
   imports: [CommonModule, FormsModule, SimilarityMeterComponent, TooltipDirective, SpotifyConnectComponent],
   template: `
   <section class="matches-page">
-    <h2>Your Top Music Matches</h2>
+    <h2>Your Top Music Matches ({{ matches.basis() | titlecase }})</h2>
+    <!-- Pre-Spotify connection placeholder -->
+    <div *ngIf="!matches.spotifyReady()" class="pre-connect-placeholder">
+      <div class="placeholder-panel">
+        <h3>Connect Spotify to Get Started</h3>
+        <p>Your musical taste powers quality matches. We only store snapshot metadata (artist + rank).</p>
+        <ul class="benefits">
+          <li>Discover classmates with overlapping top artists</li>
+          <li>See rank tuples for each shared artist</li>
+          <li>Adjust listening window (4 weeks / 6 months / long term)</li>
+        </ul>
+        <app-spotify-connect (connected)="onSpotifyConnected()" label="Connect Spotify"></app-spotify-connect>
+        <p class="privacy-note">Private: no playlists modified or listening history exposed.</p>
+      </div>
+    </div>
+    <ng-container *ngIf="matches.spotifyReady()">
     <div class="controls-bar">
       <label>
         Results Limit:
@@ -34,6 +49,26 @@ import { TooltipDirective } from './tooltip.directive';
         <input type="number" min="0" max="3000" [(ngModel)]="debounceMs" (change)="onDebounceChange()" class="debounce-input" />
       </label>
       <button type="button" class="reset-btn" (click)="resetControls()" appTooltip="Reset limit & debounce to defaults (50 / 400ms)">Reset</button>
+      <div class="basis-toggle" role="tablist" aria-label="Match Basis">
+        <button type="button"
+                role="tab"
+                [attr.aria-selected]="matches.basis()==='artists'"
+                class="basis-btn"
+                [class.active]="matches.basis()==='artists'"
+                (click)="setBasis('artists')"
+                appTooltip="Match based on overlapping top artists">
+          Artists
+        </button>
+        <button type="button"
+                role="tab"
+                [attr.aria-selected]="matches.basis()==='tracks'"
+                class="basis-btn"
+                [class.active]="matches.basis()==='tracks'"
+                (click)="setBasis('tracks')"
+                appTooltip="Match based on overlapping top tracks">
+          Tracks
+        </button>
+      </div>
       <div class="range-toggle" role="group" aria-label="Time Range">
         <button type="button" 
                 *ngFor="let r of ranges" 
@@ -49,7 +84,7 @@ import { TooltipDirective } from './tooltip.directive';
         <span class="info-icon small" appTooltip="Spotify provides 3 windows for your top artists:\nShort term ≈ last 4 weeks\nMedium term ≈ last 6 months\nLong term ≈ several years (weighted toward the past year)\nSelecting a different window recalculates overlap & rank positions." aria-label="Spotify time range info">i</span>
       </div>
     </div>
-    <app-spotify-connect (connected)="onSpotifyConnected()"></app-spotify-connect>
+  <app-spotify-connect (connected)="onSpotifyConnected()" label="Re-sync Spotify"></app-spotify-connect>
     <p class="note">Tip: check back here often! As more Kellogg students register, we build better matches.</p>
     
     <!-- Loading indicators -->
@@ -94,7 +129,7 @@ import { TooltipDirective } from './tooltip.directive';
             
             <div class="match-details">
               <div class="artists-section">
-                <h4 class="artists-title">Artists in Common <span class="info-icon" appTooltip="Tuples (#A/#B) show rank positions: #A = your rank, #B = their rank.">?</span></h4>
+                <h4 class="artists-title">{{ matches.basis()==='artists' ? 'Artists' : 'Tracks' }} in Common <span class="info-icon" appTooltip="Tuples (#A/#B) show rank positions: #A = your rank, #B = their rank.">?</span></h4>
                 <div class="artists-grid">
                   <span 
                     *ngFor="let artist of visibleArtists(match)" 
@@ -113,6 +148,9 @@ import { TooltipDirective } from './tooltip.directive';
                   <span class="page-indicator">{{ artistPage(match)+1 }} / {{ totalArtistPages(match) }}</span>
                   <button type="button" (click)="nextArtists(match)" [disabled]="artistPage(match) >= totalArtistPages(match)-1">Next</button>
                 </div>
+                <!-- Tooltip hint anchors -->
+                <span *ngIf="range==='short_term' && match.overlap === 1" class="overlap-hint-anchor info-icon small" appTooltip="Only 1 shared artist in the past 4 weeks — try a longer window for more." aria-label="Low short-term overlap hint">i</span>
+                <span *ngIf="range==='long_term' && sameAsMedium(match)" class="overlap-hint-anchor info-icon small" appTooltip="No additional shared artists beyond your 6‑month window." aria-label="No delta long-term hint">i</span>
               </div>
               
               <div class="match-stats">
@@ -121,11 +159,11 @@ import { TooltipDirective } from './tooltip.directive';
                   <span class="stat-value">{{ (match.score * 100) | number:'1.1-1' }}%</span>
                 </div>
                 <div class="stat">
-                  <span class="stat-label">Shared Artists:</span>
+                  <span class="stat-label">Shared {{ matches.basis()==='artists' ? 'Artists' : 'Tracks' }}:</span>
                   <span class="stat-value">{{ match.overlap }}</span>
                 </div>
                 <div class="stat">
-                  <span class="stat-label">Total Artists:</span>
+                  <span class="stat-label">Total {{ matches.basis()==='artists' ? 'Artists' : 'Tracks' }}:</span>
                   <span class="stat-value">{{ match.artists.length || 0 }}</span>
                 </div>
                 <div class="stat" *ngIf="match.program">
@@ -151,6 +189,7 @@ import { TooltipDirective } from './tooltip.directive';
     <div class="actions">
       <button type="button" (click)="back()">Back</button>
     </div>
+    </ng-container>
   </section>
   `
 })
@@ -177,8 +216,15 @@ export class MatchesComponent implements OnInit, OnDestroy {
   debounceMs = 400;
 
   constructor(public matches: MatchService, private router: Router, private spotify: SpotifyService) {
-    effect(() => { if (!this.matches.matches()) { /* could redirect */ } });
-    this.matches.fetchIfReady();
+    effect(() => { if (!this.matches.matches()) { /* placeholder for potential redirect */ } });
+    // Reactive hook: when spotifyReady flips true and we have no matches yet, attempt fetch.
+    effect(() => {
+      const ready = this.matches.spotifyReady();
+      if (ready && !this.matches.matches() && !this.matches.loading()) {
+        // Defer fetch to microtask to avoid signal write inside effect restrictions
+        queueMicrotask(() => this.matches.fetch('medium_term', this.limit, this.overlapsLimit));
+      }
+    });
   }
   ngOnInit(): void {
     // URL query params override stored prefs (deep-link)
@@ -223,7 +269,7 @@ export class MatchesComponent implements OnInit, OnDestroy {
       this.range = storedRange;
     }
   }
-  refetch() { this.matches.fetch(this.range, this.limit, this.overlapsLimit); }
+  refetch(forceFresh: boolean = false) { this.matches.fetch(this.range, this.limit, this.overlapsLimit, forceFresh); }
   private updateUrlState() {
     const params = new URLSearchParams();
     params.set('range', this.range);
@@ -238,12 +284,12 @@ export class MatchesComponent implements OnInit, OnDestroy {
     if (this.matches.loading()) {
       // defer until loading ends
       const wait = setInterval(() => {
-        if (!this.matches.loading()) { clearInterval(wait); this.refetch(); }
+        if (!this.matches.loading()) { clearInterval(wait); this.refetch(true); }
       }, 150);
     } else {
       // small debounce to allow rapid toggling without spamming network
       if (this.limitDebounce) clearTimeout(this.limitDebounce);
-      this.limitDebounce = setTimeout(() => this.refetch(), 180);
+      this.limitDebounce = setTimeout(() => this.refetch(true), 180);
     }
   }
   rangeLabel(): string {
@@ -252,6 +298,11 @@ export class MatchesComponent implements OnInit, OnDestroy {
       case 'medium_term': return 'last 6 months';
       case 'long_term': return 'long-term (year+)';
     }
+  }
+  setBasis(b: 'artists'|'tracks') {
+    this.matches.setBasis(b);
+    // refetch current range if needed (service will pull from cache if present)
+    this.refetch(false);
   }
   onLimitChange() {
     localStorage.setItem('kmmMatchLimit', this.limit.toString());
@@ -308,4 +359,12 @@ export class MatchesComponent implements OnInit, OnDestroy {
     return name;
   }
   ngOnDestroy(): void { if (this.limitDebounce) clearTimeout(this.limitDebounce); }
+
+  // Determine if long_term overlap count for this match equals previously cached medium_term overlap (no delta)
+  sameAsMedium(match: any): boolean {
+    if (this.range !== 'long_term') return false;
+    const prev = this.matches.previousOverlap(match.name, 'medium_term');
+    if (prev === null) return false; // no history to compare
+    return prev === match.overlap;
+  }
 }

@@ -83,6 +83,8 @@ services:
       EMAIL_FROM_NAME: Kellogg Music Match
       APP_BASE_URL: https://kelloggmatch.com
       SENDGRID_API_KEY: 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
+      # Feature flags
+      MATCH_TRACKS_ENABLED: "true"
     depends_on:
       flyway:
         condition: service_completed_successfully

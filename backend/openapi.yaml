@@ -635,6 +635,16 @@ paths:
             enum: [short_term, medium_term, long_term]
             default: medium_term
           description: Spotify time range window used for similarity if Spotify data present.
+        - name: basis
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [artists, tracks]
+            default: artists
+          description: |-
+            Similarity basis. "artists" (default) uses top artist snapshots; "tracks" uses top track snapshots. 
+            Tracks is feature-flag gated server-side and will return 400 if disabled.
         - name: limit
           in: query
           required: false

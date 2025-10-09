@@ -78,7 +78,12 @@ func NewMatchingAPIServiceWrapper(matchingService *business.MatchingService, spo
 }
 
 // FindMusicMatches delegates to business logic
-func (w *MatchingAPIServiceWrapper) FindMusicMatches(ctx context.Context, artistsRequest generated.ArtistsRequest, xUserUsername string, range_ string, limit int32, overlapsLimit int32) (generated.ImplResponse, error) {
+func (w *MatchingAPIServiceWrapper) FindMusicMatches(ctx context.Context, artistsRequest generated.ArtistsRequest, xUserUsername string, range_ string, basis string, limit int32, overlapsLimit int32) (generated.ImplResponse, error) {
+	// Inject basis into context for business layer until signature formally extended there (it already reads match_basis)
+	if basis == "" {
+		basis = "artists"
+	}
+	ctx = context.WithValue(ctx, "match_basis", basis)
 	if user, ok := GetUserFromContext(ctx); ok && user.Username != "" {
 		return w.matchingService.FindMusicMatches(ctx, artistsRequest, user.Username, range_, limit, overlapsLimit)
 	}

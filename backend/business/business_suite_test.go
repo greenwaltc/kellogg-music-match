@@ -306,3 +306,8 @@ func (m *MockUserRepository) StoreSpotifyTopTracks(ctx context.Context, userID u
 func (m *MockUserRepository) FindSimilarUsersBySpotifyTopArtists(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]business.SimilarUserResult, error) {
 	return []business.SimilarUserResult{}, nil
 }
+
+// FindSimilarUsersBySpotifyTopTracks mock returns empty slice
+func (m *MockUserRepository) FindSimilarUsersBySpotifyTopTracks(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]business.SimilarUserResult, error) {
+	return []business.SimilarUserResult{}, nil
+}

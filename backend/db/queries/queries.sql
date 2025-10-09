@@ -303,6 +303,51 @@ WHERE agg.similarity > 0
 ORDER BY agg.similarity DESC, u.created_at ASC
 LIMIT sqlc.arg(limit_n);
 
+-- name: FindTopNSimilarUsersBySpotifyTracks :many
+-- Similar to artist similarity but operates on track snapshots.
+WITH anchor AS (
+  SELECT v.user_id AS anchor_user_id, v.item_rank AS anchor_item_rank, v.spotify_track_id, v.name AS anchor_name
+  FROM v_current_spotify_top_tracks v
+  WHERE v.user_id = sqlc.arg(anchor_user_id) AND v.range = sqlc.arg(range)
+), others AS (
+  SELECT v.user_id AS other_user_id, v.item_rank AS other_item_rank, v.spotify_track_id, v.name AS other_name
+  FROM v_current_spotify_top_tracks v
+  WHERE v.user_id <> sqlc.arg(anchor_user_id) AND v.range = sqlc.arg(range)
+), overlap AS (
+  SELECT o.other_user_id,
+         a.spotify_track_id,
+         a.anchor_name AS name,
+         a.anchor_item_rank AS anchor_rank,
+         o.other_item_rank AS other_rank,
+         1.0 / (a.anchor_item_rank + o.other_item_rank)::float8 AS weight
+  FROM anchor a
+  JOIN others o USING (spotify_track_id)
+), agg AS (
+  SELECT other_user_id,
+    SUM(weight)::float8 AS similarity,
+       jsonb_agg(jsonb_build_object(
+         'spotify_track_id', spotify_track_id,
+         'name', name,
+         'anchor_rank', anchor_rank,
+         'other_rank', other_rank
+       ) ORDER BY (anchor_rank + other_rank), anchor_rank, other_rank) AS overlaps_json
+  FROM overlap
+  GROUP BY other_user_id
+)
+SELECT u.id AS user_id,
+     u.username,
+     u.first_name,
+     u.last_name,
+     u.program,
+     u.graduation_year,
+     agg.similarity,
+     agg.overlaps_json
+FROM agg
+JOIN users u ON u.id = agg.other_user_id
+WHERE agg.similarity > 0
+ORDER BY agg.similarity DESC, u.created_at ASC
+LIMIT sqlc.arg(limit_n);
+
 -- name: DeleteSpotifyTopArtistSnapshotForRange :exec
 DELETE FROM spotify_top_artist_snapshots 
 WHERE user_id = sqlc.arg(user_id) AND range = sqlc.arg(range) AND fetched_at < sqlc.arg(fetched_at_cutoff);

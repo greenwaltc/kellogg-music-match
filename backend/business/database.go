@@ -58,6 +58,7 @@ type UserRepository interface {
 
 	// Spotify similarity operations
 	FindSimilarUsersBySpotifyTopArtists(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]SimilarUserResult, error)
+	FindSimilarUsersBySpotifyTopTracks(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]SimilarUserResult, error)
 }
 
 // PostgreSQLUserRepository implements UserRepository using pgxpool
@@ -524,6 +525,53 @@ func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopArtists(ctx conte
 			if err := json.Unmarshal(row.OverlapsJson, &overlaps); err != nil {
 				// If decoding fails, continue but leave overlaps empty; log for debugging.
 				fmt.Printf("WARN: failed to unmarshal overlaps_json for user %s: %v\n", row.UserID, err)
+			}
+		}
+		var program *string
+		if row.Program.Valid {
+			program = &row.Program.String
+		}
+		var gradYear *int32
+		if row.GraduationYear.Valid {
+			gradYear = &row.GraduationYear.Int32
+		}
+		results = append(results, SimilarUserResult{
+			UserID:         row.UserID,
+			Username:       row.Username,
+			FirstName:      row.FirstName,
+			LastName:       row.LastName,
+			Program:        program,
+			GraduationYear: gradYear,
+			Similarity:     row.Similarity,
+			Overlaps:       overlaps,
+		})
+	}
+	return results, nil
+}
+
+// FindSimilarUsersBySpotifyTopTracks delegates to the sqlc-generated track similarity query (feature-flag gated at higher layer)
+func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopTracks(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]SimilarUserResult, error) {
+	if rng == "" {
+		rng = "medium_term"
+	}
+	if limit <= 0 {
+		limit = 10
+	}
+	rows, err := r.queries.FindTopNSimilarUsersBySpotifyTracks(ctx, sqlc.FindTopNSimilarUsersBySpotifyTracksParams{
+		LimitN:       limit,
+		AnchorUserID: anchorUserID,
+		Range:        rng,
+	})
+	if err != nil {
+		return nil, err
+	}
+	results := make([]SimilarUserResult, 0, len(rows))
+	for _, row := range rows {
+		// Reuse SpotifyArtistOverlap struct for now; semantic rename later if differentiating
+		var overlaps []SpotifyArtistOverlap
+		if len(row.OverlapsJson) > 0 {
+			if err := json.Unmarshal(row.OverlapsJson, &overlaps); err != nil {
+				fmt.Printf("WARN: failed to unmarshal track overlaps_json for user %s: %v\n", row.UserID, err)
 			}
 		}
 		var program *string

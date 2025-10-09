@@ -48,6 +48,8 @@ type Querier interface {
 	//   * We filter out users with zero overlap.
 	//   * JSON structure for overlaps: [{"spotify_artist_id":"...","name":"...","anchor_rank":1,"other_rank":2}]
 	FindTopNSimilarUsersBySpotifyArtists(ctx context.Context, arg FindTopNSimilarUsersBySpotifyArtistsParams) ([]FindTopNSimilarUsersBySpotifyArtistsRow, error)
+	// Similar to artist similarity but operates on track snapshots.
+	FindTopNSimilarUsersBySpotifyTracks(ctx context.Context, arg FindTopNSimilarUsersBySpotifyTracksParams) ([]FindTopNSimilarUsersBySpotifyTracksRow, error)
 	GetAllFeedback(ctx context.Context, lim int32) ([]GetAllFeedbackRow, error)
 	GetAllUsers(ctx context.Context) ([]User, error)
 	GetChicagoEventsCountWithArtistSearch(ctx context.Context, arg GetChicagoEventsCountWithArtistSearchParams) (int64, error)

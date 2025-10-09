@@ -96,9 +96,8 @@ export class SpotifyCallbackComponent implements OnInit {
         if (res.status === 'complete') {
           this.phase = 'done';
           this.syncing = false;
-          // Refresh matches now that Spotify data is persisted
-          this.matches.clear();
-          this.matches.fetch('medium_term', 10);
+          // Signal Spotify readiness & perform immediate fetch
+          this.matches.markSpotifyReadyAndRefetch('medium_term');
           this.router.navigate(['/matches']);
         } else if (res.status === 'failed' || res.status === 'cancelled') {
           this.phase = 'done';

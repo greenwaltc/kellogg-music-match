@@ -46,6 +46,7 @@
   .artist-pagination button, .toggle-btn { background:$color-control-bg; border:1px solid $color-control-border; padding:.25rem .6rem; font-size:.6rem; border-radius:4px; cursor:pointer; font-weight:600; }
   .artist-pagination button:hover, .toggle-btn:hover { background:$color-control-bg-hover; }
   .page-indicator { font-size:.6rem; color:#555; }
+  .overlap-hint-anchor { margin-left:.4rem; cursor:pointer; }
 
   .match-stats { display:flex; flex-direction:column; gap:.6rem; }
   .stat { display:flex; justify-content:space-between; font-size:.7rem; }
@@ -72,6 +73,16 @@
   .empty-msg { text-align:center; color:var(--color-text-muted); font-style:italic; padding:1.4rem; background:$color-empty-bg; border-radius:8px; margin:1rem 0; font-size:.7rem; }
   .actions { text-align:center; margin-top:1.25rem; }
   .actions button { background:$neutral-600; color:#fff; border:none; padding:.6rem 1.4rem; border-radius:6px; font-size:.75rem; cursor:pointer; }
+
+  // Pre-connect placeholder styling
+  .pre-connect-placeholder { margin:1rem 0 2rem; display:flex; justify-content:center; }
+  .placeholder-panel { max-width:760px; width:100%; background:var(--color-surface); border:1px dashed var(--color-border); border-radius:18px; padding:2rem 1.75rem 1.9rem; text-align:center; box-shadow:0 6px 32px -12px rgba(0,0,0,.18); position:relative; overflow:hidden; }
+  .placeholder-panel::before { content:""; position:absolute; inset:0; background:radial-gradient(circle at 30% 15%,rgba(102,126,234,.18),transparent 60%), radial-gradient(circle at 80% 70%,rgba(118,75,162,.18),transparent 55%); pointer-events:none; }
+  .placeholder-panel h3 { margin:0 0 .85rem; font-size:1.35rem; font-weight:700; background:$gradient-accent; -webkit-background-clip:text; background-clip:text; color:transparent; letter-spacing:.5px; }
+  .placeholder-panel p { margin:.4rem 0 .9rem; font-size:.8rem; color:var(--color-text); }
+  .placeholder-panel .benefits { list-style:none; padding:0; margin:.25rem 0 1rem; display:flex; flex-direction:column; gap:.45rem; }
+  .placeholder-panel .benefits li { font-size:.7rem; font-weight:500; background:$color-control-bg; color:var(--color-text); padding:.55rem .75rem; border-radius:10px; border:1px solid $color-control-border; letter-spacing:.3px; }
+  .placeholder-panel .privacy-note { font-size:.6rem; color:var(--color-text-muted); margin:.85rem 0 0; }
 
   .match-card.crush-card { background:linear-gradient(135deg,#ffe6f0 0%,#fff0f5 100%); border:2px solid #ff69b4; position:relative; }
   .match-card.crush-card::before { content:'\1F495'; position:absolute; top:10px; right:15px; font-size:1.3rem; opacity:.65; }

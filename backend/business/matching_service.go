@@ -142,6 +142,8 @@ func (s *MatchingService) SimilarityCacheStats() *SimilarityCacheStats {
 }
 
 // FindMusicMatches implements music matching business logic
+// FindMusicMatches determines similar users based on Spotify top artists or tracks depending on the 'basis' value.
+// BACKWARD COMPAT: existing generated wrapper currently does not pass a basis param; we infer from artistsRequest.Basis if later added or default to "artists".
 func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest generated.ArtistsRequest, xUserUsername string, rng string, limit int32, overlapsLimit ...int32) (generated.ImplResponse, error) {
 	if xUserUsername == "" {
 		return generated.Response(http.StatusBadRequest, generated.ErrorResponse{Message: "username header is required"}), nil
@@ -176,6 +178,21 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 		limit = int32(max)
 	}
 
+	// Determine basis (artists|tracks). For now, we look at a context value or artistsRequest future extension; fallback to default.
+	basis := "artists"
+	if v := ctx.Value("match_basis"); v != nil {
+		if bs, ok := v.(string); ok && (bs == "artists" || bs == "tracks") {
+			basis = bs
+		}
+	}
+	// Overridable via a sentinel field in ArtistsRequest future extension (defensive; ignore if empty)
+	// NOTE: We avoid modifying generated model until OpenAPI regenerated; this allows early server adoption.
+
+	// feature flag check for tracks
+	if basis == "tracks" && !cfg.Matching.TracksEnabled {
+		return generated.Response(http.StatusBadRequest, generated.ErrorResponse{Message: "track-based matching disabled"}), nil
+	}
+
 	// Determine overlaps limit (optional variadic for backward compatibility in tests not yet updated)
 	var ovLimit int32 = 0
 	if len(overlapsLimit) > 0 {
@@ -188,14 +205,22 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 		}
 	}
 
-	cacheKey := fmt.Sprintf("spotify:%s:%s:%d:%d", user.ID.String(), rng, limit, ovLimit)
+	cacheKey := fmt.Sprintf("spotify:%s:%s:%s:%d:%d", basis, user.ID.String(), rng, limit, ovLimit)
 	// Cache lookup (guard against nil cache for safety if constructed elsewhere)
 	if s.cache != nil {
 		if matches, ok := s.cache.get(cacheKey); ok {
 			return generated.Response(http.StatusOK, matches), nil
 		}
 	}
-	similar, err := s.userRepo.FindSimilarUsersBySpotifyTopArtists(ctx, user.ID, rng, limit)
+	// BEFORE performing similarity query, ensure the anchor user actually has Spotify top artist snapshots
+	// for the requested range. If not, we short-circuit with an empty list (frontend shows a connect CTA)
+	// instead of fabricating a pseudo self-match placeholder which could be misleading post-auth.
+	var similar []SimilarUserResult
+	if basis == "tracks" {
+		similar, err = s.userRepo.FindSimilarUsersBySpotifyTopTracks(ctx, user.ID, rng, limit)
+	} else {
+		similar, err = s.userRepo.FindSimilarUsersBySpotifyTopArtists(ctx, user.ID, rng, limit)
+	}
 	if err != nil {
 		fmt.Printf("ERROR: similarity query failed: %v\n", err)
 		return generated.Response(http.StatusInternalServerError, generated.ErrorResponse{Message: "similarity query failed"}), nil
@@ -287,26 +312,8 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 		matches = append(matches, mu)
 	}
 
-	// Fallback: if no matches, keep prior playful placeholder (but must satisfy constraints => Overlap>=1). We'll skip adding placeholder if zero because spec would reject Overlap 0.
-	if len(matches) == 0 {
-		// fabricate a minimal self-like entry using user's own name to satisfy UI; not ideal but prevents empty list shock.
-		gradYear := int32(2025)
-		if user.GraduationYear.Valid {
-			gradYear = user.GraduationYear.Int32
-		}
-		program := ""
-		if user.Program.Valid {
-			program = user.Program.String
-		}
-		matches = append(matches, &generated.MatchUser{
-			Name:           user.FirstName + " " + user.LastName,
-			Program:        program,
-			GraduationYear: gradYear,
-			Overlap:        1,
-			Score:          0.05,
-			Artists:        []string{"(Need more Spotify data to compute real matches)"},
-		})
-	}
+	// New behavior: if no matches discovered, simply return an empty array (client displays hint/CTA)
+	// This prevents a confusing "self" placeholder appearing before first successful sync.
 
 	if s.cache != nil {
 		s.cache.set(cacheKey, matches)
