@@ -85,6 +85,9 @@ services:
       SENDGRID_API_KEY: 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
       # Feature flags
       MATCH_TRACKS_ENABLED: "true"
+      # Matching configuration: cap ranks considered per user (defaults 20)
+      MATCHING_ARTIST_TOPN: 50
+      MATCHING_TRACK_TOPN: 50
     depends_on:
       flyway:
         condition: service_completed_successfully

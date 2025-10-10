@@ -66,6 +66,9 @@ func main() {
 		spotifyClientIdPublic := get("spotifyClientIdPublic", "")
 		spotifyRedirectUri := get("spotifyRedirectUri", "")
 		debugEnabled := getBoolStr("debugEnabled", false)
+		// Matching caps for top ranks considered per user (artists/tracks)
+		matchingArtistTopN := get("matchingArtistTopN", "20")
+		matchingTrackTopN := get("matchingTrackTopN", "20")
 		// Ticketmaster credentials required as secrets
 		tmKey := pulumiCfg.RequireSecret("ticketmasterConsumerKey")
 		tmSecret := pulumiCfg.RequireSecret("ticketmasterConsumerSecret")
@@ -454,6 +457,9 @@ func main() {
 									&corev1.EnvVarArgs{Name: pulumi.String("OTEL_TRACES_SAMPLER_ARG"), Value: otelTracesSamplerArg},
 									// Legacy environment variables for backward compatibility
 									&corev1.EnvVarArgs{Name: pulumi.String("PORT"), Value: legacyPort},
+									// Matching configuration
+									&corev1.EnvVarArgs{Name: pulumi.String("MATCHING_ARTIST_TOPN"), Value: matchingArtistTopN},
+									&corev1.EnvVarArgs{Name: pulumi.String("MATCHING_TRACK_TOPN"), Value: matchingTrackTopN},
 									// DATABASE_URL derived at runtime from other envs; omitted to avoid duplicating secret
 								},
 								Resources: &corev1.ResourceRequirementsArgs{

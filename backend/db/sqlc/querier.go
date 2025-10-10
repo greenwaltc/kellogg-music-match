@@ -43,6 +43,7 @@ type Querier interface {
 	//   user_id UUID          -> anchor user
 	//   range   TEXT          -> spotify range ('short_term'|'medium_term'|'long_term')
 	//   limit_n INT           -> maximum similar users to return
+	//   top_n   INT           -> consider only top N ranked items per user
 	// Notes:
 	//   * We restrict snapshots to only the most recent fetched_at per user per range using the views.
 	//   * We filter out users with zero overlap.

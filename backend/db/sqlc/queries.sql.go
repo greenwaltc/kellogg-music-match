@@ -208,11 +208,11 @@ const findTopNSimilarUsersBySpotifyArtists = `-- name: FindTopNSimilarUsersBySpo
 WITH anchor AS (
   SELECT v.user_id AS anchor_user_id, v.item_rank AS anchor_item_rank, v.spotify_artist_id, v.name AS anchor_name
   FROM v_current_spotify_top_artists v
-  WHERE v.user_id = $2 AND v.range = $3
+  WHERE v.user_id = $2 AND v.range = $3 AND v.item_rank <= $4
 ), others AS (
   SELECT v.user_id AS other_user_id, v.item_rank AS other_item_rank, v.spotify_artist_id, v.name AS other_name
   FROM v_current_spotify_top_artists v
-  WHERE v.user_id <> $2 AND v.range = $3
+  WHERE v.user_id <> $2 AND v.range = $3 AND v.item_rank <= $4
 ), overlap AS (
   SELECT o.other_user_id,
          a.spotify_artist_id,
@@ -253,6 +253,7 @@ type FindTopNSimilarUsersBySpotifyArtistsParams struct {
 	LimitN       int32     `json:"limit_n"`
 	AnchorUserID uuid.UUID `json:"anchor_user_id"`
 	Range        string    `json:"range"`
+	TopN         int32     `json:"top_n"`
 }
 
 type FindTopNSimilarUsersBySpotifyArtistsRow struct {
@@ -280,13 +281,19 @@ type FindTopNSimilarUsersBySpotifyArtistsRow struct {
 //	user_id UUID          -> anchor user
 //	range   TEXT          -> spotify range ('short_term'|'medium_term'|'long_term')
 //	limit_n INT           -> maximum similar users to return
+//	top_n   INT           -> consider only top N ranked items per user
 //
 // Notes:
 //   - We restrict snapshots to only the most recent fetched_at per user per range using the views.
 //   - We filter out users with zero overlap.
 //   - JSON structure for overlaps: [{"spotify_artist_id":"...","name":"...","anchor_rank":1,"other_rank":2}]
 func (q *Queries) FindTopNSimilarUsersBySpotifyArtists(ctx context.Context, arg FindTopNSimilarUsersBySpotifyArtistsParams) ([]FindTopNSimilarUsersBySpotifyArtistsRow, error) {
-	rows, err := q.db.Query(ctx, findTopNSimilarUsersBySpotifyArtists, arg.LimitN, arg.AnchorUserID, arg.Range)
+	rows, err := q.db.Query(ctx, findTopNSimilarUsersBySpotifyArtists,
+		arg.LimitN,
+		arg.AnchorUserID,
+		arg.Range,
+		arg.TopN,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -318,11 +325,11 @@ const findTopNSimilarUsersBySpotifyTracks = `-- name: FindTopNSimilarUsersBySpot
 WITH anchor AS (
   SELECT v.user_id AS anchor_user_id, v.item_rank AS anchor_item_rank, v.spotify_track_id, v.name AS anchor_name
   FROM v_current_spotify_top_tracks v
-  WHERE v.user_id = $2 AND v.range = $3
+  WHERE v.user_id = $2 AND v.range = $3 AND v.item_rank <= $4
 ), others AS (
   SELECT v.user_id AS other_user_id, v.item_rank AS other_item_rank, v.spotify_track_id, v.name AS other_name
   FROM v_current_spotify_top_tracks v
-  WHERE v.user_id <> $2 AND v.range = $3
+  WHERE v.user_id <> $2 AND v.range = $3 AND v.item_rank <= $4
 ), overlap AS (
   SELECT o.other_user_id,
          a.spotify_track_id,
@@ -363,6 +370,7 @@ type FindTopNSimilarUsersBySpotifyTracksParams struct {
 	LimitN       int32     `json:"limit_n"`
 	AnchorUserID uuid.UUID `json:"anchor_user_id"`
 	Range        string    `json:"range"`
+	TopN         int32     `json:"top_n"`
 }
 
 type FindTopNSimilarUsersBySpotifyTracksRow struct {
@@ -378,7 +386,12 @@ type FindTopNSimilarUsersBySpotifyTracksRow struct {
 
 // Similar to artist similarity but operates on track snapshots.
 func (q *Queries) FindTopNSimilarUsersBySpotifyTracks(ctx context.Context, arg FindTopNSimilarUsersBySpotifyTracksParams) ([]FindTopNSimilarUsersBySpotifyTracksRow, error) {
-	rows, err := q.db.Query(ctx, findTopNSimilarUsersBySpotifyTracks, arg.LimitN, arg.AnchorUserID, arg.Range)
+	rows, err := q.db.Query(ctx, findTopNSimilarUsersBySpotifyTracks,
+		arg.LimitN,
+		arg.AnchorUserID,
+		arg.Range,
+		arg.TopN,
+	)
 	if err != nil {
 		return nil, err
 	}

@@ -134,6 +134,11 @@ func (m *EnhancedMockUserRepository) FindSimilarUsersBySpotifyTopArtists(ctx con
 	return []business.SimilarUserResult{}, nil
 }
 
+// Track similarity stub to satisfy interface in tests
+func (m *EnhancedMockUserRepository) FindSimilarUsersBySpotifyTopTracks(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]business.SimilarUserResult, error) {
+	return []business.SimilarUserResult{}, nil
+}
+
 var _ = Describe("PasswordResetService", func() {
 	var (
 		service          *business.PasswordResetService

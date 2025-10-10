@@ -3,6 +3,7 @@ package business
 import (
 	"context"
 	"fmt"
+	"sort"
 	"net/http"
 	"strings"
 	"sync"
@@ -314,6 +315,17 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 
 	// New behavior: if no matches discovered, simply return an empty array (client displays hint/CTA)
 	// This prevents a confusing "self" placeholder appearing before first successful sync.
+
+	// Ensure deterministic order by the score we actually return to clients
+	sort.SliceStable(matches, func(i, j int) bool {
+		if matches[i].Score == matches[j].Score {
+			if matches[i].Overlap == matches[j].Overlap {
+				return matches[i].Name < matches[j].Name
+			}
+			return matches[i].Overlap > matches[j].Overlap
+		}
+		return matches[i].Score > matches[j].Score
+	})
 
 	if s.cache != nil {
 		s.cache.set(cacheKey, matches)

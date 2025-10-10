@@ -33,6 +33,7 @@ type TicketmasterEvent struct {
 	} `json:"dates"`
 	Embedded struct {
 		Venues []struct {
+			ID      string `json:"id"`
 			Name    string `json:"name"`
 			Address struct {
 				Line1 string `json:"line1"`

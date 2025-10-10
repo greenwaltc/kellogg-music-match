@@ -5,9 +5,8 @@
 
   .controls-bar { background:var(--color-surface); border:1px solid var(--color-border); border-radius:18px; padding:1rem 1.15rem 1.1rem; box-shadow:0 4px 18px -6px rgba(0,0,0,.10); position:relative; display:flex; flex-wrap:wrap; gap:.75rem 1rem; align-items:flex-end; margin-bottom:1rem; }
   .controls-bar label { display:flex; flex-direction:column; gap:.35rem; font-size:.55rem; font-weight:600; text-transform:uppercase; letter-spacing:.6px; color:var(--color-text-muted); min-width:110px; }
-  .controls-bar select, .controls-bar input[type=number] { background:var(--color-input-bg); color:var(--color-text); border:1px solid var(--color-border); border-radius:10px; padding:.55rem .65rem .55rem .55rem; font-size:.7rem; font-weight:500; letter-spacing:.3px; min-width:90px; box-shadow:0 2px 4px rgba(0,0,0,.04) inset; transition:border-color .25s, background .25s; }
-  .controls-bar select:focus, .controls-bar input[type=number]:focus { @include focus-ring(); }
-  .debounce-input { width:110px; }
+  .controls-bar select { background:var(--color-input-bg); color:var(--color-text); border:1px solid var(--color-border); border-radius:10px; padding:.55rem .65rem .55rem .55rem; font-size:.7rem; font-weight:500; letter-spacing:.3px; min-width:90px; box-shadow:0 2px 4px rgba(0,0,0,.04) inset; transition:border-color .25s, background .25s; }
+  .controls-bar select:focus { @include focus-ring(); }
   .reset-btn { align-self:flex-end; margin-top:1.15rem; background:$color-reset-bg; border:1px solid $color-reset-border; color:$color-danger-text; padding:.55rem .85rem .6rem; font-size:.6rem; font-weight:600; border-radius:8px; letter-spacing:.45px; cursor:pointer; transition:background .25s, border-color .25s, transform .18s; }
   .reset-btn:hover { background:$color-reset-hover; }
   .reset-btn:active { transform:translateY(1px); }
@@ -20,7 +19,7 @@
   .info-icon:hover { background:#3d4b63; }
   .info-icon.small { width:14px; height:14px; font-size:.55rem; }
   [appTooltip] { position:relative; }
-  .range-toggle { display:flex; gap:.4rem; }
+  .range-toggle, .basis-toggle { display:flex; gap:.4rem; }
   .range-btn { position:relative; border:1px solid $color-control-border; background:$color-control-bg; color:$neutral-800; padding:.45rem .75rem; font-size:.65rem; border-radius:$radius-pill; cursor:pointer; font-weight:600; letter-spacing:.25px; transition:background .25s, transform .18s, box-shadow .25s; }
   .range-btn:hover:not(.active){ background:$color-control-bg-hover; }
   .range-btn:active{ transform:scale(.94); }

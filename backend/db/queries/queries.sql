@@ -256,6 +256,7 @@ SELECT * FROM spotify_tokens WHERE user_id = sqlc.arg(user_id) LIMIT 1;
 --   user_id UUID          -> anchor user
 --   range   TEXT          -> spotify range ('short_term'|'medium_term'|'long_term')
 --   limit_n INT           -> maximum similar users to return
+--   top_n   INT           -> consider only top N ranked items per user
 -- Notes:
 --   * We restrict snapshots to only the most recent fetched_at per user per range using the views.
 --   * We filter out users with zero overlap.
@@ -263,11 +264,11 @@ SELECT * FROM spotify_tokens WHERE user_id = sqlc.arg(user_id) LIMIT 1;
 WITH anchor AS (
   SELECT v.user_id AS anchor_user_id, v.item_rank AS anchor_item_rank, v.spotify_artist_id, v.name AS anchor_name
   FROM v_current_spotify_top_artists v
-  WHERE v.user_id = sqlc.arg(anchor_user_id) AND v.range = sqlc.arg(range)
+  WHERE v.user_id = sqlc.arg(anchor_user_id) AND v.range = sqlc.arg(range) AND v.item_rank <= sqlc.arg(top_n)
 ), others AS (
   SELECT v.user_id AS other_user_id, v.item_rank AS other_item_rank, v.spotify_artist_id, v.name AS other_name
   FROM v_current_spotify_top_artists v
-  WHERE v.user_id <> sqlc.arg(anchor_user_id) AND v.range = sqlc.arg(range)
+  WHERE v.user_id <> sqlc.arg(anchor_user_id) AND v.range = sqlc.arg(range) AND v.item_rank <= sqlc.arg(top_n)
 ), overlap AS (
   SELECT o.other_user_id,
          a.spotify_artist_id,
@@ -308,11 +309,11 @@ LIMIT sqlc.arg(limit_n);
 WITH anchor AS (
   SELECT v.user_id AS anchor_user_id, v.item_rank AS anchor_item_rank, v.spotify_track_id, v.name AS anchor_name
   FROM v_current_spotify_top_tracks v
-  WHERE v.user_id = sqlc.arg(anchor_user_id) AND v.range = sqlc.arg(range)
+  WHERE v.user_id = sqlc.arg(anchor_user_id) AND v.range = sqlc.arg(range) AND v.item_rank <= sqlc.arg(top_n)
 ), others AS (
   SELECT v.user_id AS other_user_id, v.item_rank AS other_item_rank, v.spotify_track_id, v.name AS other_name
   FROM v_current_spotify_top_tracks v
-  WHERE v.user_id <> sqlc.arg(anchor_user_id) AND v.range = sqlc.arg(range)
+  WHERE v.user_id <> sqlc.arg(anchor_user_id) AND v.range = sqlc.arg(range) AND v.item_rank <= sqlc.arg(top_n)
 ), overlap AS (
   SELECT o.other_user_id,
          a.spotify_track_id,

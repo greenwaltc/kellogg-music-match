@@ -44,16 +44,12 @@ import { TooltipDirective } from './tooltip.directive';
           <option *ngFor="let opt of overlapsLimitOptions" [value]="opt">{{ opt }}</option>
         </select>
       </label>
-      <label>
-        Debounce (ms):
-        <input type="number" min="0" max="3000" [(ngModel)]="debounceMs" (change)="onDebounceChange()" class="debounce-input" />
-      </label>
-      <button type="button" class="reset-btn" (click)="resetControls()" appTooltip="Reset limit & debounce to defaults (50 / 400ms)">Reset</button>
+      <button type="button" class="reset-btn" (click)="resetControls()" appTooltip="Reset limits to defaults">Reset</button>
       <div class="basis-toggle" role="tablist" aria-label="Match Basis">
         <button type="button"
                 role="tab"
                 [attr.aria-selected]="matches.basis()==='artists'"
-                class="basis-btn"
+                class="range-btn"
                 [class.active]="matches.basis()==='artists'"
                 (click)="setBasis('artists')"
                 appTooltip="Match based on overlapping top artists">
@@ -62,7 +58,7 @@ import { TooltipDirective } from './tooltip.directive';
         <button type="button"
                 role="tab"
                 [attr.aria-selected]="matches.basis()==='tracks'"
-                class="basis-btn"
+                class="range-btn"
                 [class.active]="matches.basis()==='tracks'"
                 (click)="setBasis('tracks')"
                 appTooltip="Match based on overlapping top tracks">
@@ -213,7 +209,6 @@ export class MatchesComponent implements OnInit, OnDestroy {
   artistsPerPage = 25;
   showRankInfo = false;
   private limitDebounce: any;
-  debounceMs = 400;
 
   constructor(public matches: MatchService, private router: Router, private spotify: SpotifyService) {
     effect(() => { if (!this.matches.matches()) { /* placeholder for potential redirect */ } });
@@ -255,10 +250,7 @@ export class MatchesComponent implements OnInit, OnDestroy {
       }
     }
     const storedDb = localStorage.getItem('kmmMatchLimitDebounceMs');
-    if (storedDb) {
-      const d = parseInt(storedDb, 10);
-      if (!isNaN(d) && d >= 0 && d <= 3000) this.debounceMs = d;
-    }
+    if (storedDb) { /* legacy: clear deprecated key */ localStorage.removeItem('kmmMatchLimitDebounceMs'); }
     const storedOv = localStorage.getItem('kmmOverlapsLimit');
     if (storedOv) {
       const ov = parseInt(storedOv, 10);
@@ -306,20 +298,13 @@ export class MatchesComponent implements OnInit, OnDestroy {
   }
   onLimitChange() {
     localStorage.setItem('kmmMatchLimit', this.limit.toString());
-    if (this.limitDebounce) clearTimeout(this.limitDebounce);
-    this.limitDebounce = setTimeout(() => { this.updateUrlState(); this.refetch(); }, this.debounceMs);
-  }
-  onDebounceChange() {
-    if (this.debounceMs < 0) this.debounceMs = 0;
-    if (this.debounceMs > 3000) this.debounceMs = 3000;
-    localStorage.setItem('kmmMatchLimitDebounceMs', this.debounceMs.toString());
+    this.updateUrlState();
+    this.refetch();
   }
   resetControls() {
     this.limit = 50;
     this.overlapsLimit = null;
-    this.debounceMs = 400;
     localStorage.setItem('kmmMatchLimit', this.limit.toString());
-    localStorage.setItem('kmmMatchLimitDebounceMs', this.debounceMs.toString());
     localStorage.removeItem('kmmOverlapsLimit');
     this.updateUrlState();
     this.refetch();

@@ -155,6 +155,7 @@ func (a *TicketmasterAdapter) convertVenue(tmEvent TicketmasterEvent) Venue {
 
 	tmVenue := tmEvent.Embedded.Venues[0]
 	return Venue{
+		ID:   tmVenue.ID,
 		Name: tmVenue.Name,
 		Address: Address{
 			Street:  tmVenue.Address.Line1,

@@ -510,10 +510,13 @@ func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopArtists(ctx conte
 	if limit <= 0 {
 		limit = 10
 	}
+	// Load matching config to obtain per-user top N cap for ranks
+	cfg := config.Load()
 	rows, err := r.queries.FindTopNSimilarUsersBySpotifyArtists(ctx, sqlc.FindTopNSimilarUsersBySpotifyArtistsParams{
 		LimitN:       limit,
 		AnchorUserID: anchorUserID,
 		Range:        rng,
+		TopN:         int32(cfg.Matching.ArtistTopN),
 	})
 	if err != nil {
 		return nil, err
@@ -557,10 +560,12 @@ func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopTracks(ctx contex
 	if limit <= 0 {
 		limit = 10
 	}
+	cfg := config.Load()
 	rows, err := r.queries.FindTopNSimilarUsersBySpotifyTracks(ctx, sqlc.FindTopNSimilarUsersBySpotifyTracksParams{
 		LimitN:       limit,
 		AnchorUserID: anchorUserID,
 		Range:        rng,
+		TopN:         int32(cfg.Matching.TrackTopN),
 	})
 	if err != nil {
 		return nil, err
