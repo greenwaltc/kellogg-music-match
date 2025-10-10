@@ -77,9 +77,10 @@ type TicketmasterConfig struct {
 	DefaultCountry  string
 	DateRangeMonths int // number of months to look ahead for events
 	// Optional geo-based search (overrides city/state when provided)
-	GeoLatLong string // e.g. "41.8781,-87.6298"
-	Radius     int    // distance from geo point
-	RadiusUnit string // miles (default) or km
+	GeoLatLong  string // e.g. "41.8781,-87.6298"
+	Radius      int    // distance from geo point
+	RadiusUnit  string // miles (default) or km
+	PageDelayMs int    // delay between paginated requests (milliseconds)
 }
 
 // DebugConfig holds debug-related configuration
@@ -174,10 +175,11 @@ func Load() *Config {
 			DefaultCity:     getEnvWithDefault("TICKETMASTER_DEFAULT_CITY", "Chicago"),
 			DefaultState:    getEnvWithDefault("TICKETMASTER_DEFAULT_STATE", "IL"),
 			DefaultCountry:  getEnvWithDefault("TICKETMASTER_DEFAULT_COUNTRY", "US"),
-			DateRangeMonths: getEnvIntWithDefault("TICKETMASTER_DATE_RANGE_MONTHS", 6),
+			DateRangeMonths: getEnvIntWithDefault("TICKETMASTER_DATE_RANGE_MONTHS", 12),
 			GeoLatLong:      getEnvWithDefault("TICKETMASTER_GEO_LATLONG", ""),
 			Radius:          getEnvIntWithDefault("TICKETMASTER_RADIUS", 0),
 			RadiusUnit:      getEnvWithDefault("TICKETMASTER_RADIUS_UNIT", "miles"),
+			PageDelayMs:     getEnvIntWithDefault("TICKETMASTER_PAGE_DELAY_MS", 250),
 		},
 		Debug: DebugConfig{
 			Enabled: getEnvBoolWithDefault("DEBUG_ENABLED", false),

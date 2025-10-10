@@ -78,6 +78,8 @@ func main() {
 		tmCity := get("ticketmasterDefaultCity", "Chicago")
 		tmState := get("ticketmasterDefaultState", "IL")
 		tmCountry := get("ticketmasterDefaultCountry", "US")
+		// Inter-page delay for Ticketmaster pagination (ms)
+		tmPageDelayMs := get("ticketmasterPageDelayMs", "250")
 		emailEnabled := getBoolStr("emailEnabled", true)
 		emailProvider := get("emailProvider", "sendgrid")
 		emailFromEmail := get("emailFromEmail", "support@kelloggmatch.com")
@@ -426,6 +428,8 @@ func main() {
 									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_DEFAULT_CITY"), Value: tmCity},
 									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_DEFAULT_STATE"), Value: tmState},
 									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_DEFAULT_COUNTRY"), Value: tmCountry},
+									// Pagination pacing between Ticketmaster page requests (milliseconds)
+									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_PAGE_DELAY_MS"), Value: tmPageDelayMs},
 									// Optional geo override
 									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_GEO_LATLONG"), Value: geoLatLong},
 									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_RADIUS"), Value: geoRadius},

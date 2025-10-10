@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/greenwaltc/kellogg-music-match/backend/business/concert"
 	"github.com/greenwaltc/kellogg-music-match/backend/config"
 )
@@ -112,17 +113,17 @@ func (s *ConcertService) ValidateConfiguration(ctx context.Context) error {
 }
 
 // GetChicagoEvents retrieves Chicago area events from the local database with search and pagination
-func (s *ConcertService) GetChicagoEvents(ctx context.Context, artistName *string, anyInterest bool, limit int32, offset int32) ([]*concert.Event, int64, error) {
+func (s *ConcertService) GetChicagoEvents(ctx context.Context, artistName *string, anyInterest bool, limit int32, offset int32, onlyMyTopArtists bool, anchorUserID *uuid.UUID, topN *int32) ([]*concert.Event, int64, error) {
 	if s.repository == nil {
 		return nil, 0, fmt.Errorf("repository not available")
 	}
 
-	events, err := s.repository.GetChicagoEvents(ctx, artistName, anyInterest, limit, offset)
+	events, err := s.repository.GetChicagoEvents(ctx, artistName, anyInterest, limit, offset, onlyMyTopArtists, anchorUserID, topN)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get Chicago events: %w", err)
 	}
 
-	count, err := s.repository.GetChicagoEventsCount(ctx, artistName, anyInterest)
+	count, err := s.repository.GetChicagoEventsCount(ctx, artistName, anyInterest, onlyMyTopArtists, anchorUserID, topN)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get Chicago events count: %w", err)
 	}

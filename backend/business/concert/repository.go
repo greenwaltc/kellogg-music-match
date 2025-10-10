@@ -24,8 +24,8 @@ type Repository interface {
 	DeleteOldEvents(ctx context.Context, cutoffDate time.Time) error
 	GetEventCount(ctx context.Context) (int64, error)
 	IsHealthy(ctx context.Context) error
-	GetChicagoEvents(ctx context.Context, artistName *string, anyInterest bool, limit int32, offset int32) ([]*Event, error)
-	GetChicagoEventsCount(ctx context.Context, artistName *string, anyInterest bool) (int64, error)
+	GetChicagoEvents(ctx context.Context, artistName *string, anyInterest bool, limit int32, offset int32, onlyMyTopArtists bool, anchorUserID *uuid.UUID, topN *int32) ([]*Event, error)
+	GetChicagoEventsCount(ctx context.Context, artistName *string, anyInterest bool, onlyMyTopArtists bool, anchorUserID *uuid.UUID, topN *int32) (int64, error)
 	GetChicagoEventByID(ctx context.Context, id string) (*Event, error)
 	// User interest operations
 	UpsertUserInterest(ctx context.Context, userID string, eventID string, status string) error
@@ -177,17 +177,30 @@ func (r *PostgreSQLRepository) IsHealthy(ctx context.Context) error {
 }
 
 // GetChicagoEvents retrieves Chicago area events with optional artist filtering and pagination
-func (r *PostgreSQLRepository) GetChicagoEvents(ctx context.Context, artistName *string, anyInterest bool, limit int32, offset int32) ([]*Event, error) {
+func (r *PostgreSQLRepository) GetChicagoEvents(ctx context.Context, artistName *string, anyInterest bool, limit int32, offset int32, onlyMyTopArtists bool, anchorUserID *uuid.UUID, topN *int32) ([]*Event, error) {
 	artistNameParam := ""
 	if artistName != nil {
 		artistNameParam = *artistName
 	}
 
+	// Derive anchor user and topN defaults
+	var anchor uuid.UUID
+	if anchorUserID != nil {
+		anchor = *anchorUserID
+	}
+	var topNVal int32 = 20
+	if topN != nil && *topN > 0 {
+		topNVal = *topN
+	}
+
 	params := database.GetChicagoEventsWithArtistSearchParams{
-		ArtistName:  artistNameParam,
-		AnyInterest: anyInterest,
-		LimitCount:  limit,
-		OffsetCount: offset,
+		ArtistName:       artistNameParam,
+		AnyInterest:      anyInterest,
+		OnlyMyTopArtists: onlyMyTopArtists,
+		AnchorUserID:     anchor,
+		TopN:             topNVal,
+		LimitCount:       limit,
+		OffsetCount:      offset,
 	}
 
 	rows, err := r.queries.GetChicagoEventsWithArtistSearch(ctx, params)
@@ -255,13 +268,29 @@ func (r *PostgreSQLRepository) GetChicagoEvents(ctx context.Context, artistName 
 }
 
 // GetChicagoEventsCount returns the total count of Chicago area events with optional artist filtering
-func (r *PostgreSQLRepository) GetChicagoEventsCount(ctx context.Context, artistName *string, anyInterest bool) (int64, error) {
+func (r *PostgreSQLRepository) GetChicagoEventsCount(ctx context.Context, artistName *string, anyInterest bool, onlyMyTopArtists bool, anchorUserID *uuid.UUID, topN *int32) (int64, error) {
 	artistNameParam := ""
 	if artistName != nil {
 		artistNameParam = *artistName
 	}
 
-	params := database.GetChicagoEventsCountWithArtistSearchParams{ArtistName: artistNameParam, InterestStatus: "", AnyInterest: anyInterest}
+	var anchor uuid.UUID
+	if anchorUserID != nil {
+		anchor = *anchorUserID
+	}
+	var topNVal int32 = 20
+	if topN != nil && *topN > 0 {
+		topNVal = *topN
+	}
+
+	params := database.GetChicagoEventsCountWithArtistSearchParams{
+		ArtistName:       artistNameParam,
+		InterestStatus:   "",
+		AnyInterest:      anyInterest,
+		OnlyMyTopArtists: onlyMyTopArtists,
+		AnchorUserID:     anchor,
+		TopN:             topNVal,
+	}
 	count, err := r.queries.GetChicagoEventsCountWithArtistSearch(ctx, params)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get Chicago events count: %w", err)
@@ -452,7 +481,7 @@ func (m *MockRepository) IsHealthy(ctx context.Context) error {
 	return nil
 }
 
-func (m *MockRepository) GetChicagoEvents(ctx context.Context, artistName *string, anyInterest bool, limit int32, offset int32) ([]*Event, error) {
+func (m *MockRepository) GetChicagoEvents(ctx context.Context, artistName *string, anyInterest bool, limit int32, offset int32, onlyMyTopArtists bool, anchorUserID *uuid.UUID, topN *int32) ([]*Event, error) {
 	// Collect and sort Chicago events deterministically by date (asc) then ID
 	var all []*Event
 	for _, event := range m.events {
@@ -484,6 +513,8 @@ func (m *MockRepository) GetChicagoEvents(ctx context.Context, artistName *strin
 			}
 		}
 
+		// onlyMyTopArtists filter is not enforced in mock; accept and return same set (could be enhanced with injected user profiles)
+
 		all = append(all, event)
 	}
 	// Sort
@@ -507,7 +538,7 @@ func (m *MockRepository) GetChicagoEvents(ctx context.Context, artistName *strin
 	return window, nil
 }
 
-func (m *MockRepository) GetChicagoEventsCount(ctx context.Context, artistName *string, anyInterest bool) (int64, error) {
+func (m *MockRepository) GetChicagoEventsCount(ctx context.Context, artistName *string, anyInterest bool, onlyMyTopArtists bool, anchorUserID *uuid.UUID, topN *int32) (int64, error) {
 	count := int64(0)
 	for _, event := range m.events {
 		// Simple Chicago filter
@@ -534,6 +565,7 @@ func (m *MockRepository) GetChicagoEventsCount(ctx context.Context, artistName *
 				continue
 			}
 		}
+		// onlyMyTopArtists filter ignored in mock
 
 		count++
 	}

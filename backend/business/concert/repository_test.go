@@ -77,7 +77,7 @@ func TestMockRepository_GetChicagoEvents(t *testing.T) {
 	require.NoError(t, repo.UpsertEvent(ctx, nyEvent))
 
 	t.Run("GetAllChicagoEvents", func(t *testing.T) {
-		events, err := repo.GetChicagoEvents(ctx, nil, false, 10, 0)
+		events, err := repo.GetChicagoEvents(ctx, nil, false, 10, 0, false, nil, nil)
 		require.NoError(t, err)
 		assert.Len(t, events, 2, "Should return only Chicago events")
 
@@ -89,7 +89,7 @@ func TestMockRepository_GetChicagoEvents(t *testing.T) {
 
 	t.Run("SearchByArtistName", func(t *testing.T) {
 		artistName := "Taylor"
-		events, err := repo.GetChicagoEvents(ctx, &artistName, false, 10, 0)
+		events, err := repo.GetChicagoEvents(ctx, &artistName, false, 10, 0, false, nil, nil)
 		require.NoError(t, err)
 		assert.Len(t, events, 1, "Should return only Taylor Swift event")
 		assert.Equal(t, "Taylor Swift Concert", events[0].Name)
@@ -97,27 +97,27 @@ func TestMockRepository_GetChicagoEvents(t *testing.T) {
 
 	t.Run("SearchByArtistNameCaseInsensitive", func(t *testing.T) {
 		artistName := "metallica"
-		events, err := repo.GetChicagoEvents(ctx, &artistName, false, 10, 0)
+		events, err := repo.GetChicagoEvents(ctx, &artistName, false, 10, 0, false, nil, nil)
 		require.NoError(t, err)
 		assert.Len(t, events, 1, "Should return Metallica event with case insensitive search")
 		assert.Equal(t, "Metallica Show", events[0].Name)
 	})
 
 	t.Run("PaginationLimit", func(t *testing.T) {
-		events, err := repo.GetChicagoEvents(ctx, nil, false, 1, 0)
+		events, err := repo.GetChicagoEvents(ctx, nil, false, 1, 0, false, nil, nil)
 		require.NoError(t, err)
 		assert.Len(t, events, 1, "Should respect limit parameter")
 	})
 
 	t.Run("PaginationOffset", func(t *testing.T) {
-		events, err := repo.GetChicagoEvents(ctx, nil, false, 1, 1)
+		events, err := repo.GetChicagoEvents(ctx, nil, false, 1, 1, false, nil, nil)
 		require.NoError(t, err)
 		assert.Len(t, events, 1, "Should respect offset parameter")
 	})
 
 	t.Run("NoMatchingArtist", func(t *testing.T) {
 		artistName := "NonexistentArtist"
-		events, err := repo.GetChicagoEvents(ctx, &artistName, false, 10, 0)
+		events, err := repo.GetChicagoEvents(ctx, &artistName, false, 10, 0, false, nil, nil)
 		require.NoError(t, err)
 		assert.Len(t, events, 0, "Should return no events for nonexistent artist")
 	})
@@ -156,21 +156,21 @@ func TestMockRepository_GetChicagoEventsCount(t *testing.T) {
 	require.NoError(t, repo.UpsertEvent(ctx, nonChicagoEvent))
 
 	t.Run("CountAllChicagoEvents", func(t *testing.T) {
-		count, err := repo.GetChicagoEventsCount(ctx, nil, false)
+		count, err := repo.GetChicagoEventsCount(ctx, nil, false, false, nil, nil)
 		require.NoError(t, err)
 		assert.Equal(t, int64(1), count, "Should count only Chicago events")
 	})
 
 	t.Run("CountWithArtistFilter", func(t *testing.T) {
 		artistName := "Test"
-		count, err := repo.GetChicagoEventsCount(ctx, &artistName, false)
+		count, err := repo.GetChicagoEventsCount(ctx, &artistName, false, false, nil, nil)
 		require.NoError(t, err)
 		assert.Equal(t, int64(1), count, "Should count Chicago events matching artist")
 	})
 
 	t.Run("CountWithNoMatchingArtist", func(t *testing.T) {
 		artistName := "Nonexistent"
-		count, err := repo.GetChicagoEventsCount(ctx, &artistName, false)
+		count, err := repo.GetChicagoEventsCount(ctx, &artistName, false, false, nil, nil)
 		require.NoError(t, err)
 		assert.Equal(t, int64(0), count, "Should return 0 for nonexistent artist")
 	})

@@ -28,7 +28,7 @@ func TestMockRepository_UserInterestLifecycle(t *testing.T) {
 	require.NoError(t, repo.UpsertUserInterest(ctx, "user-2", "evt-1", "GOING"))
 	require.NoError(t, repo.UpsertUserInterest(ctx, "user-3", "evt-1", "LOOKING_FOR_GROUP"))
 
-	events, err := repo.GetChicagoEvents(ctx, nil, false, 10, 0)
+	events, err := repo.GetChicagoEvents(ctx, nil, false, 10, 0, false, nil, nil)
 	require.NoError(t, err)
 	require.Len(t, events, 1)
 	e := events[0]
@@ -38,7 +38,7 @@ func TestMockRepository_UserInterestLifecycle(t *testing.T) {
 
 	// Update interest status
 	require.NoError(t, repo.UpsertUserInterest(ctx, "user-1", "evt-1", "GOING"))
-	events, err = repo.GetChicagoEvents(ctx, nil, false, 10, 0)
+	events, err = repo.GetChicagoEvents(ctx, nil, false, 10, 0, false, nil, nil)
 	require.NoError(t, err)
 	e = events[0]
 	assert.ElementsMatch(t, []string{}, e.InterestedUserIDs)
@@ -46,7 +46,7 @@ func TestMockRepository_UserInterestLifecycle(t *testing.T) {
 
 	// Remove interest
 	require.NoError(t, repo.RemoveUserInterest(ctx, "user-2", "evt-1"))
-	events, err = repo.GetChicagoEvents(ctx, nil, false, 10, 0)
+	events, err = repo.GetChicagoEvents(ctx, nil, false, 10, 0, false, nil, nil)
 	require.NoError(t, err)
 	e = events[0]
 	assert.ElementsMatch(t, []string{}, e.InterestedUserIDs)

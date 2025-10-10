@@ -72,7 +72,7 @@ func TestFetchConcerts_GeoMode(t *testing.T) {
 		t.Fatalf("expected request to be made")
 	}
 	q := rt.lastReq.URL.Query()
-	if q.Get("geoPoint") != cfg.GeoLatLong || q.Get("radius") != "50" || q.Get("unit") != "miles" {
+	if q.Get("latlong") != cfg.GeoLatLong || q.Get("radius") != "50" || q.Get("unit") != "miles" {
 		t.Errorf("expected geo params, got: %v", rt.lastReq.URL.String())
 	}
 	if q.Get("city") != "" {
@@ -102,8 +102,8 @@ func TestFetchConcerts_CityFallbackInvalidGeo(t *testing.T) {
 	if q.Get("city") != "Chicago" || q.Get("stateCode") != "IL" {
 		t.Errorf("expected city/state fallback, got URL: %s", rt.lastReq.URL.String())
 	}
-	if q.Get("geoPoint") != "" {
-		t.Errorf("expected no geoPoint when invalid geo provided")
+	if q.Get("latlong") != "" {
+		t.Errorf("expected no latlong when invalid geo provided")
 	}
 }
 
@@ -127,7 +127,7 @@ func TestFetchConcertsByArtist_Geo(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	q := rt.lastReq.URL.Query()
-	if q.Get("geoPoint") == "" || q.Get("radius") != "10" || q.Get("unit") != "km" {
+	if q.Get("latlong") == "" || q.Get("radius") != "10" || q.Get("unit") != "km" {
 		t.Errorf("expected geo params in artist search, got URL: %s", rt.lastReq.URL.String())
 	}
 }
@@ -151,7 +151,7 @@ func TestFetchConcertsByArtist_CityFallback_NoRadius(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	q := rt.lastReq.URL.Query()
-	if q.Get("city") != "Chicago" || q.Get("geoPoint") != "" {
+	if q.Get("city") != "Chicago" || q.Get("latlong") != "" {
 		t.Errorf("expected city fallback when radius=0, got URL: %s", rt.lastReq.URL.String())
 	}
 }

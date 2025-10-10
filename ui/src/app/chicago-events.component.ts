@@ -108,6 +108,14 @@ interface ChicagoEventsResponse {
             <input type="checkbox" [(ngModel)]="onlyWithInterest" (change)="onAnyInterestToggle()" />
             <span>Only events with interested Kellogg students</span>
           </label>
+          <label style="display:inline-flex; align-items:center; gap:.4rem; cursor:pointer; user-select:none; opacity: {{ isAuthenticated ? 1 : 0.6 }};">
+            <input type="checkbox" [(ngModel)]="onlyMyTopArtists" (change)="onOnlyTopArtistsToggle()" [disabled]="!isAuthenticated" />
+            <span>Only my top artists</span>
+          </label>
+          <label style="display:inline-flex; align-items:center; gap:.35rem; user-select:none;">
+            <span style="opacity:.85;">Top N</span>
+            <input type="number" min="1" max="200" step="1" [(ngModel)]="topNArtists" (change)="onTopNArtistsChange()" [disabled]="!onlyMyTopArtists || !isAuthenticated" style="width:68px; padding:.25rem .4rem; border-radius:6px; border:1px solid var(--color-border); background: var(--color-bg-soft); color: var(--color-text);" />
+          </label>
         </div>
         <div style="margin-top:0.75rem; text-align:center; display:flex; justify-content:center; gap:.5rem; flex-wrap:wrap;">
           <button class="retry-button" (click)="performSearch()" [disabled]="!searchQuery.trim() || searchLoading || isLoadingMore" style="min-width:110px; position:relative;">
@@ -175,6 +183,7 @@ interface ChicagoEventsResponse {
             <div class="date-badge">
               <div class="date-day">{{formatDate(event.date, 'day')}}</div>
               <div class="date-month">{{formatDate(event.date, 'month')}}</div>
+              <div class="date-year">{{formatDate(event.date, 'year')}}</div>
             </div>
 
             <!-- Event Content -->
@@ -392,6 +401,11 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
   // New filter flag
   onlyWithInterest = false;
   private ANY_INTEREST_STORAGE_KEY = 'kmm_chi_any_interest';
+  // New: Only my top artists filter + Top N
+  onlyMyTopArtists = false;
+  topNArtists = 20;
+  private ONLY_TOP_STORAGE_KEY = 'kmm_chi_only_top_artists';
+  private TOPN_STORAGE_KEY = 'kmm_chi_top_n_artists';
   // Observer scroll throttling
   private ioPaused = false;
   private scrollLastY = 0;
@@ -445,6 +459,18 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
     try {
       const storedInterest = localStorage.getItem(this.ANY_INTEREST_STORAGE_KEY);
       if (storedInterest === 'true') this.onlyWithInterest = true;
+    } catch {}
+
+    // Restore Only my top artists
+    try {
+      const storedOnlyTop = localStorage.getItem(this.ONLY_TOP_STORAGE_KEY);
+      if (storedOnlyTop === 'true') this.onlyMyTopArtists = true;
+    } catch {}
+    // Restore Top N value
+    try {
+      const rawN = localStorage.getItem(this.TOPN_STORAGE_KEY);
+      const n = rawN ? parseInt(rawN, 10) : NaN;
+      if (!isNaN(n) && n >= 1 && n <= 50) this.topNArtists = n;
     } catch {}
   }
 
@@ -633,6 +659,13 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
 
     if (this.onlyWithInterest) {
       params.append('anyInterest', 'true');
+    }
+
+    if (this.onlyMyTopArtists && this.isAuthenticated) {
+      params.append('onlyMyTopArtists', 'true');
+      if (this.topNArtists && this.topNArtists > 0) {
+        params.append('topNArtists', String(Math.max(1, Math.min(200, this.topNArtists))));
+      }
     }
 
   const query = searchQuery ?? this.activeSearchQuery;
@@ -932,6 +965,10 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
     const params = new URLSearchParams({ limit: this.pageSize.toString(), offset: '0' });
     if (this.activeSearchQuery.trim()) params.append('artistName', this.activeSearchQuery.trim());
     if (this.onlyWithInterest) params.append('anyInterest', 'true');
+    if (this.onlyMyTopArtists && this.isAuthenticated) {
+      params.append('onlyMyTopArtists', 'true');
+      if (this.topNArtists && this.topNArtists > 0) params.append('topNArtists', String(Math.max(1, Math.min(200, this.topNArtists))));
+    }
     this.http.get<ChicagoEventsResponse>(`${this.apiBaseUrl}/chicago/events?${params}`)
       .pipe(catchError(() => of(null)))
       .subscribe(resp => {
@@ -954,7 +991,31 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
     this.resetAndSearch(this.activeSearchQuery);
   }
 
-  formatDate(dateString: string, format: 'day' | 'month' | 'time'): string {
+  onOnlyTopArtistsToggle() {
+    try {
+      if (this.onlyMyTopArtists) localStorage.setItem(this.ONLY_TOP_STORAGE_KEY, 'true');
+      else localStorage.removeItem(this.ONLY_TOP_STORAGE_KEY);
+    } catch {}
+    this.resetAndSearch(this.activeSearchQuery);
+  }
+
+  onTopNArtistsChange() {
+    // Clamp and persist
+    let n = Number(this.topNArtists) || 20;
+  n = Math.max(1, Math.min(200, n));
+    this.topNArtists = n;
+    try { localStorage.setItem(this.TOPN_STORAGE_KEY, String(n)); } catch {}
+    if (this.onlyMyTopArtists && this.isAuthenticated) {
+      this.resetAndSearch(this.activeSearchQuery);
+    }
+  }
+
+  get isAuthenticated(): boolean {
+    const u = this.auth.user();
+    return !!u && !!(u.id || u.email);
+  }
+
+  formatDate(dateString: string, format: 'day' | 'month' | 'time' | 'year'): string {
     const date = new Date(dateString);
     
     switch (format) {
@@ -962,6 +1023,8 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
         return date.getDate().toString();
       case 'month':
         return date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+      case 'year':
+        return date.getFullYear().toString();
       case 'time':
         return date.toLocaleTimeString('en-US', { 
           hour: 'numeric', 

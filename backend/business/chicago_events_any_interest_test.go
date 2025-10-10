@@ -44,13 +44,13 @@ func TestConcertService_GetChicagoEvents_AnyInterest(t *testing.T) {
 	svc := NewConcertServiceWithRepository(&MockEventProvider{}, repo, &config.Config{})
 
 	// anyInterest=false returns both
-	eventsAll, countAll, err := svc.GetChicagoEvents(ctx, nil, false, 10, 0)
+	eventsAll, countAll, err := svc.GetChicagoEvents(ctx, nil, false, 10, 0, false, nil, nil)
 	require.NoError(t, err)
 	assert.Equal(t, int64(2), countAll)
 	require.Equal(t, 2, len(eventsAll))
 
 	// anyInterest=true returns only the one with interest
-	eventsFiltered, countFiltered, err := svc.GetChicagoEvents(ctx, nil, true, 10, 0)
+	eventsFiltered, countFiltered, err := svc.GetChicagoEvents(ctx, nil, true, 10, 0, false, nil, nil)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(eventsFiltered))
 	assert.Equal(t, int64(1), countFiltered)

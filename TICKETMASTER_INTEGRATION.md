@@ -17,7 +17,11 @@ The Ticketmaster integration uses the following environment variables:
 - `TICKETMASTER_DEFAULT_CITY` - Default city for searches (default: `Chicago`)
 - `TICKETMASTER_DEFAULT_STATE` - Default state code (default: `IL`)
 - `TICKETMASTER_DEFAULT_COUNTRY` - Default country code (default: `US`)
-- `TICKETMASTER_DATE_RANGE_MONTHS` - Event date range in months (default: `6`)
+- `TICKETMASTER_DATE_RANGE_MONTHS` - Event date range in months (default: `12`)
+- `TICKETMASTER_GEO_LATLONG` - Optional "lat,long" to search by geocoordinates (e.g. `41.8781,-87.6298`)
+- `TICKETMASTER_RADIUS` - Radius for geo search (default: `0`, ignored when geo not set)
+- `TICKETMASTER_RADIUS_UNIT` - `miles` (default) or `km`
+- `TICKETMASTER_PAGE_DELAY_MS` - Delay between paginated requests in milliseconds (default: `250`)
 
 ## Current Configuration
 
@@ -78,6 +82,8 @@ environment:
   TICKETMASTER_CONSUMER_KEY: 3RVuRqbo6iLpQj0iEG6UUAZiWa2Z5Y0O
   TICKETMASTER_CONSUMER_SECRET: EzfZFlmQwTHXIrsb
   TICKETMASTER_DEFAULT_CITY: Chicago
+  # Inter-page delay to respect TM rate-limits across pagination
+  TICKETMASTER_PAGE_DELAY_MS: 250
   # ... other config
 ```
 

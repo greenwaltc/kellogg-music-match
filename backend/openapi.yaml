@@ -907,6 +907,24 @@ paths:
             type: boolean
             default: false
             example: false
+        - name: onlyMyTopArtists
+          in: query
+          description: If true, only return events that include at least one artist present in the authenticated user's top N Spotify artists (by rank).
+          required: false
+          schema:
+            type: boolean
+            default: false
+            example: false
+        - name: topNArtists
+          in: query
+          description: Optional override for N when filtering by the user's top artists. If omitted, the server default will be used.
+          required: false
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 200
+            example: 10
       responses:
         '200':
           description: Chicago events retrieved successfully

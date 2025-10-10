@@ -160,19 +160,20 @@ ON CONFLICT (event_id, artist_id) DO UPDATE SET
 
 -- name: GetConcertEventByID :one
 SELECT 
-    ce.*,
-    v.name as venue_name,
-    v.street as venue_street, 
-    v.city as venue_city,
-    v.state as venue_state,
-    v.country as venue_country,
-    v.postal as venue_postal,
-    v.capacity as venue_capacity
+  ce.*,
+  v.name as venue_name,
+  v.street as venue_street, 
+  v.city as venue_city,
+  v.state as venue_state,
+  v.country as venue_country,
+  v.postal as venue_postal,
+  v.capacity as venue_capacity
 FROM concert_events ce
 LEFT JOIN venues v ON ce.venue_id = v.id
 WHERE ce.id = sqlc.arg(id);
 
 -- name: GetConcertEventsInDateRange :many
+-- name: GetChicagoEventsWithArtistSearch :many
 SELECT 
     ce.*,
     v.name as venue_name,
@@ -289,15 +290,16 @@ WITH anchor AS (
        ) ORDER BY (anchor_rank + other_rank), anchor_rank, other_rank) AS overlaps_json
   FROM overlap
   GROUP BY other_user_id
+
 )
 SELECT u.id AS user_id,
-     u.username,
-     u.first_name,
-     u.last_name,
-     u.program,
-     u.graduation_year,
-     agg.similarity,
-     agg.overlaps_json
+  u.username,
+  u.first_name,
+  u.last_name,
+  u.program,
+  u.graduation_year,
+  agg.similarity,
+  agg.overlaps_json
 FROM agg
 JOIN users u ON u.id = agg.other_user_id
 WHERE agg.similarity > 0
@@ -469,6 +471,16 @@ WHERE ce.event_date >= CURRENT_TIMESTAMP
   AND ce.status = 'onsale'
   AND (sqlc.arg(artist_name) = '' OR ca.name ILIKE '%' || sqlc.arg(artist_name) || '%')
   AND (sqlc.arg(any_interest)::bool = false OR EXISTS (SELECT 1 FROM user_concert_event_interest u2 WHERE u2.event_id = ce.id))
+  AND (
+    sqlc.arg(only_my_top_artists)::bool = false OR EXISTS (
+      SELECT 1
+      FROM v_current_spotify_top_artists sta
+      WHERE sta.user_id = sqlc.arg(anchor_user_id)
+        AND sta.range = 'medium_term'
+        AND sta.item_rank <= sqlc.arg(top_n)
+        AND lower(sta.name) = lower(ca.name)
+    )
+  )
 GROUP BY ce.id, v.name, v.street, v.city, v.state, v.country, v.postal, v.capacity
 ORDER BY ce.event_date ASC
 LIMIT sqlc.arg(limit_count) OFFSET sqlc.arg(offset_count);
@@ -485,7 +497,17 @@ WHERE ce.event_date >= CURRENT_TIMESTAMP
   AND ce.status = 'onsale'
   AND (sqlc.arg(artist_name) = '' OR ca.name ILIKE '%' || sqlc.arg(artist_name) || '%')
   AND (sqlc.arg(interest_status) = '' OR ucei.interest_status = sqlc.arg(interest_status) OR ucei.interest_status IS NULL)
-  AND (sqlc.arg(any_interest)::bool = false OR EXISTS (SELECT 1 FROM user_concert_event_interest u2 WHERE u2.event_id = ce.id));
+  AND (sqlc.arg(any_interest)::bool = false OR EXISTS (SELECT 1 FROM user_concert_event_interest u2 WHERE u2.event_id = ce.id))
+  AND (
+    sqlc.arg(only_my_top_artists)::bool = false OR EXISTS (
+      SELECT 1
+      FROM v_current_spotify_top_artists sta
+      WHERE sta.user_id = sqlc.arg(anchor_user_id)
+        AND sta.range = 'medium_term'
+        AND sta.item_rank <= sqlc.arg(top_n)
+        AND lower(sta.name) = lower(ca.name)
+    )
+  );
 
 -- name: GetConcertEventsInDateRangeWithInterest :many
 -- Returns events within date range plus associated venue, artists, and user interest buckets

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/greenwaltc/kellogg-music-match/backend/business/concert"
 	"github.com/greenwaltc/kellogg-music-match/backend/config"
 	. "github.com/onsi/ginkgo/v2"
@@ -356,11 +357,45 @@ func (m *MockEventProvider) SearchEvents(ctx context.Context, criteria concert.S
 
 	// Check for paginated results first
 	if result, exists := m.paginatedResults[criteria.Page]; exists {
-		return result, nil
+		// Return a copy filtered by the requested date range to simulate segmented windows
+		filtered := concert.SearchResult{
+			Events:      []concert.Event{},
+			TotalCount:  result.TotalCount,
+			CurrentPage: result.CurrentPage,
+			TotalPages:  result.TotalPages,
+			HasMore:     result.HasMore,
+		}
+		for _, ev := range result.Events {
+			if !ev.Date.Before(criteria.StartDate) && ev.Date.Before(criteria.EndDate) {
+				filtered.Events = append(filtered.Events, ev)
+			}
+		}
+		if len(filtered.Events) == 0 {
+			filtered.HasMore = false
+			filtered.TotalCount = 0
+			filtered.TotalPages = 0
+		} else {
+			filtered.TotalCount = len(filtered.Events)
+		}
+		return &filtered, nil
 	}
 
 	if m.searchResults != nil {
-		return m.searchResults, nil
+		// Return a copy filtered by the requested date range to simulate segmented windows
+		filtered := concert.SearchResult{
+			Events:      []concert.Event{},
+			TotalCount:  0,
+			CurrentPage: 1,
+			TotalPages:  1,
+			HasMore:     false,
+		}
+		for _, ev := range m.searchResults.Events {
+			if !ev.Date.Before(criteria.StartDate) && ev.Date.Before(criteria.EndDate) {
+				filtered.Events = append(filtered.Events, ev)
+			}
+		}
+		filtered.TotalCount = len(filtered.Events)
+		return &filtered, nil
 	}
 
 	return &concert.SearchResult{
@@ -474,10 +509,10 @@ func (m *MockRepository) AssociateEventWithArtist(ctx context.Context, eventID, 
 }
 
 // Added to satisfy updated Repository interface
-func (m *MockRepository) GetChicagoEvents(ctx context.Context, artistName *string, anyInterest bool, limit int32, offset int32) ([]*concert.Event, error) {
+func (m *MockRepository) GetChicagoEvents(ctx context.Context, artistName *string, anyInterest bool, limit int32, offset int32, onlyMyTopArtists bool, anchorUserID *uuid.UUID, topN *int32) ([]*concert.Event, error) {
 	return []*concert.Event{}, nil
 }
-func (m *MockRepository) GetChicagoEventsCount(ctx context.Context, artistName *string, anyInterest bool) (int64, error) {
+func (m *MockRepository) GetChicagoEventsCount(ctx context.Context, artistName *string, anyInterest bool, onlyMyTopArtists bool, anchorUserID *uuid.UUID, topN *int32) (int64, error) {
 	return 0, nil
 }
 func (m *MockRepository) UpsertUserInterest(ctx context.Context, userID string, eventID string, status string) error {

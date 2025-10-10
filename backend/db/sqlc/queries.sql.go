@@ -233,15 +233,16 @@ WITH anchor AS (
        ) ORDER BY (anchor_rank + other_rank), anchor_rank, other_rank) AS overlaps_json
   FROM overlap
   GROUP BY other_user_id
+
 )
 SELECT u.id AS user_id,
-     u.username,
-     u.first_name,
-     u.last_name,
-     u.program,
-     u.graduation_year,
-     agg.similarity,
-     agg.overlaps_json
+  u.username,
+  u.first_name,
+  u.last_name,
+  u.program,
+  u.graduation_year,
+  agg.similarity,
+  agg.overlaps_json
 FROM agg
 JOIN users u ON u.id = agg.other_user_id
 WHERE agg.similarity > 0
@@ -515,16 +516,36 @@ WHERE ce.event_date >= CURRENT_TIMESTAMP
   AND ($1 = '' OR ca.name ILIKE '%' || $1 || '%')
   AND ($2 = '' OR ucei.interest_status = $2 OR ucei.interest_status IS NULL)
   AND ($3::bool = false OR EXISTS (SELECT 1 FROM user_concert_event_interest u2 WHERE u2.event_id = ce.id))
+  AND (
+    $4::bool = false OR EXISTS (
+      SELECT 1
+      FROM v_current_spotify_top_artists sta
+      WHERE sta.user_id = $5
+        AND sta.range = 'medium_term'
+        AND sta.item_rank <= $6
+        AND lower(sta.name) = lower(ca.name)
+    )
+  )
 `
 
 type GetChicagoEventsCountWithArtistSearchParams struct {
-	ArtistName     interface{} `json:"artist_name"`
-	InterestStatus interface{} `json:"interest_status"`
-	AnyInterest    bool        `json:"any_interest"`
+	ArtistName       interface{} `json:"artist_name"`
+	InterestStatus   interface{} `json:"interest_status"`
+	AnyInterest      bool        `json:"any_interest"`
+	OnlyMyTopArtists bool        `json:"only_my_top_artists"`
+	AnchorUserID     uuid.UUID   `json:"anchor_user_id"`
+	TopN             int32       `json:"top_n"`
 }
 
 func (q *Queries) GetChicagoEventsCountWithArtistSearch(ctx context.Context, arg GetChicagoEventsCountWithArtistSearchParams) (int64, error) {
-	row := q.db.QueryRow(ctx, getChicagoEventsCountWithArtistSearch, arg.ArtistName, arg.InterestStatus, arg.AnyInterest)
+	row := q.db.QueryRow(ctx, getChicagoEventsCountWithArtistSearch,
+		arg.ArtistName,
+		arg.InterestStatus,
+		arg.AnyInterest,
+		arg.OnlyMyTopArtists,
+		arg.AnchorUserID,
+		arg.TopN,
+	)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -554,16 +575,29 @@ WHERE ce.event_date >= CURRENT_TIMESTAMP
   AND ce.status = 'onsale'
   AND ($1 = '' OR ca.name ILIKE '%' || $1 || '%')
   AND ($2::bool = false OR EXISTS (SELECT 1 FROM user_concert_event_interest u2 WHERE u2.event_id = ce.id))
+  AND (
+    $3::bool = false OR EXISTS (
+      SELECT 1
+      FROM v_current_spotify_top_artists sta
+      WHERE sta.user_id = $4
+        AND sta.range = 'medium_term'
+        AND sta.item_rank <= $5
+        AND lower(sta.name) = lower(ca.name)
+    )
+  )
 GROUP BY ce.id, v.name, v.street, v.city, v.state, v.country, v.postal, v.capacity
 ORDER BY ce.event_date ASC
-LIMIT $4 OFFSET $3
+LIMIT $7 OFFSET $6
 `
 
 type GetChicagoEventsWithArtistSearchParams struct {
-	ArtistName  interface{} `json:"artist_name"`
-	AnyInterest bool        `json:"any_interest"`
-	OffsetCount int32       `json:"offset_count"`
-	LimitCount  int32       `json:"limit_count"`
+	ArtistName       interface{} `json:"artist_name"`
+	AnyInterest      bool        `json:"any_interest"`
+	OnlyMyTopArtists bool        `json:"only_my_top_artists"`
+	AnchorUserID     uuid.UUID   `json:"anchor_user_id"`
+	TopN             int32       `json:"top_n"`
+	OffsetCount      int32       `json:"offset_count"`
+	LimitCount       int32       `json:"limit_count"`
 }
 
 type GetChicagoEventsWithArtistSearchRow struct {
@@ -600,6 +634,9 @@ func (q *Queries) GetChicagoEventsWithArtistSearch(ctx context.Context, arg GetC
 	rows, err := q.db.Query(ctx, getChicagoEventsWithArtistSearch,
 		arg.ArtistName,
 		arg.AnyInterest,
+		arg.OnlyMyTopArtists,
+		arg.AnchorUserID,
+		arg.TopN,
 		arg.OffsetCount,
 		arg.LimitCount,
 	)
@@ -651,14 +688,14 @@ func (q *Queries) GetChicagoEventsWithArtistSearch(ctx context.Context, arg GetC
 
 const getConcertEventByID = `-- name: GetConcertEventByID :one
 SELECT 
-    ce.id, ce.name, ce.event_date, ce.venue_id, ce.genres, ce.price_min, ce.price_max, ce.price_currency, ce.ticket_url, ce.description, ce.status, ce.age_restriction, ce.provider, ce.external_url, ce.created_at, ce.updated_at,
-    v.name as venue_name,
-    v.street as venue_street, 
-    v.city as venue_city,
-    v.state as venue_state,
-    v.country as venue_country,
-    v.postal as venue_postal,
-    v.capacity as venue_capacity
+  ce.id, ce.name, ce.event_date, ce.venue_id, ce.genres, ce.price_min, ce.price_max, ce.price_currency, ce.ticket_url, ce.description, ce.status, ce.age_restriction, ce.provider, ce.external_url, ce.created_at, ce.updated_at,
+  v.name as venue_name,
+  v.street as venue_street, 
+  v.city as venue_city,
+  v.state as venue_state,
+  v.country as venue_country,
+  v.postal as venue_postal,
+  v.capacity as venue_capacity
 FROM concert_events ce
 LEFT JOIN venues v ON ce.venue_id = v.id
 WHERE ce.id = $1

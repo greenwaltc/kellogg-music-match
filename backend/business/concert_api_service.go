@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/greenwaltc/kellogg-music-match/backend/business/concert"
 	"github.com/greenwaltc/kellogg-music-match/backend/config"
 	"github.com/greenwaltc/kellogg-music-match/backend/generated"
@@ -303,14 +304,27 @@ func (s *ConcertAPIService) convertToAPIConcert(event concert.Event) generated.C
 }
 
 // GetChicagoEvents retrieves Chicago area events with search and pagination
-func (s *ConcertAPIService) GetChicagoEvents(ctx context.Context, artistName string, limit int32, offset int32, anyInterest bool) (generated.ImplResponse, error) {
+func (s *ConcertAPIService) GetChicagoEvents(ctx context.Context, artistName string, limit int32, offset int32, anyInterest bool, onlyMyTopArtists bool, topNArtists int32) (generated.ImplResponse, error) {
 	// Convert empty string to nil pointer for optional parameter
 	var artistNamePtr *string
 	if artistName != "" {
 		artistNamePtr = &artistName
 	}
 
-	events, totalCount, err := s.concertService.GetChicagoEvents(ctx, artistNamePtr, anyInterest, limit, offset)
+	// Derive anchor user from context if available
+	var anchorPtr *uuid.UUID
+	if userID := getUserIDFromContext(ctx); userID != "" {
+		if parsed, err := uuid.Parse(userID); err == nil {
+			anchorPtr = &parsed
+		}
+	}
+
+	// topN can be nil if zero (use server default)
+	var topNPtr *int32
+	if topNArtists > 0 {
+		topNPtr = &topNArtists
+	}
+	events, totalCount, err := s.concertService.GetChicagoEvents(ctx, artistNamePtr, anyInterest, limit, offset, onlyMyTopArtists, anchorPtr, topNPtr)
 	if err != nil {
 		return generated.Response(http.StatusInternalServerError, generated.ErrorResponse{
 			Message: fmt.Sprintf("Failed to get Chicago events: %v", err),
