@@ -7,6 +7,7 @@ import { ThemeService } from './theme.service';
 import { MatchService } from './match.service';
 import { SpotifyConnectComponent } from './spotify-connect.component';
 import { SpotifyCallbackComponent } from './spotify-callback.component';
+import { PushService } from './services/push.service';
 
 @Component({
   selector: 'app-root',
@@ -23,6 +24,7 @@ export class AppComponent implements OnInit {
 
   constructor(
     private auth: AuthService,
+    private push: PushService,
     private router: Router,
     public theme: ThemeService,
     private matchService: MatchService,
@@ -30,6 +32,8 @@ export class AppComponent implements OnInit {
   ) {
     this.user = this.auth.user;
   }
+
+  enablePush() { this.push.ensureSubscribed(); }
 
   logout(): void {
     this.auth.logout();

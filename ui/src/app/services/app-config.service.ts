@@ -3,6 +3,7 @@ import { Injectable } from '@angular/core';
 export interface AppConfig {
   apiBaseUrl: string;
   featureFlags?: Record<string, any>;
+  vapidPublicKey?: string;
 }
 
 const CONFIG_URL = '/config.json';
@@ -29,7 +30,7 @@ export class AppConfigService {
     }
 
     // No cache on cold start: use safe defaults and hydrate later only when online
-    this.config = { apiBaseUrl: '', featureFlags: {} };
+    this.config = { apiBaseUrl: '', featureFlags: {}, vapidPublicKey: '' };
     this.whenOnline(() => this.hydrateFromNetwork());
   }
 
@@ -47,7 +48,11 @@ export class AppConfigService {
 
   private async refreshInBackground() {
     try {
-      await fetch(BYPASS_URL, { cache: 'no-store' });
+      const res = await fetch(BYPASS_URL, { cache: 'no-store' });
+      if (res.ok) {
+        const fresh = await res.json();
+        this.config = fresh;
+      }
     } catch {}
   }
 

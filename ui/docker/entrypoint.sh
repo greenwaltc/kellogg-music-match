@@ -14,12 +14,16 @@ generate_config() {
   cat > "$CONFIG_PATH" <<EOF
 {
   "apiBaseUrl": "${API_BASE_URL}",
+  "vapidPublicKey": "${VAPID_PUBLIC_KEY}",
   "artistMinCount": ${ARTIST_MIN_COUNT},
   "artistMaxCount": ${ARTIST_MAX_COUNT},
   "spotifyClientId": "${SPOTIFY_CLIENT_ID}",
   "spotifyRedirectUri": "${SPOTIFY_REDIRECT_URI}"
 }
 EOF
+  if [ -z "${VAPID_PUBLIC_KEY}" ]; then
+    echo "[entrypoint] WARNING: VAPID_PUBLIC_KEY is empty; push subscriptions will be disabled."
+  fi
   echo "[entrypoint] Generated runtime config.json (API_BASE_URL=${API_BASE_URL})"
 }
 

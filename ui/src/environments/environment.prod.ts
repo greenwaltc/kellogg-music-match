@@ -2,5 +2,5 @@
 declare global { interface Window { __kmmConfig?: { apiBaseUrl?: string }; } }
 export const environment = {
   production: true,
-  apiBaseUrl: (typeof window !== 'undefined' && window.__kmmConfig?.apiBaseUrl) || ''
+  apiBaseUrl: (typeof window !== 'undefined' && window.__kmmConfig?.apiBaseUrl) || '/api'
 };

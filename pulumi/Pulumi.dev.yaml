@@ -162,6 +162,10 @@ config:
 
   kellogg-music-match:spotifyRefreshTokenKey:
     secure: AAABALxGpuoOvskkfMfd9EyxqxEuIr0jXiQgaM+hx0Rn3dY53GtoriB1lweZmZe8uhF3RoxQt69C5KbMbfygD6huDfkBwSkMd39xYw==
+  kellogg-music-match:vapidPrivateKey:
+    secure: AAABAN+Gu/EEjErdmINoL75Vkpcg3oosIEDMyF7242JIPOYgW3qmUYja3SPFm0yQkMi4uCgpl2aI6yL1it2n9pIHNt+Ih9CF/knA
+  kellogg-music-match:vapidPublicKey:
+    secure: AAABADztf14x7i2BHA2Q3ghu4FqHChbsEJJW+7jlsshYrxKUrVRLiGRN2l1csDf+q1XhC/AJRV0nGBzacK6bgmfvOmZ9DPVEklmZOGmwQ2MEQAuEe1Mu3TSOWsSQHpvBEUh7aH0pf7mgiG9k2HXPl/5HR4mZ8O4=
 
 # -----------------------------------------------------------------------------
 # SECRETS HANDLING REMINDER

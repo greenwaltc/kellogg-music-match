@@ -93,3 +93,7 @@ config:
     secure: AAABABnkWK2Q2yT0HxZj4hk2CEomQZKQLlLZnVpIgWEPitd1heHXMpZ1+G9KBB5IJZQr4klMOu6JOpkZG/FIIK2A
   kellogg-music-match:spotifyRefreshTokenKey:
     secure: AAABAN33RIFegBG4r+JKkSU5pREI/Vriqoe/YvMY75fga/emogAzQlRGzUh93Hi8NoqDalmKNR9h8vCiyGlQOKUcq6eBqaig7IIFSg==
+  kellogg-music-match:vapidPrivateKey:
+    secure: AAABAEG3dziLnGr5Tzb2f3HUapx7F/DzcN/fgOSJqAcVZBXUrqY1FCjsrZftrUDi1fo5sMKrCXxZZBJ4wSGzWMFb+5xnHdEMBElW
+  kellogg-music-match:vapidPublicKey:
+    secure: AAABAGH76w6MeoajTPMtdleNOJbD1sd1CBmJM6Wc/IQdy5pGYo07sx3Pv4XOGY6ir8N/dLH+cBSSPmY55hxP88AJmD0imcUyo9uZzz6yIju3zKHi/NDYJyFDIi7VKUx8menO/8pDN/n7uS1L/Z+p/Bi3ZjQqZEA=

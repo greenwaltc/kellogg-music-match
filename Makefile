@@ -201,3 +201,6 @@ ngrok-tunnel: ## Start ngrok tunnel for backend
 	@echo "✅ ngrok tunnel started!"
 
 .DEFAULT_GOAL := help
+
+generate-vapid-keys:
+	npx web-push generate-vapid-keys

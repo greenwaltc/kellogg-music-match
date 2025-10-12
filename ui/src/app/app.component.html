@@ -7,14 +7,16 @@
     
     <!-- Desktop Navigation -->
     <nav *ngIf="isLoggedIn(); else loggedOut" class="nav desktop-nav">
-  <a routerLink="/matches" routerLinkActive="active">Matches</a>
-  <a routerLink="/chicago-events" routerLinkActive="active">Chicago Events</a>
+      <a routerLink="/matches" routerLinkActive="active">Matches</a>
+      <a routerLink="/chicago-events" routerLinkActive="active">Chicago Events</a>
       <button type="button" class="ghost" (click)="toggleTheme()" aria-label="Toggle theme">{{ theme.mode() === 'dark' ? '🌞' : '🌙' }}</button>
+      <button type="button" class="ghost" (click)="enablePush()" aria-label="Enable notifications">🔔 Enable notifications</button>
       <button type="button" (click)="logout()">Logout</button>
     </nav>
     <ng-template #loggedOut>
       <nav class="nav desktop-nav">
         <button type="button" class="ghost" (click)="toggleTheme()" aria-label="Toggle theme">{{ theme.mode() === 'dark' ? '🌞' : '🌙' }}</button>
+        <button type="button" class="ghost" (click)="enablePush()" aria-label="Enable notifications">🔔 Enable notifications</button>
       </nav>
     </ng-template>
 
@@ -32,14 +34,16 @@
 
     <!-- Mobile Navigation Menu -->
     <nav *ngIf="isLoggedIn(); else mobileLoggedOut" class="mobile-nav" [class.open]="mobileMenuOpen()">
-  <a routerLink="/matches" routerLinkActive="active" (click)="closeMobileMenu()">Matches</a>
-  <a routerLink="/chicago-events" routerLinkActive="active" (click)="closeMobileMenu()">Chicago Events</a>
+      <a routerLink="/matches" routerLinkActive="active" (click)="closeMobileMenu()">Matches</a>
+      <a routerLink="/chicago-events" routerLinkActive="active" (click)="closeMobileMenu()">Chicago Events</a>
       <button type="button" class="ghost" (click)="toggleTheme()" aria-label="Toggle theme">{{ theme.mode() === 'dark' ? '🌞' : '🌙' }}</button>
+      <button type="button" class="ghost" (click)="enablePush(); closeMobileMenu()" aria-label="Enable notifications">🔔 Enable notifications</button>
       <button type="button" (click)="logout(); closeMobileMenu()">Logout</button>
     </nav>
     <ng-template #mobileLoggedOut>
       <nav class="mobile-nav" [class.open]="mobileMenuOpen()">
         <button type="button" class="ghost" (click)="toggleTheme()" aria-label="Toggle theme">{{ theme.mode() === 'dark' ? '🌞' : '🌙' }}</button>
+        <button type="button" class="ghost" (click)="enablePush(); closeMobileMenu()" aria-label="Enable notifications">🔔 Enable notifications</button>
       </nav>
     </ng-template>
   </header>
