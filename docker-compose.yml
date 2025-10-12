@@ -57,7 +57,7 @@ services:
       DB_PORT: 5432
       DB_NAME: kellogg_music_match
       DB_USER: kellogg_user
-      DB_PASSWORD: kellogg_secure_pass_2024
+      DB_PASSWORD: ${DB_PASSWORD:-}
       DB_SSLMODE: disable
       DEBUG_ENABLED: "false"
       # Spotify API credentials (provide via .env; do NOT hardcode secrets)
@@ -65,12 +65,12 @@ services:
       #   SPOTIFY_CLIENT_ID=your_spotify_app_client_id
       #   SPOTIFY_CLIENT_SECRET=your_spotify_app_client_secret
       # Optionally override redirect; default below matches local UI callback.
-      SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID}
-      SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET}
+      SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID:-}
+      SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET:-}
       SPOTIFY_REDIRECT_URI: ${SPOTIFY_REDIRECT_URI:-http://localhost:4200/spotify/callback}
       # Ticketmaster API configuration
-      TICKETMASTER_CONSUMER_KEY: 3RVuRqbo6iLpQj0iEG6UUAZiWa2Z5Y0O
-      TICKETMASTER_CONSUMER_SECRET: EzfZFlmQwTHXIrsb
+      TICKETMASTER_CONSUMER_KEY: ${TICKETMASTER_CONSUMER_KEY:-}
+      TICKETMASTER_CONSUMER_SECRET: ${TICKETMASTER_CONSUMER_SECRET:-}
       TICKETMASTER_BASE_URL: https://app.ticketmaster.com/discovery/v2
       TICKETMASTER_TIMEOUT: 30
       TICKETMASTER_MAX_RESULTS: 100
@@ -88,7 +88,7 @@ services:
       EMAIL_FROM_EMAIL: support@kelloggmatch.com
       EMAIL_FROM_NAME: Kellogg Music Match
       APP_BASE_URL: https://kelloggmatch.com
-      SENDGRID_API_KEY: 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
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}
       # Feature flags
       MATCH_TRACKS_ENABLED: "true"
       # Matching configuration: cap ranks considered per user (defaults 20)
