@@ -1,8 +1,6 @@
-import { bootstrapApplication } from '@angular/platform-browser';
 import { provideAnimations } from '@angular/platform-browser/animations';
 import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
 import { provideRouter, Routes } from '@angular/router';
-import { AppComponent } from './app/app.component';
 import { LoginComponent } from './app/login.component';
 import { ArtistsComponent } from './app/artists.component';
 import { MatchesComponent } from './app/matches.component';
@@ -15,7 +13,17 @@ import { authGuard } from './app/auth.guard';
 import { jwtInterceptor } from './app/jwt.interceptor';
 import { loginRedirectGuard } from './app/login-redirect.guard';
 import { provideServiceWorker } from '@angular/service-worker';
+import { APP_INITIALIZER } from '@angular/core';
+import { bootstrapApplication } from '@angular/platform-browser';
+import { AppComponent } from './app/app.component';
+import { AppConfigService } from './app/services/app-config.service';
 import { isDevMode } from '@angular/core';
+import { ConfigService } from './app/config.service';
+
+// Ensure your existing providers remain; we add APP_INITIALIZER
+function initConfig(cfg: AppConfigService) {
+  return () => cfg.load();
+}
 
 declare global {
   interface Window {
@@ -35,30 +43,15 @@ const routes: Routes = [
   // Artists & standalone Spotify connect page removed (Spotify connect now on Matches page)
 ];
 
-// Wait for config to load before bootstrapping Angular
-async function loadConfigAndBootstrap() {
-  try {
-    // Give the config loading script some time to complete
-    let retries = 10;
-    while (retries > 0 && (!window.__kmmConfig?.apiBaseUrl || window.__kmmConfig.apiBaseUrl === '')) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-      retries--;
-    }
-  } catch (err) {
-    console.warn('Config loading failed:', err);
-  }
-
-  bootstrapApplication(AppComponent, {
-    providers: [
+bootstrapApplication(AppComponent, {
+  providers: [
     provideAnimations(),
     provideHttpClient(withFetch(), withInterceptors([jwtInterceptor])),
     provideRouter(routes),
     provideServiceWorker('ngsw-worker.js', {
-        enabled: !isDevMode(),
-        registrationStrategy: 'registerWhenStable:30000'
-    })
-]
-  }).catch((err: unknown) => console.error(err));
-}
-
-loadConfigAndBootstrap();
+      enabled: !isDevMode(),
+      registrationStrategy: 'registerWhenStable:30000'
+    }),
+    { provide: APP_INITIALIZER, useFactory: initConfig, deps: [AppConfigService], multi: true }
+  ]
+}).catch((err: unknown) => console.error(err));

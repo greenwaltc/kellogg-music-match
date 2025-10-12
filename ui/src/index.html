@@ -11,11 +11,6 @@
   <style>
     body { font-family: system-ui, Arial, sans-serif; margin:0; background:#121212; color:#eee; }
   </style>
-  <script>
-    // Runtime configuration loader (config.json served next to index.html)
-    window.__kmmConfig = { apiBaseUrl: '/api' }; // Default fallback
-    fetch('config.json',{cache:'no-store'}).then(r=> r.ok ? r.json():{}).then(cfg=>{ if(cfg && typeof cfg.apiBaseUrl==='string'){ window.__kmmConfig.apiBaseUrl = cfg.apiBaseUrl; } }).catch(()=>{});
-  </script>
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#1976d2">
 </head>
