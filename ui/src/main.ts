@@ -14,6 +14,8 @@ import { SpotifyCallbackComponent } from './app/spotify-callback.component';
 import { authGuard } from './app/auth.guard';
 import { jwtInterceptor } from './app/jwt.interceptor';
 import { loginRedirectGuard } from './app/login-redirect.guard';
+import { provideServiceWorker } from '@angular/service-worker';
+import { isDevMode } from '@angular/core';
 
 declare global {
   interface Window {
@@ -48,10 +50,14 @@ async function loadConfigAndBootstrap() {
 
   bootstrapApplication(AppComponent, {
     providers: [
-      provideAnimations(),
-      provideHttpClient(withFetch(), withInterceptors([jwtInterceptor])),
-      provideRouter(routes)
-    ]
+    provideAnimations(),
+    provideHttpClient(withFetch(), withInterceptors([jwtInterceptor])),
+    provideRouter(routes),
+    provideServiceWorker('ngsw-worker.js', {
+        enabled: !isDevMode(),
+        registrationStrategy: 'registerWhenStable:30000'
+    })
+]
   }).catch((err: unknown) => console.error(err));
 }
 

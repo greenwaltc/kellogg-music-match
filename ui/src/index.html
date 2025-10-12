@@ -16,8 +16,11 @@
     window.__kmmConfig = { apiBaseUrl: '/api' }; // Default fallback
     fetch('config.json',{cache:'no-store'}).then(r=> r.ok ? r.json():{}).then(cfg=>{ if(cfg && typeof cfg.apiBaseUrl==='string'){ window.__kmmConfig.apiBaseUrl = cfg.apiBaseUrl; } }).catch(()=>{});
   </script>
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#1976d2">
 </head>
 <body>
   <app-root>Loading...</app-root>
+  <noscript>Please enable JavaScript to continue using this application.</noscript>
 </body>
 </html>

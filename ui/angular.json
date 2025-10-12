@@ -17,10 +17,17 @@
             "main": "src/main.ts",
             "polyfills": ["zone.js"],
             "tsConfig": "tsconfig.app.json",
-            "assets": ["src/favicon.ico", "src/assets", "src/config.json"],
+            "assets": [
+              "src/favicon.ico",
+              "src/assets",
+              "src/config.json",
+              "src/manifest.webmanifest"
+            ],
             "inlineStyleLanguage": "scss",
             "styles": ["src/styles.scss"],
-            "scripts": []
+            "scripts": [],
+            "serviceWorker": true,
+            "ngswConfigPath": "ngsw-config.json"
           },
           "configurations": {
             "production": {
@@ -69,7 +76,12 @@
             "karmaConfig": "karma.conf.js",
             "scripts": [],
             "styles": ["src/styles.scss"],
-            "assets": ["src/favicon.ico", "src/assets", "src/config.json"]
+            "assets": [
+              "src/favicon.ico",
+              "src/assets",
+              "src/config.json",
+              "src/manifest.webmanifest"
+            ]
           }
         }
       }
