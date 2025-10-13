@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { SwPush } from '@angular/service-worker';
 import { HttpClient } from '@angular/common/http';
 import { AppConfigService, AppConfig } from './app-config.service';
+import { ApiBaseService } from '../api-base.service';
 import { ToastService } from './toast.service';
 
 type ExtendedConfig = AppConfig;
@@ -12,6 +13,7 @@ export class PushService {
   private http = inject(HttpClient);
   private cfg = inject(AppConfigService);
   private toast = inject(ToastService);
+  private api = inject(ApiBaseService);
   private lastSubscription: PushSubscription | null = null;
   private retryTimer: any = null;
   private retryAttempts = 0;
@@ -97,7 +99,7 @@ export class PushService {
       return null;
     }
 
-    const { vapidPublicKey, apiBaseUrl } = this.cfg.get<ExtendedConfig>();
+  const { vapidPublicKey } = this.cfg.get<ExtendedConfig>();
     const serverPublicKey = this.normalizeVapidKey(vapidPublicKey);
     if (!serverPublicKey) {
       console.error('[Push] Missing vapidPublicKey in config.json');
@@ -129,17 +131,15 @@ export class PushService {
   const sub = await this.swPush.requestSubscription({ serverPublicKey });
       console.log('[Push] Subscription created:', JSON.stringify(sub));
 
-      if (apiBaseUrl) {
-        try {
-          await this.http.post(`${apiBaseUrl}/push/subscribe`, sub).toPromise();
-          console.log('[Push] Subscription sent to server.');
-          this.toast.show('Notifications enabled', { type: 'success', durationMs: 3000 });
-        } catch {
-          console.warn('[Push] Could not send subscription to server yet.');
-          this.toast.show('Subscribed locally, but server not reachable. Will retry later.', { type: 'warning', durationMs: 5000 });
-          this.lastSubscription = sub;
-          this.scheduleRetry();
-        }
+      try {
+        await this.http.post(this.api.url('/push/subscribe'), sub).toPromise();
+        console.log('[Push] Subscription sent to server.');
+        this.toast.show('Notifications enabled', { type: 'success', durationMs: 3000 });
+      } catch {
+        console.warn('[Push] Could not send subscription to server yet.');
+        this.toast.show('Subscribed locally, but server not reachable. Will retry later.', { type: 'warning', durationMs: 5000 });
+        this.lastSubscription = sub;
+        this.scheduleRetry();
       }
       return sub;
     } catch (err) {
@@ -163,10 +163,8 @@ export class PushService {
   private async retryPost() {
     const sub = this.lastSubscription;
     if (!sub) return;
-    const { apiBaseUrl } = this.cfg.get<ExtendedConfig>();
-    if (!apiBaseUrl) return;
     try {
-      await this.http.post(`${apiBaseUrl}/push/subscribe`, sub).toPromise();
+      await this.http.post(this.api.url('/push/subscribe'), sub).toPromise();
       this.retryAttempts = 0;
       this.lastSubscription = null;
       this.toast.show('Notifications enabled (server connected)', { type: 'success', durationMs: 2500 });

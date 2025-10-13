@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule, NgForm } from '@angular/forms';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { AuthService } from './auth.service';
-import { environment } from '../environments/environment';
+import { ApiBaseService } from './api-base.service';
 
 @Component({
   selector: 'app-feedback',
@@ -173,6 +173,7 @@ import { environment } from '../environments/environment';
 export class FeedbackComponent {
   private http = inject(HttpClient);
   private authService = inject(AuthService);
+  private api = inject(ApiBaseService);
 
   feedbackText = '';
   maxLength = 1000;
@@ -202,7 +203,7 @@ export class FeedbackComponent {
       });
 
       const response = await this.http.post(
-        `${environment.apiBaseUrl}/feedback`,
+        this.api.url('/feedback'),
         { feedback: this.feedbackText.trim() },
         { headers }
       ).toPromise();

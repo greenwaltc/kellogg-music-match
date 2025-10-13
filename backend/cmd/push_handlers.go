@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -65,6 +67,15 @@ func NewSubscribeHandler(repo PushRepo) http.HandlerFunc {
 
 // NewTestHandler returns an http.HandlerFunc to send a test push to all of the user's subscriptions
 func NewTestHandler(repo PushRepo, cfg *config.Config, sender PushSender) http.HandlerFunc {
+	// naive in-memory per-user rate limiter: allow 3 requests per 60s window
+	type rlState struct {
+		count       int
+		windowStart time.Time
+	}
+	limiter := struct {
+		m  map[uuid.UUID]*rlState
+		mu sync.Mutex
+	}{m: make(map[uuid.UUID]*rlState)}
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			w.WriteHeader(http.StatusMethodNotAllowed)
@@ -87,6 +98,31 @@ func NewTestHandler(repo PushRepo, cfg *config.Config, sender PushSender) http.H
 				return
 			}
 			userID = parsed
+		}
+
+		// rate limit check
+		limiter.mu.Lock()
+		st := limiter.m[userID]
+		now := time.Now()
+		if st == nil || now.Sub(st.windowStart) > 60*time.Second {
+			st = &rlState{count: 0, windowStart: now}
+			limiter.m[userID] = st
+		}
+		st.count++
+		cur := st.count
+		limiter.mu.Unlock()
+
+		// Set basic rate limit headers for visibility
+		w.Header().Set("X-RateLimit-Limit", "3")
+		w.Header().Set("X-RateLimit-Window", "60s")
+		rem := 3 - cur
+		if rem < 0 {
+			rem = 0
+		}
+		w.Header().Set("X-RateLimit-Remaining", strconv.Itoa(rem))
+		if cur > 3 {
+			http.Error(w, "too many requests", http.StatusTooManyRequests)
+			return
 		}
 
 		subs, err := repo.GetPushSubscriptionsByUser(r.Context(), userID)

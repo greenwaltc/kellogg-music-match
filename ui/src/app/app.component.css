@@ -1,3 +1,9 @@
+.perm-status {
+  font-size: 0.85rem;
+  color: #ffca28;
+  margin: 0 0.5rem;
+}
+.perm-status a { color: inherit; text-decoration: underline; }
 .wrapper { padding: 0 1rem 5rem; max-width: 960px; margin: 0 auto; }
 .topbar { display:flex; align-items:center; justify-content:space-between; padding:1rem 0 0.5rem; gap:1rem; position: relative; }
 .brand { 

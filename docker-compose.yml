@@ -111,8 +111,6 @@ services:
   ui:
     build: 
       context: ./ui
-      args:
-        API_BASE_URL: /api
     image: kellogg-music-match-ui:latest
     container_name: kmm-ui
     environment:

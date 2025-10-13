@@ -3,6 +3,7 @@ import { trigger, state, style, transition, animate } from '@angular/animations'
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
+import { ApiBaseService } from './api-base.service';
 import { ConcertInterestService } from './concert-interest.service';
 import { AuthService } from './auth.service';
 import { Subject } from 'rxjs';
@@ -430,8 +431,8 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
   spotifySyncing = false;
   spotifyStatusMessage: string | null = null;
 
-  // api base url (legacy usage in component); ensure initialization
-  private apiBaseUrl: string = window.__kmmConfig?.apiBaseUrl || 'http://localhost:8080';
+  // API base service (replaces legacy hardcoded base URL)
+  // Always use this.api.url(path) or this.api.baseUrl
 
   startSpotifySync() {
     if (this.spotifySyncing) { return; }
@@ -454,7 +455,7 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
   private readonly SCROLL_HISTORY_KEY = 'kmm_chi_scroll_history';
   private lastHistoryPushTime = 0; // performance.now() timestamp of last accepted history entry
 
-  constructor(private http: HttpClient, private interest: ConcertInterestService, private auth: AuthService, private spotifyService: SpotifyService) {
+  constructor(private http: HttpClient, private interest: ConcertInterestService, private auth: AuthService, private spotifyService: SpotifyService, private api: ApiBaseService) {
     // Restore anyInterest flag
     try {
       const storedInterest = localStorage.getItem(this.ANY_INTEREST_STORAGE_KEY);
@@ -673,7 +674,7 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
       params.append('artistName', query.trim());
     }
 
-    this.http.get<ChicagoEventsResponse>(`${this.apiBaseUrl}/chicago/events?${params}`)
+  this.http.get<ChicagoEventsResponse>(this.api.url(`/chicago/events?${params}`))
       .pipe(
         catchError(error => {
           console.error('Error loading Chicago events:', error);
@@ -969,7 +970,7 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
       params.append('onlyMyTopArtists', 'true');
       if (this.topNArtists && this.topNArtists > 0) params.append('topNArtists', String(Math.max(1, Math.min(200, this.topNArtists))));
     }
-    this.http.get<ChicagoEventsResponse>(`${this.apiBaseUrl}/chicago/events?${params}`)
+  this.http.get<ChicagoEventsResponse>(this.api.url(`/chicago/events?${params}`))
       .pipe(catchError(() => of(null)))
       .subscribe(resp => {
         if (!resp) return;
@@ -1091,7 +1092,7 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
     this.singleExpandedEventId = eventId;
     this.lastExpandedEventId = eventId;
     this.loadingAttendeesFor = eventId;
-    this.http.get<ChicagoEvent>(`${this.apiBaseUrl}/chicago/events/${eventId}`)
+  this.http.get<ChicagoEvent>(this.api.url(`/chicago/events/${eventId}`))
       .pipe(catchError(err => { console.warn('single event fetch failed', err); return of(null); }))
       .subscribe(resp => {
         if (resp) {

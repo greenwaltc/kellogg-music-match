@@ -239,7 +239,7 @@ func sendWebPush(subJSON []byte, cfg *config.Config) error {
 			"icon":  "/assets/icons/icon-192x192.png",
 			"badge": "/assets/icons/badge-72x72.png",
 			"data": map[string]interface{}{
-				"url": "/", // where to navigate on click
+				"url": "/matches", // where to navigate on click
 			},
 			"requireInteraction": false,
 		},

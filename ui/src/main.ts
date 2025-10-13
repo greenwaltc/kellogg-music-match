@@ -25,11 +25,6 @@ function initConfig(cfg: AppConfigService) {
   return () => cfg.load();
 }
 
-declare global {
-  interface Window {
-    __kmmConfig?: { apiBaseUrl?: string };
-  }
-}
 
 const routes: Routes = [
   { path: '', component: LoginComponent, canActivate: [loginRedirectGuard] },

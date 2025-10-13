@@ -1,7 +1,6 @@
 # UI Dockerfile
 # 1. Build Angular app
 FROM node:20-alpine AS build
-ARG API_BASE_URL=""
 WORKDIR /app
 
 # Copy package files first for better Docker layer caching
@@ -12,9 +11,8 @@ RUN npm ci --no-audit --no-fund
 COPY . .
 
 # Build production version
-ENV API_BASE_URL=${API_BASE_URL}
 # Build only; runtime config.json will be generated in final image entrypoint.
-RUN echo "{\n  \"apiBaseUrl\": \"${API_BASE_URL}\"\n}" > src/config.json \
+RUN cp -f src/config.json.template src/config.json \
     && npm run build -- --configuration=production
 
 # 2. Nginx for static hosting
@@ -28,8 +26,7 @@ RUN addgroup -g 1001 -S nginx-user && \
 
 # Copy built application
 COPY --from=build /app/dist/kellogg-music-match-ui /usr/share/nginx/html
-# Copy generated config.json (can be overridden at runtime by mounting another file)
-# Provide a temporary placeholder (will be replaced at runtime if writable)
+# Copy placeholder config.json (entrypoint will overwrite at runtime)
 COPY --from=build /app/src/config.json /usr/share/nginx/html/config.json
 # Provide a simple default nginx config enabling gzip & Angular fallback
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf

@@ -5,7 +5,8 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { OnInit } from '@angular/core';
 import { MatchService, MatchUser, Artist } from './match.service';
-import { environment } from '../environments/environment';
+// import { environment } from '../environments/environment';
+import { ApiBaseService } from './api-base.service';
 import { AuthService } from './auth.service';
 import { ArtistAutocompleteComponent } from './artist-autocomplete.component';
 // Temporarily removed CDK drag-drop to fix build issues
@@ -418,13 +419,12 @@ export class ArtistsComponent implements OnInit {
   minArtists = 5;
   error = signal<string | null>(null);
   form!: FormGroup<ArtistsFormShape>;
-  private apiBase = environment.apiBaseUrl;
-
-  constructor(private fb: FormBuilder, private http: HttpClient, public matches: MatchService, private router: Router, private auth: AuthService) {
+  constructor(private fb: FormBuilder, private http: HttpClient, public matches: MatchService, private router: Router, private auth: AuthService, private api: ApiBaseService) {
     // Initialize with 5 empty artist controls
     const initialControls = Array.from({ length: this.minArtists }, () => this.artistControl());
     this.form = this.fb.group<ArtistsFormShape>({ artists: this.fb.array(initialControls, { validators: [this.noDuplicatesValidator, this.minArtistsValidator] }) });
   }
+  
 
   ngOnInit(): void {
     // Clear and reset form for new user session
@@ -567,14 +567,15 @@ export class ArtistsComponent implements OnInit {
   const range = 'medium_term';
   const limit = 10;
   const qp = new URLSearchParams({ range, limit: limit.toString() }).toString();
-  this.http.post<MatchUser[]>(this.url(`/findMusicMatches?${qp}`), { artists }, { headers }).subscribe({
+  this.http.post<MatchUser[]>(this.api.url(`/findMusicMatches?${qp}`), { artists }, { headers }).subscribe({
       next: (res: any) => { this.matches.set(res); this.router.navigateByUrl('/matches'); },
       error: (err: any) => { this.matches.loading.set(false); this.error.set(this.extractError(err) + ' Please try again later.'); }
     });
   this.auth.updateArtists(artists);
   }
 
-  private url(path: string): string { return `${this.apiBase}${path}`; }
+  // Deprecated helper retained for minimal changes in code paths above; prefer ApiBaseService
+  private url(path: string): string { return this.api.url(path); }
 
   private extractError(err: any): string {
     if (!err) return 'Unknown error';

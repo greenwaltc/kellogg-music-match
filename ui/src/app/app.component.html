@@ -9,6 +9,10 @@
     <nav *ngIf="isLoggedIn(); else loggedOut" class="nav desktop-nav">
       <a routerLink="/matches" routerLinkActive="active">Matches</a>
       <a routerLink="/chicago-events" routerLinkActive="active">Chicago Events</a>
+      <span class="perm-status" *ngIf="notifPermission() !== 'granted'">
+        Notifications: {{ notifPermission() }}
+        <a href="https://support.google.com/chrome/answer/3220216?hl=en" target="_blank" rel="noopener noreferrer">Manage</a>
+      </span>
   <button type="button" class="ghost" (click)="toggleTheme()" aria-label="Toggle theme">{{ theme.mode() === 'dark' ? '🌞' : '🌙' }}</button>
       <button type="button" class="ghost" (click)="enablePush()" aria-label="Enable notifications">🔔 Enable notifications</button>
   <button type="button" class="ghost" (click)="testPush()" aria-label="Send test notification">📩 Test notification</button>
@@ -38,6 +42,10 @@
     <nav *ngIf="isLoggedIn(); else mobileLoggedOut" class="mobile-nav" [class.open]="mobileMenuOpen()">
       <a routerLink="/matches" routerLinkActive="active" (click)="closeMobileMenu()">Matches</a>
       <a routerLink="/chicago-events" routerLinkActive="active" (click)="closeMobileMenu()">Chicago Events</a>
+      <span class="perm-status" *ngIf="notifPermission() !== 'granted'">
+        Notifications: {{ notifPermission() }}
+        <a href="https://support.google.com/chrome/answer/3220216?hl=en" target="_blank" rel="noopener noreferrer" (click)="$event.stopPropagation()">Manage</a>
+      </span>
   <button type="button" class="ghost" (click)="toggleTheme()" aria-label="Toggle theme">{{ theme.mode() === 'dark' ? '🌞' : '🌙' }}</button>
   <button type="button" class="ghost" (click)="enablePush(); closeMobileMenu()" aria-label="Enable notifications">🔔 Enable notifications</button>
   <button type="button" class="ghost" (click)="testPush(); closeMobileMenu()" aria-label="Send test notification">📩 Test notification</button>

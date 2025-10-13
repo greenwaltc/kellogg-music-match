@@ -1,9 +1,8 @@
 import { Injectable } from '@angular/core';
-import { environment } from '../environments/environment';
 
 @Injectable({ providedIn: 'root' })
 export class ApiBaseService {
-  private readonly base = window.__kmmConfig?.apiBaseUrl || environment.apiBaseUrl;
+  private readonly base = (typeof window !== 'undefined' && (window as any).__kmmConfig?.apiBaseUrl) || '/api';
 
   url(path: string): string {
     if (!path.startsWith('/')) return this.base + '/' + path;

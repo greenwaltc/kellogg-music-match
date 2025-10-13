@@ -1,4 +1,8 @@
 {
-  "apiBaseUrl": "REPLACE_ME",
-  "vapidPublicKey": "REPLACE_ME"
+  "apiBaseUrl": "/api",
+  "vapidPublicKey": "",
+  "artistMinCount": 5,
+  "artistMaxCount": 20,
+  "spotifyClientId": "",
+  "spotifyRedirectUri": ""
 }

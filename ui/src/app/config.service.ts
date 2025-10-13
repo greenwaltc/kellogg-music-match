@@ -1,7 +1,6 @@
 import { Injectable } from '@angular/core';
 
 export interface RuntimeConfig {
-  apiBaseUrl: string;
   artistMinCount?: number;
   artistMaxCount?: number;
   spotifyClientId?: string;
@@ -17,8 +16,8 @@ export class ConfigService {
     if (!this.cfgPromise) {
       this.cfgPromise = fetch('/config.json', { cache: 'no-cache' })
         .then(r => (r.ok ? r.json() : Promise.reject(new Error('config fetch failed'))))
-        .then(json => json as RuntimeConfig)
-        .catch(() => ({ apiBaseUrl: '/api' }))
+  .then(json => json as RuntimeConfig)
+  .catch(() => ({} as RuntimeConfig))
         .then(cfg => {
           this.current = cfg;
           return cfg;

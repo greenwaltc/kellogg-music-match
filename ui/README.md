@@ -125,26 +125,27 @@ Notes:
 
 ## Configuration
 
-### Environment Settings
-Configure API base URL in `src/environments/environment.ts`:
+### API base URL
+- The UI uses a single `ApiBaseService` for all HTTP calls.
+- Base URL resolution order:
+  1) `window.__kmmConfig.apiBaseUrl` loaded from `/config.json` at runtime (written by the container entrypoint), otherwise
+  2) `'/api'` fallback (default NGINX reverse proxy to backend).
 
-```typescript
-export const environment = {
-  production: false,
-  apiBaseUrl: 'http://localhost:8080'  // Backend API URL
-};
-```
-
-### Runtime Configuration  
-For Docker deployments, the app loads configuration from `/config.json`:
+### Runtime Configuration (config.json)
+At container start, `docker/entrypoint.sh` writes `/usr/share/nginx/html/config.json` from environment. Example:
 
 ```json
 {
-  "apiBaseUrl": "https://api.yourdomain.com"
+  "apiBaseUrl": "/api",
+  "vapidPublicKey": "<your VAPID public key>",
+  "artistMinCount": 5,
+  "artistMaxCount": 20,
+  "spotifyClientId": "...",
+  "spotifyRedirectUri": "https://your.app/spotify/callback"
 }
 ```
 
-This allows runtime API URL changes without rebuilding the image.
+You can override this at runtime by mounting a custom `config.json` or setting environment variables used by the entrypoint.
 
 ## Development
 
@@ -181,7 +182,7 @@ Outputs to `dist/kellogg-music-match-ui/`.
 
 ### Production Docker Build
 ```bash
-docker build --build-arg API_BASE_URL=http://localhost:8080 -t kellogg-music-match-ui:latest .
+docker build -t kellogg-music-match-ui:latest .
 ```
 
 ### Docker Deployment
@@ -189,8 +190,9 @@ docker build --build-arg API_BASE_URL=http://localhost:8080 -t kellogg-music-mat
 # Run container
 docker run -d -p 4200:80 kellogg-music-match-ui:latest
 
-# Or with custom API URL
+# With custom runtime config
 docker run -d -p 4200:80 \
+  -e VAPID_PUBLIC_KEY=... \
   -v $(pwd)/config.json:/usr/share/nginx/html/config.json:ro \
   kellogg-music-match-ui:latest
 ```

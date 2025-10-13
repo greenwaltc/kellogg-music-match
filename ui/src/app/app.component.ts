@@ -3,13 +3,13 @@ import { CommonModule } from '@angular/common';
 import { RouterModule, Router, Routes } from '@angular/router';
 import { SwUpdate, VersionReadyEvent } from '@angular/service-worker';
 import { HttpClient } from '@angular/common/http';
+import { ApiBaseService } from './api-base.service';
 import { AuthService } from './auth.service';
 import { ThemeService } from './theme.service';
 import { MatchService } from './match.service';
 import { SpotifyConnectComponent } from './spotify-connect.component';
 import { SpotifyCallbackComponent } from './spotify-callback.component';
 import { PushService } from './services/push.service';
-import { AppConfigService } from './services/app-config.service';
 import { ToastService } from './services/toast.service';
 
 @Component({
@@ -24,6 +24,7 @@ export class AppComponent implements OnInit {
   user = signal<any>(null);
   isLoggedIn = computed(() => !!this.user());
   mobileMenuOpen = signal(false);
+  notifPermission = signal<NotificationPermission>(typeof Notification !== 'undefined' ? Notification.permission : 'default');
 
   constructor(
     private auth: AuthService,
@@ -33,8 +34,8 @@ export class AppComponent implements OnInit {
     private matchService: MatchService,
     private swUpdate: SwUpdate,
     private http: HttpClient,
-    private appCfg: AppConfigService,
-    public toast: ToastService,
+  public toast: ToastService,
+  private api: ApiBaseService,
   ) {
     this.user = this.auth.user;
   }
@@ -42,12 +43,7 @@ export class AppComponent implements OnInit {
   enablePush() { this.push.ensureSubscribed(); }
 
   testPush() {
-    const { apiBaseUrl } = this.appCfg.get<any>();
-    if (!apiBaseUrl) {
-      this.toast.show('API base URL not configured.', { type: 'error', durationMs: 4000 });
-      return;
-    }
-    this.http.post(`${apiBaseUrl}/push/test`, {}).subscribe({
+    this.http.post(this.api.url('/push/test'), {}).subscribe({
       next: () => this.toast.show('Test notification sent', { type: 'success', durationMs: 3000 }),
       error: (err) => {
         console.error('Test push failed', err);
@@ -69,6 +65,16 @@ export class AppComponent implements OnInit {
 
   ngOnInit(): void {
     this.matchService.fetchIfReady();
+
+    // Track notification permission changes (best-effort)
+    try {
+      if (typeof window !== 'undefined') {
+        const updatePerm = () => this.notifPermission.set(Notification.permission);
+        document.addEventListener('visibilitychange', updatePerm);
+        // Also update once on boot after a tick
+        setTimeout(updatePerm, 0);
+      }
+    } catch {}
 
     if (this.swUpdate.isEnabled) {
       this.swUpdate.versionUpdates.subscribe(evt => {
