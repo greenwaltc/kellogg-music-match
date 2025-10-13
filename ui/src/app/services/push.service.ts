@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { SwPush } from '@angular/service-worker';
 import { HttpClient } from '@angular/common/http';
 import { AppConfigService, AppConfig } from './app-config.service';
+import { ToastService } from './toast.service';
 
 type ExtendedConfig = AppConfig;
 
@@ -10,6 +11,10 @@ export class PushService {
   private swPush = inject(SwPush);
   private http = inject(HttpClient);
   private cfg = inject(AppConfigService);
+  private toast = inject(ToastService);
+  private lastSubscription: PushSubscription | null = null;
+  private retryTimer: any = null;
+  private retryAttempts = 0;
 
   constructor() {
     // Log push messages delivered to the SW and forwarded to the app
@@ -57,6 +62,7 @@ export class PushService {
 
     if (!('Notification' in window)) {
       console.warn('[Push] Notifications unsupported in this browser.');
+      this.toast.show('Notifications are not supported in this browser.', { type: 'warning', durationMs: 4000 });
       return null;
     }
 
@@ -69,6 +75,13 @@ export class PushService {
     }
     if (perm !== 'granted') {
       console.warn('[Push] Permission not granted:', perm);
+      // Offer a retry if the user changed permissions in settings
+      this.toast.show('Notifications are disabled. Enable in your browser settings and retry.', {
+        type: 'warning',
+        actionLabel: 'Retry',
+        action: () => this.ensureSubscribed(),
+        durationMs: 0,
+      });
       return null;
     }
 
@@ -80,6 +93,7 @@ export class PushService {
     // 3) Now try to subscribe with Angular SwPush
     if (!this.swPush.isEnabled) {
       console.warn('[Push] SwPush not enabled yet; try again after SW is active.');
+      this.toast.show('Service worker not ready yet. Please try again in a moment.', { type: 'info', durationMs: 3000 });
       return null;
     }
 
@@ -87,14 +101,17 @@ export class PushService {
     const serverPublicKey = this.normalizeVapidKey(vapidPublicKey);
     if (!serverPublicKey) {
       console.error('[Push] Missing vapidPublicKey in config.json');
+      this.toast.show('Push is not configured on the server (missing VAPID key).', { type: 'error', durationMs: 5000 });
       return null;
     }
     if (serverPublicKey.startsWith('-----BEGIN')) {
       console.error('[Push] VAPID key appears to be a PEM block. Provide the base64url-encoded public key string (e.g., from web-push generate-vapid-keys).');
+      this.toast.show('Invalid VAPID key format on server.', { type: 'error', durationMs: 5000 });
       return null;
     }
     if (!this.isValidVapidPublicKey(serverPublicKey)) {
       console.error('[Push] VAPID public key is not a valid base64url-encoded P-256 public key. Ensure you are using the PUBLIC key from `web-push generate-vapid-keys` (the long string starting with "B...") and not the PEM.');
+      this.toast.show('Server VAPID key is invalid.', { type: 'error', durationMs: 5000 });
       return null;
     }
 
@@ -109,21 +126,53 @@ export class PushService {
         }
       } catch {}
 
-      const sub = await this.swPush.requestSubscription({ serverPublicKey });
+  const sub = await this.swPush.requestSubscription({ serverPublicKey });
       console.log('[Push] Subscription created:', JSON.stringify(sub));
 
       if (apiBaseUrl) {
         try {
           await this.http.post(`${apiBaseUrl}/push/subscribe`, sub).toPromise();
           console.log('[Push] Subscription sent to server.');
+          this.toast.show('Notifications enabled', { type: 'success', durationMs: 3000 });
         } catch {
           console.warn('[Push] Could not send subscription to server yet.');
+          this.toast.show('Subscribed locally, but server not reachable. Will retry later.', { type: 'warning', durationMs: 5000 });
+          this.lastSubscription = sub;
+          this.scheduleRetry();
         }
       }
       return sub;
     } catch (err) {
       console.error('[Push] Subscription failed:', err);
+      this.toast.show('Failed to enable notifications. Please try again.', { type: 'error', durationMs: 5000, actionLabel: 'Retry', action: () => this.ensureSubscribed() });
       return null;
+    }
+  }
+
+  private scheduleRetry() {
+    if (this.retryTimer) return;
+    const base = 5000; // 5s base
+    const max = 60000; // cap at 60s
+    const delay = Math.min(base * Math.pow(2, this.retryAttempts), max);
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = null;
+      this.retryPost();
+    }, delay);
+  }
+
+  private async retryPost() {
+    const sub = this.lastSubscription;
+    if (!sub) return;
+    const { apiBaseUrl } = this.cfg.get<ExtendedConfig>();
+    if (!apiBaseUrl) return;
+    try {
+      await this.http.post(`${apiBaseUrl}/push/subscribe`, sub).toPromise();
+      this.retryAttempts = 0;
+      this.lastSubscription = null;
+      this.toast.show('Notifications enabled (server connected)', { type: 'success', durationMs: 2500 });
+    } catch {
+      this.retryAttempts++;
+      this.scheduleRetry();
     }
   }
 }

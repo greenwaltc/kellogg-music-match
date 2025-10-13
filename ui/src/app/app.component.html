@@ -9,14 +9,16 @@
     <nav *ngIf="isLoggedIn(); else loggedOut" class="nav desktop-nav">
       <a routerLink="/matches" routerLinkActive="active">Matches</a>
       <a routerLink="/chicago-events" routerLinkActive="active">Chicago Events</a>
-      <button type="button" class="ghost" (click)="toggleTheme()" aria-label="Toggle theme">{{ theme.mode() === 'dark' ? '🌞' : '🌙' }}</button>
+  <button type="button" class="ghost" (click)="toggleTheme()" aria-label="Toggle theme">{{ theme.mode() === 'dark' ? '🌞' : '🌙' }}</button>
       <button type="button" class="ghost" (click)="enablePush()" aria-label="Enable notifications">🔔 Enable notifications</button>
+  <button type="button" class="ghost" (click)="testPush()" aria-label="Send test notification">📩 Test notification</button>
       <button type="button" (click)="logout()">Logout</button>
     </nav>
     <ng-template #loggedOut>
       <nav class="nav desktop-nav">
-        <button type="button" class="ghost" (click)="toggleTheme()" aria-label="Toggle theme">{{ theme.mode() === 'dark' ? '🌞' : '🌙' }}</button>
-        <button type="button" class="ghost" (click)="enablePush()" aria-label="Enable notifications">🔔 Enable notifications</button>
+  <button type="button" class="ghost" (click)="toggleTheme()" aria-label="Toggle theme">{{ theme.mode() === 'dark' ? '🌞' : '🌙' }}</button>
+  <button type="button" class="ghost" (click)="enablePush()" aria-label="Enable notifications">🔔 Enable notifications</button>
+  <button type="button" class="ghost" (click)="testPush()" aria-label="Send test notification">📩 Test notification</button>
       </nav>
     </ng-template>
 
@@ -36,20 +38,28 @@
     <nav *ngIf="isLoggedIn(); else mobileLoggedOut" class="mobile-nav" [class.open]="mobileMenuOpen()">
       <a routerLink="/matches" routerLinkActive="active" (click)="closeMobileMenu()">Matches</a>
       <a routerLink="/chicago-events" routerLinkActive="active" (click)="closeMobileMenu()">Chicago Events</a>
-      <button type="button" class="ghost" (click)="toggleTheme()" aria-label="Toggle theme">{{ theme.mode() === 'dark' ? '🌞' : '🌙' }}</button>
-      <button type="button" class="ghost" (click)="enablePush(); closeMobileMenu()" aria-label="Enable notifications">🔔 Enable notifications</button>
+  <button type="button" class="ghost" (click)="toggleTheme()" aria-label="Toggle theme">{{ theme.mode() === 'dark' ? '🌞' : '🌙' }}</button>
+  <button type="button" class="ghost" (click)="enablePush(); closeMobileMenu()" aria-label="Enable notifications">🔔 Enable notifications</button>
+  <button type="button" class="ghost" (click)="testPush(); closeMobileMenu()" aria-label="Send test notification">📩 Test notification</button>
       <button type="button" (click)="logout(); closeMobileMenu()">Logout</button>
     </nav>
     <ng-template #mobileLoggedOut>
       <nav class="mobile-nav" [class.open]="mobileMenuOpen()">
-        <button type="button" class="ghost" (click)="toggleTheme()" aria-label="Toggle theme">{{ theme.mode() === 'dark' ? '🌞' : '🌙' }}</button>
-        <button type="button" class="ghost" (click)="enablePush(); closeMobileMenu()" aria-label="Enable notifications">🔔 Enable notifications</button>
+  <button type="button" class="ghost" (click)="toggleTheme()" aria-label="Toggle theme">{{ theme.mode() === 'dark' ? '🌞' : '🌙' }}</button>
+  <button type="button" class="ghost" (click)="enablePush(); closeMobileMenu()" aria-label="Enable notifications">🔔 Enable notifications</button>
+  <button type="button" class="ghost" (click)="testPush(); closeMobileMenu()" aria-label="Send test notification">📩 Test notification</button>
       </nav>
     </ng-template>
   </header>
   <main>
     <router-outlet></router-outlet>
   </main>
+  <!-- Toast Container -->
+  <div class="toast" *ngIf="toast.visible()" [class.success]="toast.type()==='success'" [class.error]="toast.type()==='error'" [class.warning]="toast.type()==='warning'">
+    <span class="toast-text">{{ toast.text() }}</span>
+    <button *ngIf="toast.actionLabel()" (click)="toast.triggerAction()" class="toast-action">{{ toast.actionLabel() }}</button>
+    <button class="toast-close" (click)="toast.hide()" aria-label="Close">✕</button>
+  </div>
   <footer class="site-footer">
     <div class="footer-content">
       <div class="footer-links">

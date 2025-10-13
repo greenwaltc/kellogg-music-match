@@ -20,42 +20,7 @@ import { TooltipDirective } from './tooltip.directive';
         </div>
         <div class="meter-labels">
           <span class="score-text">{{ (score * 100) | number:'1.0-1' }}% match</span>
-          <span class="overlap-text"> {{ overlap }} shared artists</span>
         </div>
-      </div>
-      <div class="similarity-circle" 
-           [class.high-similarity]="score >= 0.7"
-           [class.medium-similarity]="score >= 0.4 && score < 0.7"
-           [class.low-similarity]="score < 0.4">
-        <svg width="50" height="50" viewBox="0 0 50 50">
-          <circle 
-            cx="25" 
-            cy="25" 
-            r="20" 
-            fill="none" 
-            stroke="#e0e0e0" 
-            stroke-width="4">
-          </circle>
-          <circle 
-            cx="25" 
-            cy="25" 
-            r="20" 
-            fill="none" 
-            [attr.stroke]="circleColor"
-            stroke-width="4" 
-            stroke-linecap="round"
-            [attr.stroke-dasharray]="circumference"
-            [attr.stroke-dashoffset]="dashOffset"
-            transform="rotate(-90 25 25)">
-          </circle>
-          <text 
-            x="25" 
-            y="30" 
-            text-anchor="middle" 
-            class="circle-text">
-            {{ (score * 100) | number:'1.0-0' }}%
-          </text>
-        </svg>
       </div>
     </div>
   `,

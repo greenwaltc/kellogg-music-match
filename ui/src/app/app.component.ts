@@ -2,12 +2,15 @@ import { Component, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router, Routes } from '@angular/router';
 import { SwUpdate, VersionReadyEvent } from '@angular/service-worker';
+import { HttpClient } from '@angular/common/http';
 import { AuthService } from './auth.service';
 import { ThemeService } from './theme.service';
 import { MatchService } from './match.service';
 import { SpotifyConnectComponent } from './spotify-connect.component';
 import { SpotifyCallbackComponent } from './spotify-callback.component';
 import { PushService } from './services/push.service';
+import { AppConfigService } from './services/app-config.service';
+import { ToastService } from './services/toast.service';
 
 @Component({
   selector: 'app-root',
@@ -28,12 +31,31 @@ export class AppComponent implements OnInit {
     private router: Router,
     public theme: ThemeService,
     private matchService: MatchService,
-    private swUpdate: SwUpdate
+    private swUpdate: SwUpdate,
+    private http: HttpClient,
+    private appCfg: AppConfigService,
+    public toast: ToastService,
   ) {
     this.user = this.auth.user;
   }
 
   enablePush() { this.push.ensureSubscribed(); }
+
+  testPush() {
+    const { apiBaseUrl } = this.appCfg.get<any>();
+    if (!apiBaseUrl) {
+      this.toast.show('API base URL not configured.', { type: 'error', durationMs: 4000 });
+      return;
+    }
+    this.http.post(`${apiBaseUrl}/push/test`, {}).subscribe({
+      next: () => this.toast.show('Test notification sent', { type: 'success', durationMs: 3000 }),
+      error: (err) => {
+        console.error('Test push failed', err);
+        const msg = (err?.status === 404) ? 'No subscription found for your account.' : 'Failed to send test notification.';
+        this.toast.show(msg, { type: 'error', durationMs: 5000 });
+      }
+    });
+  }
 
   logout(): void {
     this.auth.logout();
@@ -50,11 +72,14 @@ export class AppComponent implements OnInit {
 
     if (this.swUpdate.isEnabled) {
       this.swUpdate.versionUpdates.subscribe(evt => {
-        if ((evt as VersionReadyEvent).type === 'VERSION_READY') {
-          const accept = confirm('A new version of the app is available. Reload now?');
-          if (accept) {
-            this.swUpdate.activateUpdate().then(() => document.location.reload());
-          }
+        const e = evt as VersionReadyEvent;
+        if (e.type === 'VERSION_READY') {
+          this.toast.show('A new version is available.', {
+            type: 'info',
+            actionLabel: 'Reload now',
+            action: () => this.swUpdate.activateUpdate().then(() => document.location.reload()),
+            durationMs: 0,
+          });
         }
       });
     }
