@@ -11,6 +11,7 @@ import { SpotifyConnectComponent } from './spotify-connect.component';
 import { SpotifyCallbackComponent } from './spotify-callback.component';
 import { PushService } from './services/push.service';
 import { ToastService } from './services/toast.service';
+import { NavStateService } from './nav-state.service';
 
 @Component({
   selector: 'app-root',
@@ -25,7 +26,7 @@ export class AppComponent implements OnInit {
   isLoggedIn = computed(() => !!this.user());
   mobileMenuOpen = signal(false);
   notifPermission = signal<NotificationPermission>(typeof Notification !== 'undefined' ? Notification.permission : 'default');
-
+  // Nav visibility state persisted across sessions
   constructor(
     private auth: AuthService,
     private push: PushService,
@@ -34,11 +35,13 @@ export class AppComponent implements OnInit {
     private matchService: MatchService,
     private swUpdate: SwUpdate,
     private http: HttpClient,
-  public toast: ToastService,
-  private api: ApiBaseService,
+    public toast: ToastService,
+    private api: ApiBaseService,
+    public nav: NavStateService,
   ) {
     this.user = this.auth.user;
   }
+  // visited flags now come from NavStateService; template references nav.visitedMatches()/visitedEvents()
 
   enablePush() { this.push.ensureSubscribed(); }
 
@@ -65,6 +68,14 @@ export class AppComponent implements OnInit {
 
   ngOnInit(): void {
     this.matchService.fetchIfReady();
+
+    // Track router navigation to set visited flags
+    this.router.events.subscribe(() => {
+      const url = this.router.url || '';
+      if (url.startsWith('/matches') || url.startsWith('/chicago-events')) {
+        this.nav.markAllPrimaryVisited();
+      }
+    });
 
     // Track notification permission changes (best-effort)
     try {

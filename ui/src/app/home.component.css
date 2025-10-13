@@ -1,0 +1,17 @@
+.home-tiles { max-width: 960px; margin: 1rem auto; padding: 0 1rem; }
+.tile-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 1rem; }
+.tile { background: var(--card-bg, #fff); border-radius: 14px; padding: 1rem 1.25rem; box-shadow: 0 8px 24px -10px rgba(0,0,0,.25); cursor: pointer; transition: transform .15s ease, box-shadow .2s ease; min-height: 120px; display:flex; align-items:center; }
+.tile:active { transform: scale(0.99); }
+.tile:hover { box-shadow: 0 12px 30px -12px rgba(0,0,0,.32); }
+.tile .tile-title { font-size: 1.15rem; font-weight: 700; margin-bottom: .25rem; }
+.tile .tile-sub { font-size: .9rem; opacity: .8; }
+
+.tile-spotify { background: linear-gradient(135deg,#1db954,#159c45); color: #fff; display:flex; align-items:center; }
+.tile-spotify .spotify-badge { font-size: .75rem; font-weight: 700; letter-spacing: .04em; background: rgba(255,255,255,.15); padding: .25rem .5rem; border-radius: 999px; display:inline-block; margin-bottom: .35rem; }
+.tile-spotify .tile-title { font-size: 1rem; }
+.tile-spotify.small { min-height: 72px; margin-bottom: 1rem; }
+.tile-spotify.bottom { margin-top: 1rem; }
+
+@media (max-width: 640px) {
+  .tile-grid { grid-template-columns: 1fr; }
+}

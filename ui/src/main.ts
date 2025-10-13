@@ -2,6 +2,7 @@ import { provideAnimations } from '@angular/platform-browser/animations';
 import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
 import { provideRouter, Routes } from '@angular/router';
 import { LoginComponent } from './app/login.component';
+import { HomeComponent } from './app/home.component';
 import { ArtistsComponent } from './app/artists.component';
 import { MatchesComponent } from './app/matches.component';
 import { FeedbackComponent } from './app/feedback.component';
@@ -29,6 +30,7 @@ function initConfig(cfg: AppConfigService) {
 const routes: Routes = [
   { path: '', component: LoginComponent, canActivate: [loginRedirectGuard] },
   { path: 'login', redirectTo: '', pathMatch: 'full' },
+  { path: 'home', component: HomeComponent, canActivate: [authGuard] },
   { path: 'matches', component: MatchesComponent, canActivate: [authGuard] },
   { path: 'feedback', component: FeedbackComponent, canActivate: [authGuard] },
   { path: 'roadmap', component: RoadmapComponent, canActivate: [authGuard] },

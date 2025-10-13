@@ -1,14 +1,16 @@
 <div class="wrapper">
   <header class="topbar">
     <div class="brand">
-      <img src="assets/logo.svg" alt="Kellogg Music Match Logo" class="brand-logo">
-      <h1 class="brand-text">{{ title }}</h1>
+      <a routerLink="/home" class="brand-link" aria-label="Go to Home">
+        <img src="assets/logo.svg" alt="Kellogg Music Match Logo" class="brand-logo">
+      </a>
+      <h1 class="brand-text"><a routerLink="/home" class="brand-link">{{ title }}</a></h1>
     </div>
     
     <!-- Desktop Navigation -->
     <nav *ngIf="isLoggedIn(); else loggedOut" class="nav desktop-nav">
-      <a routerLink="/matches" routerLinkActive="active">Matches</a>
-      <a routerLink="/chicago-events" routerLinkActive="active">Chicago Events</a>
+  <a *ngIf="nav.visitedMatches()" routerLink="/matches" routerLinkActive="active">Matches</a>
+  <a *ngIf="nav.visitedEvents()" routerLink="/chicago-events" routerLinkActive="active">Chicago Events</a>
       <span class="perm-status" *ngIf="notifPermission() !== 'granted'">
         Notifications: {{ notifPermission() }}
         <a href="https://support.google.com/chrome/answer/3220216?hl=en" target="_blank" rel="noopener noreferrer">Manage</a>
@@ -40,8 +42,8 @@
 
     <!-- Mobile Navigation Menu -->
     <nav *ngIf="isLoggedIn(); else mobileLoggedOut" class="mobile-nav" [class.open]="mobileMenuOpen()">
-      <a routerLink="/matches" routerLinkActive="active" (click)="closeMobileMenu()">Matches</a>
-      <a routerLink="/chicago-events" routerLinkActive="active" (click)="closeMobileMenu()">Chicago Events</a>
+  <a *ngIf="nav.visitedMatches()" routerLink="/matches" routerLinkActive="active" (click)="closeMobileMenu()">Matches</a>
+  <a *ngIf="nav.visitedEvents()" routerLink="/chicago-events" routerLinkActive="active" (click)="closeMobileMenu()">Chicago Events</a>
       <span class="perm-status" *ngIf="notifPermission() !== 'granted'">
         Notifications: {{ notifPermission() }}
         <a href="https://support.google.com/chrome/answer/3220216?hl=en" target="_blank" rel="noopener noreferrer" (click)="$event.stopPropagation()">Manage</a>

@@ -35,7 +35,10 @@ describe('MatchService spotify gating', () => {
 
   it('fetches after markSpotifyReadyAndRefetch (with fresh param)', () => {
     svc.markSpotifyReadyAndRefetch('medium_term');
-    const req = http.expectOne(r => r.url.startsWith('http://test/findMusicMatches?range=medium_term&limit=50&fresh='));
+    const req = http.expectOne(r => r.url.startsWith('http://test/findMusicMatches?')
+      && r.url.includes('range=medium_term')
+      && r.url.includes('limit=50')
+      && r.url.includes('fresh='));
     expect(req.request.method).toBe('POST');
     req.flush([]);
   });
