@@ -37,4 +37,14 @@ export class NavStateService {
     this.markMatchesVisited();
     this.markEventsVisited();
   }
+
+  /** Clear visited flags (used on login/register/logout to avoid leaking state across users). */
+  resetVisited(): void {
+    this.visitedMatches.set(false);
+    this.visitedEvents.set(false);
+    try {
+      localStorage.removeItem(this.kMatches);
+      localStorage.removeItem(this.kEvents);
+    } catch {}
+  }
 }

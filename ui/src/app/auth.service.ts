@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { tap } from 'rxjs/operators';
 import { environment } from '../environments/environment';
 import { ApiBaseService } from './api-base.service';
+import { NavStateService } from './nav-state.service';
 
 export interface User { 
   id?: string;
@@ -54,7 +55,7 @@ export class AuthService {
   loading = signal(false);
   error = signal<string | null>(null);
 
-  constructor(private http: HttpClient, private api: ApiBaseService) {
+  constructor(private http: HttpClient, private api: ApiBaseService, private nav: NavStateService) {
     this.restore();
   }
 
@@ -84,6 +85,8 @@ export class AuthService {
             localStorage.setItem('kmm_token', res.token);
           }
           this.loading.set(false);
+          // Reset visited flags for fresh session after login
+          this.nav.resetVisited();
         },
         error: (err: any) => {
           this.loading.set(false);
@@ -105,6 +108,8 @@ export class AuthService {
             localStorage.setItem('kmm_token', res.token);
           }
           this.loading.set(false);
+          // Reset visited flags for fresh session after registration
+          this.nav.resetVisited();
         },
         error: (err: any) => {
           this.loading.set(false);
@@ -124,9 +129,19 @@ export class AuthService {
   }
 
   logout(): void {
+    const u = this.user();
     this.user.set(null);
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem('kmm_token');
+    // Clean up any per-user Spotify readiness keys for the prior user and legacy globals
+    if (u?.username) {
+      localStorage.removeItem(`kmmSpotifyReady:${u.username}`);
+      localStorage.removeItem(`kmmSpotifyReadyTs:${u.username}`);
+    }
+    localStorage.removeItem('kmmSpotifyReady');
+    localStorage.removeItem('kmmSpotifyReadyTs');
+    // Also reset visited flags
+    this.nav.resetVisited();
   }
 
   /**

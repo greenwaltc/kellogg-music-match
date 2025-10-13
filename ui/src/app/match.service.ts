@@ -46,14 +46,19 @@ export class MatchService {
 
   constructor(private http: HttpClient, private auth: AuthService, private api: ApiBaseService) {
     this.apiBase = this.api.baseUrl;
-    // Initialize readiness from persisted flag (e.g., returning to app after prior sync)
-    const storedReady = localStorage.getItem('kmmSpotifyReady');
-    if (storedReady && storedReady === 'true') {
-      this.spotifyReady.set(true);
-      const ts = localStorage.getItem('kmmSpotifyReadyTs');
-      if (ts) {
-        const num = parseInt(ts, 10);
-        if (!isNaN(num)) this.readyTimestamp = num;
+    // Initialize readiness per current user only; do not carry across users
+    const u = this.auth.user();
+    if (u?.username) {
+      const key = `kmmSpotifyReady:${u.username}`;
+      const tsKey = `kmmSpotifyReadyTs:${u.username}`;
+      const storedReady = localStorage.getItem(key);
+      if (storedReady === 'true') {
+        this.spotifyReady.set(true);
+        const ts = localStorage.getItem(tsKey);
+        if (ts) {
+          const num = parseInt(ts, 10);
+          if (!isNaN(num)) this.readyTimestamp = num;
+        }
       }
     }
     const storedBasis = localStorage.getItem('kmmMatchBasis');
@@ -97,29 +102,20 @@ export class MatchService {
       this.clear();
     }
     
-    if (this.matches() || !currentUser) return;
-    // If not marked ready yet (e.g., returning user before we persisted readiness), try a one-time probe
-    if (!this.spotifyReady()) {
-      if (!this.probed && !(window as any)['__karma__']) {
-        this.probed = true;
-        const username = currentUser.username;
-      const params: Record<string,string> = { range: 'medium_term', limit: '1', probe: '1', basis: this.basis() };
-        const qp = new URLSearchParams(params).toString();
-        this.http.post<MatchUser[]>(this.url(`/findMusicMatches?${qp}`), { artists: [] }).subscribe({
-          next: (res) => {
-            // If request succeeded (even empty array) we assume user has authorized before; mark ready & refetch full.
-            this.spotifyReady.set(true);
-            this.readyTimestamp = Date.now();
-            localStorage.setItem('kmmSpotifyReady', 'true');
-            localStorage.setItem('kmmSpotifyReadyTs', this.readyTimestamp.toString());
-            this.fetch('medium_term', 50, this.overlapsLimit, true);
-            this.lastFetchedForUser = username;
-          },
-          error: () => { /* silently ignore; user likely truly not connected */ }
-        });
-      }
-      return; // still exit; full fetch done after readiness
+      if (this.matches() || !currentUser) return;
+
+    // Refresh readiness from per-user storage in case user changed
+    const key = `kmmSpotifyReady:${currentUser.username}`;
+    const tsKey = `kmmSpotifyReadyTs:${currentUser.username}`;
+    const storedReady = localStorage.getItem(key) === 'true';
+    if (this.spotifyReady() !== storedReady) {
+      this.spotifyReady.set(storedReady);
+      const ts = localStorage.getItem(tsKey);
+      this.readyTimestamp = ts ? (()=>{ const n = parseInt(ts,10); return isNaN(n)? null : n; })() : null;
     }
+      // If not marked ready yet, do not auto-promote readiness based on generic endpoint success.
+      // We'll wait until explicit Spotify link completes and sets the flag.
+      if (!this.spotifyReady()) return;
 
     // Previously we required manual artists; backend now uses stored Spotify data and ignores body list.
     // So we always attempt a fetch for a logged-in user (sending any existing artists array or empty list).
@@ -217,8 +213,11 @@ export class MatchService {
   markSpotifyReadyAndRefetch(range: 'short_term'|'medium_term'|'long_term' = 'medium_term') {
     this.spotifyReady.set(true);
     this.readyTimestamp = Date.now();
-    localStorage.setItem('kmmSpotifyReady', 'true');
-    localStorage.setItem('kmmSpotifyReadyTs', this.readyTimestamp.toString());
+    const u = this.auth.user();
+    if (u?.username) {
+      localStorage.setItem(`kmmSpotifyReady:${u.username}`, 'true');
+      localStorage.setItem(`kmmSpotifyReadyTs:${u.username}`, this.readyTimestamp.toString());
+    }
     // Clear any stale pre-spotify matches
     this.clear();
     // Trigger a forced fresh fetch (respect stored overlaps limit and default limit)

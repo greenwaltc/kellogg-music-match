@@ -45,7 +45,7 @@ The backend uses PostgreSQL with Flyway-style historical migrations (legacy scie
 - **Single Initial Schema**: `db/schema/001_initial.sql` replaces 9 migration files
 - **Kellogg Student Profiles**: Complete user profiles with `program` and `graduation_year`
 - **Program Validation**: Constraints for Kellogg programs (2Y, 1Y, MMM, MBAi, JD-MBA, MD-MBA, EWMBA, JV)
-- **Graduation Year Constraints**: Validation for years 2025-2030
+- **Graduation Year Constraints**: Dynamic rolling window — must be within the current calendar year through five years ahead.
 - **Enhanced SQLC Integration**: Optimized queries for Go code generation
 
 ### Legacy Scientific Features (Historical)

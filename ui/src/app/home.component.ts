@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { MatchService } from './match.service';
 import { SpotifyService } from './spotify.service';
 import { NavStateService } from './nav-state.service';
+import { PushService } from './services/push.service';
 
 @Component({
   selector: 'app-home',
@@ -18,9 +19,18 @@ export class HomeComponent {
     private router: Router,
     private spotify: SpotifyService,
     private nav: NavStateService,
+    public push: PushService,
   ) {}
 
   gotoMatches() { this.nav.markAllPrimaryVisited(); this.router.navigateByUrl('/matches'); }
   gotoEvents() { this.nav.markAllPrimaryVisited(); this.router.navigateByUrl('/chicago-events'); }
   async connectSpotify() { await this.spotify.beginAuth(); }
+
+  async ngOnInit() {
+    await this.push.refreshDeviceSubscriptionFlag();
+  }
+
+  notifPerm(): NotificationPermission {
+    return (typeof Notification !== 'undefined') ? Notification.permission : 'default';
+  }
 }

@@ -12,6 +12,22 @@
 .tile-spotify.small { min-height: 72px; margin-bottom: 1rem; }
 .tile-spotify.bottom { margin-top: 1rem; }
 
+/* Notifications one-time tile styling */
+.tile-notify { 
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #7a5d00;
+  border: 1px solid #f59e0b;
+}
+.tile-notify .notify-badge { 
+  font-size: .72rem; font-weight: 800; letter-spacing: .04em; 
+  background: rgba(122,93,0,.12); color: #7a5d00; 
+  padding: .2rem .5rem; border-radius: 999px; display:inline-block; margin-bottom: .35rem;
+  text-transform: uppercase;
+}
+.tile-notify.small { min-height: 72px; margin-bottom: 1rem; }
+.tile-sub.minor { font-size: .8rem; opacity: .9; margin-top: .25rem; }
+.tile-sub.minor a { color: inherit; text-decoration: underline; }
+
 @media (max-width: 640px) {
   .tile-grid { grid-template-columns: 1fr; }
 }

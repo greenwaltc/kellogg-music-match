@@ -1,4 +1,20 @@
 <section class="home-tiles" *ngIf="true">
+  <!-- One-time per device: Enable Notifications tile -->
+  <div class="tile tile-notify small" *ngIf="!push.hasDeviceSubscription()"
+       (click)="push.ensureSubscribed()"
+       (keydown.enter)="push.ensureSubscribed()" (keydown.space)="$event.preventDefault(); push.ensureSubscribed()"
+       role="button" tabindex="0" aria-label="Enable notifications on this device">
+    <div class="tile-content">
+      <div class="notify-badge">One-time setup</div>
+      <div class="tile-title">Enable Notifications</div>
+      <div class="tile-sub">Get alerts for new music matches and relevant concert announcements.</div>
+      <div class="tile-sub minor" *ngIf="notifPerm() !== 'granted'">
+        Notifications are currently {{ notifPerm() }}. 
+        <a href="https://support.google.com/chrome/answer/3220216?hl=en" target="_blank" rel="noopener noreferrer" (click)="$event.stopPropagation()">Manage</a>
+      </div>
+    </div>
+  </div>
+
   <!-- Spotify tile at top if not yet synced -->
   <div class="tile tile-spotify small" *ngIf="!matches.spotifyReady()"
     (click)="connectSpotify()" (keydown.enter)="connectSpotify()" (keydown.space)="$event.preventDefault(); connectSpotify()"

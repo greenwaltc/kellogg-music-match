@@ -99,9 +99,9 @@ interface LoginFormShape {
             
             <div class="field">
               <label for="graduationYear">Graduation Year</label>
-              <input id="graduationYear" type="number" formControlName="graduationYear" placeholder="2027" min="2025" max="2030" />
+              <input id="graduationYear" type="number" formControlName="graduationYear" [placeholder]="gradDefault" [min]="gradMin" [max]="gradMax" />
               <div class="error" *ngIf="form.get('graduationYear')?.touched && form.get('graduationYear')?.invalid">
-                Valid graduation year required (2025-2030)
+                Valid graduation year required ({{ gradMin }}–{{ gradMax }})
               </div>
             </div>
           </div>
@@ -649,6 +649,11 @@ export class LoginComponent {
   authMode: AuthMode = 'login';
   showPassword = false;
   showConfirmPassword = false;
+  // Dynamic graduation year defaults/range
+  readonly currentYear = new Date().getFullYear();
+  readonly gradDefault = this.currentYear + 2;
+  readonly gradMin = this.currentYear;
+  readonly gradMax = this.currentYear + 5;
   passwordComplexity: PasswordComplexity = {
     minLength: false,
     hasUpperCase: false,
@@ -679,7 +684,7 @@ export class LoginComponent {
       firstName: this.fb.control<string | null>('', [Validators.required, Validators.minLength(2)]),
       lastName: this.fb.control<string | null>('', [Validators.required, Validators.minLength(2)]),
       program: this.fb.control<string | null>('', [Validators.required]),
-      graduationYear: this.fb.control<number | null>(null, [Validators.required, Validators.min(2025), Validators.max(2030)]),
+      graduationYear: this.fb.control<number | null>(this.gradDefault, [Validators.required, Validators.min(this.gradMin), Validators.max(this.gradMax)]),
       password: this.fb.control<string | null>('', [Validators.required, Validators.minLength(6)]),
       confirmPassword: this.fb.control<string | null>('', [Validators.required]),
       resetToken: this.fb.control<string | null>('', []),
@@ -693,6 +698,10 @@ export class LoginComponent {
     this.authMode = isRegister ? 'register' : 'login';
     this.auth.error.set(null);
     this.form.reset();
+    // When switching to Register, prefill graduationYear dynamically (current year + 2)
+    if (isRegister) {
+      this.form.get('graduationYear')?.setValue(this.gradDefault);
+    }
     this.passwordComplexity = {
       minLength: false,
       hasUpperCase: false,
@@ -731,7 +740,7 @@ export class LoginComponent {
       firstNameControl?.setValidators([Validators.required, Validators.minLength(2)]);
       lastNameControl?.setValidators([Validators.required, Validators.minLength(2)]);
       programControl?.setValidators([Validators.required]);
-      graduationYearControl?.setValidators([Validators.required, Validators.min(2025), Validators.max(2030)]);
+      graduationYearControl?.setValidators([Validators.required, Validators.min(this.gradMin), Validators.max(this.gradMax)]);
       passwordControl?.setValidators([Validators.required, passwordComplexityValidator()]);
       confirmPasswordControl?.setValidators([Validators.required, confirmPasswordValidator('password')]);
     } else if (this.authMode === 'login') {

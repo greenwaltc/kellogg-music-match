@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 import { SwPush } from '@angular/service-worker';
 import { HttpClient } from '@angular/common/http';
 import { AppConfigService, AppConfig } from './app-config.service';
@@ -17,6 +17,8 @@ export class PushService {
   private lastSubscription: PushSubscription | null = null;
   private retryTimer: any = null;
   private retryAttempts = 0;
+  // Whether this device has an active push subscription (and permission granted)
+  hasDeviceSubscription = signal<boolean>(false);
 
   constructor() {
     // Log push messages delivered to the SW and forwarded to the app
@@ -27,6 +29,19 @@ export class PushService {
     this.swPush.notificationClicks.subscribe(event => {
       console.log('[Push] notification click', event);
     });
+  }
+
+  /** Check if this device has an active subscription and update the signal. */
+  async refreshDeviceSubscriptionFlag(): Promise<void> {
+    try {
+      if (!('Notification' in window)) { this.hasDeviceSubscription.set(false); return; }
+      if (Notification.permission !== 'granted') { this.hasDeviceSubscription.set(false); return; }
+      const reg = await navigator.serviceWorker.ready;
+      const existing = await reg.pushManager.getSubscription();
+      this.hasDeviceSubscription.set(!!existing);
+    } catch {
+      this.hasDeviceSubscription.set(false);
+    }
   }
 
   private normalizeVapidKey(k: string | undefined | null): string {
@@ -135,11 +150,13 @@ export class PushService {
         await this.http.post(this.api.url('/push/subscribe'), sub).toPromise();
         console.log('[Push] Subscription sent to server.');
         this.toast.show('Notifications enabled', { type: 'success', durationMs: 3000 });
+        this.hasDeviceSubscription.set(true);
       } catch {
         console.warn('[Push] Could not send subscription to server yet.');
         this.toast.show('Subscribed locally, but server not reachable. Will retry later.', { type: 'warning', durationMs: 5000 });
         this.lastSubscription = sub;
         this.scheduleRetry();
+        this.hasDeviceSubscription.set(true);
       }
       return sub;
     } catch (err) {
@@ -168,6 +185,7 @@ export class PushService {
       this.retryAttempts = 0;
       this.lastSubscription = null;
       this.toast.show('Notifications enabled (server connected)', { type: 'success', durationMs: 2500 });
+      this.hasDeviceSubscription.set(true);
     } catch {
       this.retryAttempts++;
       this.scheduleRetry();

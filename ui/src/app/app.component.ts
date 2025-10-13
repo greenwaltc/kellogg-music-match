@@ -40,10 +40,11 @@ export class AppComponent implements OnInit {
     public nav: NavStateService,
   ) {
     this.user = this.auth.user;
+    // Expose nav reset for post-auth side-effects without tight coupling
+    try { (window as any).ngNavState = this.nav; } catch {}
   }
   // visited flags now come from NavStateService; template references nav.visitedMatches()/visitedEvents()
 
-  enablePush() { this.push.ensureSubscribed(); }
 
   testPush() {
     this.http.post(this.api.url('/push/test'), {}).subscribe({
@@ -58,6 +59,7 @@ export class AppComponent implements OnInit {
 
   logout(): void {
     this.auth.logout();
+    this.nav.resetVisited();
     this.matchService.clear();
     this.router.navigateByUrl('/');
   }

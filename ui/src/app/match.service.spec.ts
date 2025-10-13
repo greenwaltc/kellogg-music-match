@@ -12,8 +12,8 @@ describe('MatchService spotify gating', () => {
   let http: HttpTestingController;
 
   beforeEach(() => {
-    localStorage.removeItem('kmmSpotifyReady');
-    localStorage.removeItem('kmmSpotifyReadyTs');
+    // Clear both legacy and per-user keys
+    localStorage.clear();
     TestBed.configureTestingModule({
       imports:[HttpClientTestingModule],
       providers:[

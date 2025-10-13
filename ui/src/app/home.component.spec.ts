@@ -3,6 +3,9 @@ import { HomeComponent } from './home.component';
 import { MatchService } from './match.service';
 import { SpotifyService } from './spotify.service';
 import { Router } from '@angular/router';
+import { PushService } from './services/push.service';
+import { SwPush } from '@angular/service-worker';
+import { Subject } from 'rxjs';
 import { NavStateService } from './nav-state.service';
 
 class MockMatchService { spotifyReady = () => false as any; }
@@ -22,6 +25,8 @@ describe('HomeComponent', () => {
         { provide: MatchService, useClass: MockMatchService },
         { provide: SpotifyService, useClass: MockSpotifyService },
         { provide: Router, useClass: MockRouter },
+        { provide: PushService, useValue: { hasDeviceSubscription: () => false, refreshDeviceSubscriptionFlag: () => Promise.resolve(), ensureSubscribed: () => Promise.resolve(null) } },
+        { provide: SwPush, useValue: { isEnabled: true, messages: new Subject().asObservable(), notificationClicks: new Subject().asObservable() } },
         NavStateService,
       ]
     }).compileComponents();

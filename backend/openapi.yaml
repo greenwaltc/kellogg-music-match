@@ -1078,9 +1078,9 @@ components:
           example: "2Y"
         graduationYear:
           type: integer
-          description: Expected graduation year
-          minimum: 2025
-          maximum: 2030
+          description: |
+            Expected graduation year.
+            Must be within the rolling window of the current calendar year through five years ahead.
           example: 2027
         artists:
           type: array
@@ -1158,9 +1158,9 @@ components:
           example: "2Y"
         graduationYear:
           type: integer
-          description: Expected graduation year
-          minimum: 2025
-          maximum: 2030
+          description: |
+            Expected graduation year.
+            Must be within the rolling window of the current calendar year through five years ahead.
           example: 2027
       required:
         - username
@@ -1238,9 +1238,9 @@ components:
           example: "2Y"
         graduationYear:
           type: integer
-          description: Expected graduation year
-          minimum: 2025
-          maximum: 2030
+          description: |
+            Expected graduation year.
+            Must be within the rolling window of the current calendar year through five years ahead.
           example: 2027
         overlap:
           type: integer

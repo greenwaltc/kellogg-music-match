@@ -20,8 +20,7 @@ describe('MatchesComponent integration-ish flow', () => {
   let http: HttpTestingController;
 
   beforeEach(async () => {
-    localStorage.removeItem('kmmSpotifyReady');
-    localStorage.removeItem('kmmSpotifyReadyTs');
+  localStorage.clear();
     await TestBed.configureTestingModule({
       imports:[HttpClientTestingModule, MatchesComponent],
       providers:[
@@ -41,7 +40,7 @@ describe('MatchesComponent integration-ish flow', () => {
   it('shows pre-connect placeholder before readiness', () => {
     const el: HTMLElement = fixture.nativeElement;
     expect(el.querySelector('.pre-connect-placeholder')).toBeTruthy();
-    expect(el.textContent).toContain('Connect Spotify');
+  expect(el.textContent || '').toContain('Connect Spotify');
   });
 
   it('fetches matches after markSpotifyReadyAndRefetch and hides placeholder', () => {
