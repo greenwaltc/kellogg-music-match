@@ -219,6 +219,20 @@ func (m *MockUserRepository) GetUserByEmail(ctx context.Context, email string) (
 func (m *MockUserRepository) GetUserByID(ctx context.Context, id uuid.UUID) (*sqlc.User, error) {
 	return nil, nil
 }
+
+// Web Push subscription methods to satisfy interface for auth tests
+func (m *MockUserRepository) UpsertPushSubscription(ctx context.Context, userID *uuid.UUID, endpoint, p256dh, auth, userAgent string) error {
+	return nil
+}
+func (m *MockUserRepository) GetPushSubscriptionsByUser(ctx context.Context, userID uuid.UUID) ([]sqlc.PushSubscription, error) {
+	return []sqlc.PushSubscription{}, nil
+}
+func (m *MockUserRepository) GetAnyPushSubscriptions(ctx context.Context, lim int32) ([]sqlc.PushSubscription, error) {
+	return []sqlc.PushSubscription{}, nil
+}
+func (m *MockUserRepository) DeletePushSubscriptionByEndpoint(ctx context.Context, endpoint string) error {
+	return nil
+}
 func (m *MockUserRepository) UserExistsByUsername(ctx context.Context, username string) (bool, error) {
 	return false, nil
 }

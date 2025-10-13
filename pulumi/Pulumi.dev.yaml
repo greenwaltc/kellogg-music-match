@@ -160,6 +160,8 @@ config:
   # ---------------------------------------------------------------------------
   # kellogg-music-match:networkPolicyStrict: "false"
 
+  kellogg-music-match:vapidSubject: "mailto:support@kelloggmatch.com"
+  kellogg-music-match:pushEnabled: "true"
   kellogg-music-match:spotifyRefreshTokenKey:
     secure: AAABALxGpuoOvskkfMfd9EyxqxEuIr0jXiQgaM+hx0Rn3dY53GtoriB1lweZmZe8uhF3RoxQt69C5KbMbfygD6huDfkBwSkMd39xYw==
   kellogg-music-match:vapidPrivateKey:

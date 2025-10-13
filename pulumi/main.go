@@ -104,6 +104,11 @@ func main() {
 		spotifyClientID := pulumiCfg.RequireSecret("spotifyClientId")
 		spotifyClientSecret := pulumiCfg.RequireSecret("spotifyClientSecret")
 		spotifyRefreshKey := pulumiCfg.RequireSecret("spotifyRefreshTokenKey")
+		// VAPID keys for web push notifications (generate via `npx web-push generate-vapid-keys`)
+		vapidPublicKey := pulumiCfg.RequireSecret("vapidPublicKey")
+		vapidPrivateKey := pulumiCfg.RequireSecret("vapidPrivateKey")
+		vapidSubject := get("vapidSubject", "mailto:support@kelloggmatch.com")
+		pushEnabled := getBoolStr("pushEnabled", true)
 		legacyPort := serverPort
 		// (DATABASE_URL no longer exported; application should build from discrete env vars)
 		backendReplicas := getInt("backendReplicas", 2)
@@ -308,6 +313,8 @@ func main() {
 				"SPOTIFY_CLIENT_ID":            spotifyClientID.ToStringOutput(),
 				"SPOTIFY_CLIENT_SECRET":        spotifyClientSecret.ToStringOutput(),
 				"SPOTIFY_REFRESH_TOKEN_KEY":    spotifyRefreshKey.ToStringOutput(),
+				"VAPID_PUBLIC_KEY":             vapidPublicKey.ToStringOutput(),
+				"VAPID_PRIVATE_KEY":            vapidPrivateKey.ToStringOutput(),
 			},
 		})
 		if err != nil {
@@ -465,6 +472,9 @@ func main() {
 									&corev1.EnvVarArgs{Name: pulumi.String("MATCHING_ARTIST_TOPN"), Value: matchingArtistTopN},
 									&corev1.EnvVarArgs{Name: pulumi.String("MATCHING_TRACK_TOPN"), Value: matchingTrackTopN},
 									// DATABASE_URL derived at runtime from other envs; omitted to avoid duplicating secret
+
+									&corev1.EnvVarArgs{Name: pulumi.String("VAPID_SUBJECT"), Value: vapidSubject},
+									&corev1.EnvVarArgs{Name: pulumi.String("PUSH_ENABLED"), Value: pushEnabled},
 								},
 								Resources: &corev1.ResourceRequirementsArgs{
 									Requests: pulumi.StringMap{"cpu": backendCPUReq, "memory": backendMemReq},

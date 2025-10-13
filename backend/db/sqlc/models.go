@@ -94,6 +94,18 @@ type PasswordResetToken struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
+type PushSubscription struct {
+	ID         uuid.UUID          `json:"id"`
+	UserID     pgtype.UUID        `json:"user_id"`
+	Endpoint   string             `json:"endpoint"`
+	P256dh     string             `json:"p256dh"`
+	Auth       string             `json:"auth"`
+	UserAgent  pgtype.Text        `json:"user_agent"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
+	LastUsedAt pgtype.Timestamptz `json:"last_used_at"`
+}
+
 type ReferenceArtist struct {
 	ID               int32       `json:"id"`
 	Name             string      `json:"name"`

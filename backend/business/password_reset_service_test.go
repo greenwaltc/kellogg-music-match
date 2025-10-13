@@ -139,6 +139,20 @@ func (m *EnhancedMockUserRepository) FindSimilarUsersBySpotifyTopTracks(ctx cont
 	return []business.SimilarUserResult{}, nil
 }
 
+// Web Push subscription methods (no-ops for this test suite)
+func (m *EnhancedMockUserRepository) UpsertPushSubscription(ctx context.Context, userID *uuid.UUID, endpoint, p256dh, auth, userAgent string) error {
+	return nil
+}
+func (m *EnhancedMockUserRepository) GetPushSubscriptionsByUser(ctx context.Context, userID uuid.UUID) ([]sqlc.PushSubscription, error) {
+	return []sqlc.PushSubscription{}, nil
+}
+func (m *EnhancedMockUserRepository) GetAnyPushSubscriptions(ctx context.Context, lim int32) ([]sqlc.PushSubscription, error) {
+	return []sqlc.PushSubscription{}, nil
+}
+func (m *EnhancedMockUserRepository) DeletePushSubscriptionByEndpoint(ctx context.Context, endpoint string) error {
+	return nil
+}
+
 var _ = Describe("PasswordResetService", func() {
 	var (
 		service          *business.PasswordResetService

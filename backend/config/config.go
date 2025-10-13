@@ -19,6 +19,7 @@ type Config struct {
 	JWT          JWTConfig
 	Email        EmailConfig
 	Spotify      SpotifyConfig
+	Push         PushConfig
 }
 
 // ServerConfig holds server-related configuration
@@ -126,6 +127,14 @@ type SpotifyConfig struct {
 	RedirectURI     string
 }
 
+// PushConfig holds Web Push (VAPID) configuration
+type PushConfig struct {
+	Enabled      bool
+	VAPIDPublic  string
+	VAPIDPrivate string
+	Subject      string // e.g. mailto:support@example.com
+}
+
 // Load creates a new Config instance from environment variables
 func Load() *Config {
 	return &Config{
@@ -213,6 +222,12 @@ func Load() *Config {
 			ClientSecret:    getEnvWithDefault("SPOTIFY_CLIENT_SECRET", "spotify-client-secret"),
 			RefreshTokenKey: getEnvWithDefault("SPOTIFY_REFRESH_TOKEN_KEY", ""),
 			RedirectURI:     getEnvWithDefault("SPOTIFY_REDIRECT_URI", "http://localhost:4200/spotify/callback"),
+		},
+		Push: PushConfig{
+			Enabled:      getEnvBoolWithDefault("PUSH_ENABLED", true),
+			VAPIDPublic:  getEnvWithDefault("VAPID_PUBLIC_KEY", ""),
+			VAPIDPrivate: getEnvWithDefault("VAPID_PRIVATE_KEY", ""),
+			Subject:      getEnvWithDefault("VAPID_SUBJECT", "mailto:support@kelloggmatch.com"),
 		},
 	}
 }

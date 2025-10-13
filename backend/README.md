@@ -1,3 +1,18 @@
+## Web Push (Dev)
+
+Set the following environment variables for the backend service:
+
+- PUSH_ENABLED=true
+- VAPID_PUBLIC_KEY=BN...
+- VAPID_PRIVATE_KEY=...
+- VAPID_SUBJECT=mailto:support@kelloggmatch.com
+
+Endpoints:
+- POST /push/subscribe — stores the latest subscription (in-memory; dev only).
+- POST /push/test — sends a simple test notification to the stored subscription.
+
+Note: in-memory store is for local development only; replace with DB storage for production.
+
 # Kellogg Music Match Backend
 
 A Go backend server featuring PostgreSQL + SQLC, OpenAPI-generated transport layer, a rank‑weighted overlap music similarity engine with Spotify time‑range support, Chicago Events (Ticketmaster) integration, in‑memory similarity caching, and comprehensive behavioral + normalization testing.

@@ -137,6 +137,15 @@ func (q *Queries) DeleteOldConcertEvents(ctx context.Context, cutoffDate pgtype.
 	return err
 }
 
+const deletePushSubscriptionByEndpoint = `-- name: DeletePushSubscriptionByEndpoint :exec
+DELETE FROM push_subscriptions WHERE endpoint = $1
+`
+
+func (q *Queries) DeletePushSubscriptionByEndpoint(ctx context.Context, endpoint string) error {
+	_, err := q.db.Exec(ctx, deletePushSubscriptionByEndpoint, endpoint)
+	return err
+}
+
 const deleteSpotifyTopArtistSnapshotForRange = `-- name: DeleteSpotifyTopArtistSnapshotForRange :exec
 DELETE FROM spotify_top_artist_snapshots 
 WHERE user_id = $1 AND range = $2 AND fetched_at < $3
@@ -492,6 +501,40 @@ func (q *Queries) GetAllUsers(ctx context.Context) ([]User, error) {
 			&i.UpdatedAt,
 			&i.Program,
 			&i.GraduationYear,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAnyPushSubscriptions = `-- name: GetAnyPushSubscriptions :many
+SELECT id, user_id, endpoint, p256dh, auth, user_agent, created_at, updated_at, last_used_at FROM push_subscriptions ORDER BY updated_at DESC LIMIT $1
+`
+
+func (q *Queries) GetAnyPushSubscriptions(ctx context.Context, lim int32) ([]PushSubscription, error) {
+	rows, err := q.db.Query(ctx, getAnyPushSubscriptions, lim)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PushSubscription{}
+	for rows.Next() {
+		var i PushSubscription
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Endpoint,
+			&i.P256dh,
+			&i.Auth,
+			&i.UserAgent,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.LastUsedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -1232,6 +1275,40 @@ func (q *Queries) GetPasswordResetToken(ctx context.Context, token string) (Pass
 	return i, err
 }
 
+const getPushSubscriptionsByUser = `-- name: GetPushSubscriptionsByUser :many
+SELECT id, user_id, endpoint, p256dh, auth, user_agent, created_at, updated_at, last_used_at FROM push_subscriptions WHERE user_id = $1
+`
+
+func (q *Queries) GetPushSubscriptionsByUser(ctx context.Context, userID pgtype.UUID) ([]PushSubscription, error) {
+	rows, err := q.db.Query(ctx, getPushSubscriptionsByUser, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PushSubscription{}
+	for rows.Next() {
+		var i PushSubscription
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Endpoint,
+			&i.P256dh,
+			&i.Auth,
+			&i.UserAgent,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.LastUsedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getSpotifyTokensByUser = `-- name: GetSpotifyTokensByUser :one
 SELECT user_id, access_token, refresh_token_encrypted, expires_at, scope, token_type, created_at, updated_at FROM spotify_tokens WHERE user_id = $1 LIMIT 1
 `
@@ -1732,6 +1809,41 @@ type UpsertEventArtistParams struct {
 
 func (q *Queries) UpsertEventArtist(ctx context.Context, arg UpsertEventArtistParams) error {
 	_, err := q.db.Exec(ctx, upsertEventArtist, arg.EventID, arg.ArtistID, arg.Role)
+	return err
+}
+
+const upsertPushSubscription = `-- name: UpsertPushSubscription :exec
+
+INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, user_agent, last_used_at)
+VALUES ($1, $2, $3, $4, $5, NOW())
+ON CONFLICT (endpoint) DO UPDATE SET
+  user_id = EXCLUDED.user_id,
+  p256dh = EXCLUDED.p256dh,
+  auth = EXCLUDED.auth,
+  user_agent = EXCLUDED.user_agent,
+  last_used_at = NOW(),
+  updated_at = NOW()
+`
+
+type UpsertPushSubscriptionParams struct {
+	UserID    pgtype.UUID `json:"user_id"`
+	Endpoint  string      `json:"endpoint"`
+	P256dh    string      `json:"p256dh"`
+	Auth      string      `json:"auth"`
+	UserAgent pgtype.Text `json:"user_agent"`
+}
+
+// =======================
+// Web Push Subscriptions
+// =======================
+func (q *Queries) UpsertPushSubscription(ctx context.Context, arg UpsertPushSubscriptionParams) error {
+	_, err := q.db.Exec(ctx, upsertPushSubscription,
+		arg.UserID,
+		arg.Endpoint,
+		arg.P256dh,
+		arg.Auth,
+		arg.UserAgent,
+	)
 	return err
 }
 

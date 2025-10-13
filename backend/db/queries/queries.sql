@@ -413,6 +413,30 @@ GROUP BY ce.id, v.name, v.street, v.city, v.state, v.country, v.postal, v.capaci
 ORDER BY ce.event_date ASC
 LIMIT sqlc.arg(lim);
 
+-- =======================
+-- Web Push Subscriptions
+-- =======================
+
+-- name: UpsertPushSubscription :exec
+INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, user_agent, last_used_at)
+VALUES (sqlc.arg(user_id), sqlc.arg(endpoint), sqlc.arg(p256dh), sqlc.arg(auth), sqlc.arg(user_agent), NOW())
+ON CONFLICT (endpoint) DO UPDATE SET
+  user_id = EXCLUDED.user_id,
+  p256dh = EXCLUDED.p256dh,
+  auth = EXCLUDED.auth,
+  user_agent = EXCLUDED.user_agent,
+  last_used_at = NOW(),
+  updated_at = NOW();
+
+-- name: GetPushSubscriptionsByUser :many
+SELECT * FROM push_subscriptions WHERE user_id = sqlc.arg(user_id);
+
+-- name: GetAnyPushSubscriptions :many
+SELECT * FROM push_subscriptions ORDER BY updated_at DESC LIMIT sqlc.arg(lim);
+
+-- name: DeletePushSubscriptionByEndpoint :exec
+DELETE FROM push_subscriptions WHERE endpoint = sqlc.arg(endpoint);
+
 -- name: DeleteOldConcertEvents :exec
 DELETE FROM concert_events 
 WHERE event_date < sqlc.arg(cutoff_date);

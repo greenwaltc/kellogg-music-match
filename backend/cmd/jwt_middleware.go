@@ -63,6 +63,7 @@ func (m *JWTMiddleware) Middleware(next http.Handler) http.Handler {
 				}
 				ctx := context.WithValue(r.Context(), UserContextKey, userCtx)
 				// Bridge: also store under plain string key used by business layer fallback (avoids import cycle key-type mismatch)
+				//lint:ignore SA1029 required for cross-package compatibility across packages expecting string key
 				ctx = context.WithValue(ctx, "user", userCtx)
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
@@ -99,6 +100,7 @@ func (m *JWTMiddleware) Middleware(next http.Handler) http.Handler {
 		// Backward compatibility: also store under a separate compatibility typed key.
 		ctx = context.WithValue(ctx, compatUserKey, userCtx)
 		// Bridge for business layer (which duplicates a differently-typed key and also looks for plain string "user").
+		//lint:ignore SA1029 required for cross-package compatibility across packages expecting string key
 		ctx = context.WithValue(ctx, "user", userCtx)
 		// Logger key for structured logging correlation
 		ctx = context.WithValue(ctx, logger.ContextUserKey(), userCtx)

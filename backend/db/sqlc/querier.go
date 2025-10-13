@@ -25,6 +25,7 @@ type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteExpiredPasswordResetTokens(ctx context.Context) error
 	DeleteOldConcertEvents(ctx context.Context, cutoffDate pgtype.Timestamp) error
+	DeletePushSubscriptionByEndpoint(ctx context.Context, endpoint string) error
 	DeleteSpotifyTopArtistSnapshotForRange(ctx context.Context, arg DeleteSpotifyTopArtistSnapshotForRangeParams) error
 	DeleteSpotifyTopTrackSnapshotForRange(ctx context.Context, arg DeleteSpotifyTopTrackSnapshotForRangeParams) error
 	DeleteUser(ctx context.Context, id uuid.UUID) error
@@ -53,6 +54,7 @@ type Querier interface {
 	FindTopNSimilarUsersBySpotifyTracks(ctx context.Context, arg FindTopNSimilarUsersBySpotifyTracksParams) ([]FindTopNSimilarUsersBySpotifyTracksRow, error)
 	GetAllFeedback(ctx context.Context, lim int32) ([]GetAllFeedbackRow, error)
 	GetAllUsers(ctx context.Context) ([]User, error)
+	GetAnyPushSubscriptions(ctx context.Context, lim int32) ([]PushSubscription, error)
 	GetChicagoEventsCountWithArtistSearch(ctx context.Context, arg GetChicagoEventsCountWithArtistSearchParams) (int64, error)
 	GetChicagoEventsWithArtistSearch(ctx context.Context, arg GetChicagoEventsWithArtistSearchParams) ([]GetChicagoEventsWithArtistSearchRow, error)
 	GetConcertEventByID(ctx context.Context, id string) (GetConcertEventByIDRow, error)
@@ -65,6 +67,7 @@ type Querier interface {
 	GetEventsForArtist(ctx context.Context, arg GetEventsForArtistParams) ([]GetEventsForArtistRow, error)
 	GetFeedbackByUser(ctx context.Context, userID uuid.UUID) ([]Feedback, error)
 	GetPasswordResetToken(ctx context.Context, token string) (PasswordResetToken, error)
+	GetPushSubscriptionsByUser(ctx context.Context, userID pgtype.UUID) ([]PushSubscription, error)
 	GetSpotifyTokensByUser(ctx context.Context, userID uuid.UUID) (SpotifyToken, error)
 	GetUpcomingConcertEventsInCity(ctx context.Context, arg GetUpcomingConcertEventsInCityParams) ([]GetUpcomingConcertEventsInCityRow, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
@@ -79,6 +82,10 @@ type Querier interface {
 	UpsertConcertArtist(ctx context.Context, arg UpsertConcertArtistParams) (ConcertArtist, error)
 	UpsertConcertEvent(ctx context.Context, arg UpsertConcertEventParams) (ConcertEvent, error)
 	UpsertEventArtist(ctx context.Context, arg UpsertEventArtistParams) error
+	// =======================
+	// Web Push Subscriptions
+	// =======================
+	UpsertPushSubscription(ctx context.Context, arg UpsertPushSubscriptionParams) error
 	// =======================
 	// Spotify Tokens
 	// =======================

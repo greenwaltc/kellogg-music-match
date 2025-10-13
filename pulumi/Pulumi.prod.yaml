@@ -131,6 +131,8 @@ config:
   # Future Config Flags (placeholders)
   # ---------------------------------------------------------------------------
   # kellogg-music-match:networkPolicyStrict: "true"
+  kellogg-music-match:vapidSubject: "mailto:support@kelloggmatch.com"
+  kellogg-music-match:pushEnabled: "true"
 
   kellogg-music-match:dbPassword:
     secure: AAABACz2kWesUG/zU9jZt3RYsnPpgLaOXZJE2DJ9dyReh90OaON6/0IQixIIVXo/bV+7IK91xms=

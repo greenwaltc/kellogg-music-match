@@ -75,6 +75,8 @@ config:
   kellogg-music-match:uiMemLimit: 256Mi
   kellogg-music-match:uiMemRequest: 64Mi
   kellogg-music-match:uiReplicas: "2"
+  kellogg-music-match:vapidSubject: "mailto:support@kelloggmatch.com"
+  kellogg-music-match:pushEnabled: "true"
   kellogg-music-match:dbPassword:
     secure: AAABAMfUjujqiH4onFbdPiUUtggb7QR/zmKlvCBOGRmFmtrgU3OOns5632wKQRk9mzPDYYTPI+0=
   kellogg-music-match:jwtSecretKey:

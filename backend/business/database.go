@@ -59,6 +59,12 @@ type UserRepository interface {
 	// Spotify similarity operations
 	FindSimilarUsersBySpotifyTopArtists(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]SimilarUserResult, error)
 	FindSimilarUsersBySpotifyTopTracks(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]SimilarUserResult, error)
+
+	// Web Push subscription operations
+	UpsertPushSubscription(ctx context.Context, userID *uuid.UUID, endpoint, p256dh, auth, userAgent string) error
+	GetPushSubscriptionsByUser(ctx context.Context, userID uuid.UUID) ([]sqlc.PushSubscription, error)
+	GetAnyPushSubscriptions(ctx context.Context, lim int32) ([]sqlc.PushSubscription, error)
+	DeletePushSubscriptionByEndpoint(ctx context.Context, endpoint string) error
 }
 
 // PostgreSQLUserRepository implements UserRepository using pgxpool
@@ -171,6 +177,36 @@ func (r *PostgreSQLUserRepository) Close() error {
 		r.pool.Close()
 	}
 	return nil
+}
+
+// Web Push subscription operations
+func (r *PostgreSQLUserRepository) UpsertPushSubscription(ctx context.Context, userID *uuid.UUID, endpoint, p256dh, auth, userAgent string) error {
+	uid := pgtype.UUID{Valid: false}
+	if userID != nil {
+		uid = pgtype.UUID{Bytes: [16]byte{}, Valid: true}
+		copy(uid.Bytes[:], userID[:])
+	}
+	return r.queries.UpsertPushSubscription(ctx, sqlc.UpsertPushSubscriptionParams{
+		UserID:    uid,
+		Endpoint:  endpoint,
+		P256dh:    p256dh,
+		Auth:      auth,
+		UserAgent: pgtype.Text{String: userAgent, Valid: userAgent != ""},
+	})
+}
+
+func (r *PostgreSQLUserRepository) GetPushSubscriptionsByUser(ctx context.Context, userID uuid.UUID) ([]sqlc.PushSubscription, error) {
+	uid := pgtype.UUID{Bytes: [16]byte{}, Valid: true}
+	copy(uid.Bytes[:], userID[:])
+	return r.queries.GetPushSubscriptionsByUser(ctx, uid)
+}
+
+func (r *PostgreSQLUserRepository) GetAnyPushSubscriptions(ctx context.Context, lim int32) ([]sqlc.PushSubscription, error) {
+	return r.queries.GetAnyPushSubscriptions(ctx, lim)
+}
+
+func (r *PostgreSQLUserRepository) DeletePushSubscriptionByEndpoint(ctx context.Context, endpoint string) error {
+	return r.queries.DeletePushSubscriptionByEndpoint(ctx, endpoint)
 }
 
 // CreateUser creates a new user in the database

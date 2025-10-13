@@ -2,14 +2,18 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
+	webpush "github.com/SherClockHolmes/webpush-go"
 	"github.com/greenwaltc/kellogg-music-match/backend/business"
 	"github.com/greenwaltc/kellogg-music-match/backend/business/concert"
 	"github.com/greenwaltc/kellogg-music-match/backend/business/spotify"
 	"github.com/greenwaltc/kellogg-music-match/backend/config"
+
 	"github.com/greenwaltc/kellogg-music-match/backend/generated"
 	"github.com/greenwaltc/kellogg-music-match/backend/logger"
 	"github.com/greenwaltc/kellogg-music-match/backend/telemetry"
@@ -190,6 +194,12 @@ func main() {
 		fmt.Fprintf(w, `{"status":"%s","message":""}`, spotifySyncState.status)
 	})
 
+	// Push subscription endpoint
+	mux.HandleFunc("/push/subscribe", NewSubscribeHandler(userRepo))
+
+	// Test send endpoint (requires server to have VAPID keys)
+	mux.HandleFunc("/push/test", NewTestHandler(userRepo, cfg, sendWebPush))
+
 	// Initialize JWT middleware
 	jwtMiddleware := NewJWTMiddleware(jwtService)
 
@@ -204,4 +214,52 @@ func main() {
 	if err := http.ListenAndServe(serverAddr, corsRouter); err != nil {
 		logger.L().Error("server crashed", "error", err)
 	}
+}
+
+// sendWebPush delivers a simple JSON notification to a subscription using VAPID keys from config.
+func sendWebPush(subJSON []byte, cfg *config.Config) error {
+	var sub struct {
+		Endpoint string `json:"endpoint"`
+		Keys     struct {
+			P256dh string `json:"p256dh"`
+			Auth   string `json:"auth"`
+		} `json:"keys"`
+	}
+	if err := json.Unmarshal(subJSON, &sub); err != nil {
+		return err
+	}
+	s := &webpush.Subscription{
+		Endpoint: sub.Endpoint,
+		Keys:     webpush.Keys{Auth: sub.Keys.Auth, P256dh: sub.Keys.P256dh},
+	}
+	payload, _ := json.Marshal(map[string]interface{}{
+		"notification": map[string]interface{}{
+			"title": "Kellogg Music Match",
+			"body":  "Hello from KMM!",
+			"icon":  "/assets/icons/icon-192x192.png",
+			"badge": "/assets/icons/badge-72x72.png",
+			"data": map[string]interface{}{
+				"url": "/", // where to navigate on click
+			},
+			"requireInteraction": false,
+		},
+		"data": map[string]interface{}{
+			"timestamp": time.Now().UnixMilli(),
+		},
+	})
+	resp, err := webpush.SendNotification(payload, s, &webpush.Options{
+		Subscriber:      cfg.Push.Subject,
+		VAPIDPublicKey:  cfg.Push.VAPIDPublic,
+		VAPIDPrivateKey: cfg.Push.VAPIDPrivate,
+		TTL:             60,
+	})
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		b, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("push status %d: %s", resp.StatusCode, string(b))
+	}
+	return nil
 }
