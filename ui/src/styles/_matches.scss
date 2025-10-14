@@ -1,6 +1,7 @@
 @use 'tokens' as *;
 // Matches feature styles (namespaced)
 .matches-page {
+  .ptr-indicator { position:sticky; top:0; text-align:center; font-size:.65rem; font-weight:600; letter-spacing:.5px; padding:.35rem .5rem; color:var(--color-text-muted); opacity:.85; }
   h2 { margin:0 0 1rem; font-size:1.85rem; font-weight:700; letter-spacing:.5px; background:var(--color-gradient); -webkit-background-clip:text; background-clip:text; color:transparent; }
 
   .controls-bar { background:var(--color-surface); border:1px solid var(--color-border); border-radius:18px; padding:1rem 1.15rem 1.1rem; box-shadow:0 4px 18px -6px rgba(0,0,0,.10); position:relative; display:flex; flex-wrap:wrap; gap:.75rem 1rem; align-items:flex-end; margin-bottom:1rem; }

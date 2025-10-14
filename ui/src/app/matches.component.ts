@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { MatchService } from './match.service';
 import { SpotifyService } from './spotify.service';
+import { ToastService } from './services/toast.service';
 import { SimilarityMeterComponent } from './similarity-meter.component';
 import { SpotifyConnectComponent } from './spotify-connect.component';
 import { TooltipDirective } from './tooltip.directive';
@@ -14,6 +15,7 @@ import { TooltipDirective } from './tooltip.directive';
   imports: [CommonModule, FormsModule, SimilarityMeterComponent, TooltipDirective, SpotifyConnectComponent],
   template: `
   <section class="matches-page">
+    <div class="ptr-indicator" *ngIf="pullHintVisible">↓ Release to refresh</div>
     <h2>Your Top Music Matches ({{ matches.basis() | titlecase }})</h2>
     <!-- Pre-Spotify connection placeholder -->
     <div *ngIf="!matches.spotifyReady()" class="pre-connect-placeholder">
@@ -79,6 +81,15 @@ import { TooltipDirective } from './tooltip.directive';
       <div class="range-subtitle">Listening window: <strong>{{ rangeLabel() }}</strong>
         <span class="info-icon small" appTooltip="Spotify provides 3 windows for your top artists:\nShort term ≈ last 4 weeks\nMedium term ≈ last 6 months\nLong term ≈ several years (weighted toward the past year)\nSelecting a different window recalculates overlap & rank positions." aria-label="Spotify time range info">i</span>
       </div>
+      <button type="button"
+              class="range-btn refresh-btn"
+              [disabled]="matches.loading() || !canRefresh()"
+              (click)="triggerManualRefresh()"
+              appTooltip="Refresh matches (rate-limited)"
+              aria-label="Refresh matches">
+        <span *ngIf="!matches.loading(); else refreshingIcon">Refresh</span>
+        <ng-template #refreshingIcon>Refreshing...</ng-template>
+      </button>
     </div>
   <app-spotify-connect (connected)="onSpotifyConnected()" label="Re-sync Spotify"></app-spotify-connect>
     <p class="note">Tip: check back here often! As more Kellogg students register, we build better matches.</p>
@@ -209,8 +220,67 @@ export class MatchesComponent implements OnInit, OnDestroy {
   artistsPerPage = 25;
   showRankInfo = false;
   private limitDebounce: any;
+  // Manual refresh rate limiting (client side safety net) – align with backend 3 / 10s policy (slightly stricter: 1 every 4s, burst 3)
+  private refreshTimestamps: number[] = [];
+  private refreshMinIntervalMs = 4000; // 4 seconds between manual refresh attempts
+  private refreshBurstWindowMs = 10000; // 10 second window
+  private refreshBurstMax = 3;
+  // Pull-to-refresh state
+  pullHintVisible = false;
+  private touchStartY: number | null = null;
+  private ptrThreshold = 60; // px drag distance to trigger
 
-  constructor(public matches: MatchService, private router: Router, private spotify: SpotifyService) {
+  // Attach touch listeners (using host listeners would be more Angular-ish; inline minimal approach here)
+  ngAfterViewInit() {
+    const section = document.querySelector('.matches-page') as HTMLElement | null;
+    if (!section) return;
+    section.addEventListener('touchstart', (e: Event) => this.onTouchStart(e as TouchEvent), { passive: true });
+    section.addEventListener('touchmove', (e: Event) => this.onTouchMove(e as TouchEvent), { passive: true });
+    section.addEventListener('touchend', (e: Event) => this.onTouchEnd(e as TouchEvent), { passive: true });
+  }
+  private atTop(): boolean { return (window.scrollY || document.documentElement.scrollTop || 0) === 0; }
+  onTouchStart = (e: TouchEvent) => {
+    if (!this.atTop()) return; // only from top
+    if (e.touches.length !== 1) return;
+    this.touchStartY = e.touches[0].clientY;
+    this.pullHintVisible = false;
+  };
+  onTouchMove = (e: TouchEvent) => {
+    if (this.touchStartY == null) return;
+    const dy = e.touches[0].clientY - this.touchStartY;
+    if (dy > this.ptrThreshold) {
+      if (!this.pullHintVisible) this.pullHintVisible = true;
+    }
+  };
+  onTouchEnd = (_: TouchEvent) => {
+    if (this.pullHintVisible && this.canRefresh()) {
+      this.triggerManualRefresh();
+    }
+    this.touchStartY = null;
+    this.pullHintVisible = false;
+  };
+
+  canRefresh(): boolean {
+    const now = Date.now();
+    // purge old timestamps beyond window
+    this.refreshTimestamps = this.refreshTimestamps.filter(ts => now - ts <= this.refreshBurstWindowMs);
+    if (this.refreshTimestamps.length === 0) return true;
+    const sinceLast = now - this.refreshTimestamps[this.refreshTimestamps.length - 1];
+    if (sinceLast < this.refreshMinIntervalMs) return false;
+    if (this.refreshTimestamps.length >= this.refreshBurstMax) return false;
+    return true;
+  }
+
+  triggerManualRefresh() {
+    if (!this.canRefresh()) {
+      this.toast.show('Please wait a few seconds before refreshing again.', { type: 'warning' });
+      return;
+    }
+    this.refreshTimestamps.push(Date.now());
+    this.refetch(true);
+  }
+
+  constructor(public matches: MatchService, private router: Router, private spotify: SpotifyService, private toast: ToastService) {
     effect(() => { if (!this.matches.matches()) { /* placeholder for potential redirect */ } });
     // Reactive hook: when spotifyReady flips true and we have no matches yet, attempt fetch.
     effect(() => {

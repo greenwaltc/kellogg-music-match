@@ -2,6 +2,7 @@ import { Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../environments/environment';
 import { ApiBaseService } from './api-base.service';
+import { ToastService } from './services/toast.service';
 import { AuthService } from './auth.service';
 
 export interface MatchOverlap {
@@ -44,7 +45,7 @@ export class MatchService {
   basis = signal<'artists'|'tracks'>('artists');
   private basisReadyProbeAttempted = false;
 
-  constructor(private http: HttpClient, private auth: AuthService, private api: ApiBaseService) {
+  constructor(private http: HttpClient, private auth: AuthService, private api: ApiBaseService, private toast: ToastService) {
     this.apiBase = this.api.baseUrl;
     // Initialize readiness per current user only; do not carry across users
     const u = this.auth.user();
@@ -152,6 +153,11 @@ export class MatchService {
           queueMicrotask(()=> this.fetch('medium_term', 50, this.overlapsLimit, true));
           return;
         }
+        if (err?.status === 429) {
+          this.toast.show('Match refresh rate limit exceeded. Please retry in a few seconds.', { type: 'warning' });
+        } else {
+          this.toast.show('Failed to load matches. Please try again.', { type: 'error' });
+        }
         console.warn('[MatchService] fetchIfReady failed', err);
         this.loading.set(false);
       }
@@ -202,6 +208,9 @@ export class MatchService {
             this.loading.set(false);
             queueMicrotask(()=> this.fetch(range, limit, overlapsLimit, forceFresh));
             return;
+        }
+        if (err?.status === 429) {
+          this.toast.show('Match refresh rate limit exceeded. Please retry shortly.', { type: 'warning' });
         }
         this.loading.set(false); 
       }

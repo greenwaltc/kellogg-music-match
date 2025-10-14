@@ -43,6 +43,7 @@ A professional full-stack music taste matching application for Kellogg students.
 - **Consistent Theming** - Light/dark mode support across all components
 - **Docker** containerization with Nginx
 - **Concert Integration** - Complete UI for browsing 6 months of Chicago area events
+ - **Matches Refresh** - Manual (desktop button) & pull-to-refresh (mobile) with client+server rate limiting
 
 ### 🎵 Concert Integration
 - **Ticketmaster API** - Live concert and event discovery with 6-month configurable date range
@@ -138,7 +139,49 @@ curl "http://localhost:8080/chicago/events?limit=5&offset=0"
 curl "http://localhost:8080/chicago/events?limit=10&artist=john&offset=0"
 ```
 
-## 🛠️ Development Commands
+## � Refreshing Matches
+
+You can manually refresh your music matches to incorporate newly synced Spotify data or changed listening windows.
+
+Desktop:
+- Use the Refresh button in the Matches page controls bar (next to range/basis controls). Disabled briefly after use.
+
+Mobile:
+- Pull down from the very top of the Matches page until the "Release to refresh" indicator appears, then release.
+
+Rate Limiting:
+- Backend: Maximum 3 refresh requests per 10 seconds per user (returns HTTP 429 when exceeded).
+- Frontend: Client blocks refresh attempts closer than ~4 seconds apart and caps bursts to 3 per 10 seconds, mirroring backend constraints.
+
+If you exceed limits you'll see the button disabled or (for API calls) a 429 response; simply wait a few seconds and try again.
+
+Rate Limit Headers (returned by /findMusicMatches):
+
+| Header | Meaning |
+| ------ | ------- |
+| X-RateLimit-Limit | Maximum requests allowed in the current window (3) |
+| X-RateLimit-Remaining | Requests left before reaching the limit |
+| X-RateLimit-Window | Window size (e.g. 10s) |
+| Retry-After | Seconds until you can retry (only present on 429) |
+
+Example 429 response:
+```
+HTTP/1.1 429 Too Many Requests
+X-RateLimit-Limit: 3
+X-RateLimit-Remaining: 0
+X-RateLimit-Window: 10s
+Retry-After: 6
+Content-Type: application/json
+
+{"message":"too many match requests - retry shortly"}
+```
+
+UI Behavior:
+- Warning toast on client-side throttle (fast manual/pull refresh attempts).
+- Warning toast when server returns 429 (includes Retry-After guidance when available).
+
+
+## �🛠️ Development Commands
 
 ### 📋 General Operations
 ```bash

@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"errors"
+	"strconv"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -64,9 +66,49 @@ func (w *HealthAPIServiceWrapper) GetHealth(ctx context.Context) (generated.Impl
 }
 
 // MatchingAPIServiceWrapper wraps business logic to implement OpenAPI service interface
+type matchFinder interface {
+	FindMusicMatches(ctx context.Context, artistsRequest generated.ArtistsRequest, xUserUsername string, rng string, limit int32, overlapsLimit ...int32) (generated.ImplResponse, error)
+}
+
 type MatchingAPIServiceWrapper struct {
-	matchingService *business.MatchingService
+	matchingService matchFinder
 	spotifyService  *spotify.Service
+}
+
+// context key type for matching basis
+type matchBasisCtxKey struct{}
+
+// In-memory per-user rate limiter for FindMusicMatches.
+// Simple sliding window allowing up to 3 requests per 10 second window.
+// This guards backend from excessive refresh spam while remaining permissive for normal UI interactions.
+type matchRateState struct {
+	count       int
+	windowStart time.Time
+}
+
+var (
+	matchRateLimiterMu sync.Mutex
+	matchRateLimiter   = make(map[string]*matchRateState) // key: username (empty allowed for anonymous)
+	matchRateLimitMax  = 3
+	matchRateWindow    = 10 * time.Second
+)
+
+// typed context key to store rate header info
+type matchRateHeadersKey struct{}
+
+type matchRateHeaders struct {
+	Limit      string
+	Remaining  string
+	Window     string
+	RetryAfter string
+}
+
+// resetMatchRateLimiter is only for tests.
+// ResetMatchRateLimiter clears the in-memory rate limiter (test helper)
+func ResetMatchRateLimiter() {
+	matchRateLimiterMu.Lock()
+	defer matchRateLimiterMu.Unlock()
+	matchRateLimiter = make(map[string]*matchRateState)
 }
 
 // NewMatchingAPIServiceWrapper creates a new wrapper
@@ -83,14 +125,44 @@ func (w *MatchingAPIServiceWrapper) FindMusicMatches(ctx context.Context, artist
 	if basis == "" {
 		basis = "artists"
 	}
-	ctx = context.WithValue(ctx, "match_basis", basis)
+	// Provide both typed key (future use) and legacy string key "match_basis" that business layer currently inspects.
+	ctx = context.WithValue(ctx, matchBasisCtxKey{}, basis)
+	username := ""
 	if user, ok := GetUserFromContext(ctx); ok && user.Username != "" {
-		return w.matchingService.FindMusicMatches(ctx, artistsRequest, user.Username, range_, limit, overlapsLimit)
+		username = user.Username
+	} else if xUserUsername != "" {
+		username = xUserUsername
 	}
-	if xUserUsername != "" {
-		return w.matchingService.FindMusicMatches(ctx, artistsRequest, xUserUsername, range_, limit, overlapsLimit)
+
+	// Apply rate limiting (counts anonymous separately using empty key)
+	matchRateLimiterMu.Lock()
+	st := matchRateLimiter[username]
+	now := time.Now()
+	if st == nil || now.Sub(st.windowStart) > matchRateWindow {
+		st = &matchRateState{count: 0, windowStart: now}
+		matchRateLimiter[username] = st
 	}
-	return w.matchingService.FindMusicMatches(ctx, artistsRequest, "", range_, limit, overlapsLimit)
+	st.count++
+	cur := st.count
+	remaining := matchRateLimitMax - cur
+	if remaining < 0 {
+		remaining = 0
+	}
+	overLimit := cur > matchRateLimitMax
+	matchRateLimiterMu.Unlock()
+
+	// Stamp context with rate info struct
+	headers := &matchRateHeaders{Limit: strconv.Itoa(matchRateLimitMax), Remaining: strconv.Itoa(remaining), Window: (matchRateWindow / time.Second).String() + "s"}
+
+	if overLimit {
+		retryAfter := int(matchRateWindow-now.Sub(st.windowStart)) / int(time.Second)
+		if retryAfter < 1 {
+			retryAfter = 1
+		}
+		headers.RetryAfter = strconv.Itoa(retryAfter)
+		return generated.Response(429, generated.ErrorResponse{Message: "too many match requests - retry shortly", CreatedAt: time.Now().UTC()}), nil
+	}
+	return w.matchingService.FindMusicMatches(context.WithValue(ctx, matchRateHeadersKey{}, headers), artistsRequest, username, range_, limit, overlapsLimit)
 }
 
 // Add SyncSpotify and GetSpotifySyncStatus to satisfy generated.MatchingAPIServicer
