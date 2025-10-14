@@ -34,7 +34,7 @@
   .skeleton-card::after { content:""; position:absolute; inset:0; background:linear-gradient(110deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.5) 45%, rgba(255,255,255,0) 80%); animation:shimmerMove 1.3s linear infinite; opacity:.8; }
   .sk-date { width:52px; height:52px; border-radius:14px; background:linear-gradient(135deg,#d9d9d9,#c7c7c7); margin-bottom:.75rem; }
   .sk-lines { display:flex; flex-direction:column; gap:.5rem; }
-  .sk-line { height:14px; border-radius:6px; background:#e0e0e0; }
+  .sk-line { height:14px; border-radius:6px; background: var(--color-border); opacity:.5; }
   .sk-line.w60 { width:60%; }
   .sk-line.w80 { width:80%; }
   .sk-line.w40 { width:40%; }
@@ -76,10 +76,10 @@
   .interest-btn { background:$color-control-bg; border:1px solid $color-control-border; color:$neutral-800; padding:.45rem .7rem .5rem; border-radius:8px; font-size:.55rem; font-weight:600; letter-spacing:.35px; cursor:pointer; transition:background .2s, color .25s, box-shadow .25s, transform .2s; display:inline-flex; align-items:center; gap:.35rem; }
   .interest-btn:hover { background:$color-control-bg-hover; }
   .interest-btn.active { background:$gradient-accent; border-color:#667eea; color:#fff; box-shadow:0 0 0 2px rgba(102,126,234,.25); }
-  .interest-btn.danger { background:#fff0f0; border-color:#ffbdbd; color:#c62828; }
-  .interest-btn.danger:hover { background:#ffe3e3; }
-  .toggle-attendees { background:#faf1ff; border:1px solid #dfc5ff; color:#5c2fad; }
-  .toggle-attendees:hover { background:#f3e6ff; }
+  .interest-btn.danger { background:$color-danger-bg; border-color:$color-danger-border; color:$color-danger-text; }
+  .interest-btn.danger:hover { background:$color-danger-bg-hover; }
+  .toggle-attendees { background:var(--color-surface-translucent); border:1px solid var(--color-border); color:var(--color-text); }
+  .toggle-attendees:hover { background:var(--color-surface); }
   .interest-attendees { margin-top:.55rem; border:1px solid var(--color-border); background:var(--color-surface-translucent); backdrop-filter:blur(6px); border-radius:12px; padding:.6rem .65rem .75rem; font-size:.55rem; line-height:1.5; box-shadow:0 2px 8px rgba(0,0,0,.12); }
   .loading-attendees { font-style:italic; opacity:.7; }
   .empty-attendees { font-style:italic; opacity:.6; }

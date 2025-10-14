@@ -44,7 +44,7 @@
   .artist-pagination { margin-top:.45rem; display:flex; align-items:center; gap:.6rem; }
   .artist-pagination button, .toggle-btn { background:$color-control-bg; border:1px solid $color-control-border; padding:.25rem .6rem; font-size:.6rem; border-radius:4px; cursor:pointer; font-weight:600; }
   .artist-pagination button:hover, .toggle-btn:hover { background:$color-control-bg-hover; }
-  .page-indicator { font-size:.6rem; color:#555; }
+  .page-indicator { font-size:.6rem; color:var(--color-text-muted); }
   .overlap-hint-anchor { margin-left:.4rem; cursor:pointer; }
 
   .match-stats { display:flex; flex-direction:column; gap:.6rem; }
@@ -53,7 +53,7 @@
   .stat-value { color:var(--color-text); font-weight:600; }
 
   .loading-container { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:3rem 1rem; margin:2rem 0; }
-  .loading-spinner { width:40px; height:40px; border:4px solid #f3f3f3; border-top:4px solid #667eea; border-radius:50%; animation:spin 1s linear infinite; margin-bottom:1rem; }
+  .loading-spinner { width:40px; height:40px; border:4px solid var(--color-border); border-top:4px solid var(--color-accent); border-radius:50%; animation:spin 1s linear infinite; margin-bottom:1rem; }
   .skeleton-list { display:flex; flex-direction:column; gap:1.25rem; margin:1.5rem 0; }
   .skeleton-card { background:var(--color-surface); border:1px solid var(--color-border); border-radius:12px; padding:1.25rem 1.1rem 1.1rem; }
   .skeleton-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:.9rem; }
@@ -108,6 +108,10 @@ html.theme-dark {
     .match-card:hover { box-shadow:0 6px 20px -6px rgba(0,0,0,.75); }
   .note { background:$color-note-bg-dark; }
   .empty-msg { background:$color-empty-bg-dark; }
+  // Tame the bright crush styling for dark mode
+  .match-card.crush-card { background:linear-gradient(135deg, rgba(214,51,132,.18) 0%, rgba(214,51,132,.10) 100%); border-color:#d63384; }
+  .crush-message { background:rgba(214,51,132,.12); border-color:#d63384; }
+  .match-card.crush-card .match-name { color:#ff7ab8; }
   }
 }
 

@@ -111,16 +111,16 @@ button { cursor: pointer; transition: background .25s ease, color .25s ease, bor
 .info-icon.small:hover { background:#3d4b63; }
 /* Skeleton */
 .skeleton-list { display:flex; flex-direction:column; gap:1.25rem; margin:1.5rem 0; }
-.skeleton-card { background:#fff; border:1px solid #e0e4ea; border-radius:12px; padding:1.25rem 1.1rem 1.1rem; }
+.skeleton-card { background:var(--color-surface); border:1px solid var(--color-border); border-radius:12px; padding:1.25rem 1.1rem 1.1rem; }
 .skeleton-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:.9rem; }
-.sk-block { border-radius:6px; background:#eceff3; height:18px; position:relative; overflow:hidden; }
+.sk-block { border-radius:6px; background:var(--color-border); opacity:.5; height:18px; position:relative; overflow:hidden; }
 .sk-title { width:40%; }
-.sk-meter { width:90px; height:14px; border-radius:8px; background:#eceff3; position:relative; overflow:hidden; }
+.sk-meter { width:90px; height:14px; border-radius:8px; background:var(--color-border); opacity:.5; position:relative; overflow:hidden; }
 .skeleton-body { display:grid; grid-template-columns:2fr 1fr; gap:1.25rem; }
 .sk-tags { display:flex; flex-wrap:wrap; gap:.4rem; max-height:72px; overflow:hidden; }
-.sk-tag { display:inline-block; width:64px; height:18px; border-radius:14px; background:#eceff3; position:relative; overflow:hidden; }
+.sk-tag { display:inline-block; width:64px; height:18px; border-radius:14px; background:var(--color-border); opacity:.5; position:relative; overflow:hidden; }
 .sk-stats { display:flex; flex-direction:column; gap:.55rem; }
-.sk-stat { width:100%; height:14px; border-radius:4px; background:#eceff3; position:relative; overflow:hidden; }
+.sk-stat { width:100%; height:14px; border-radius:4px; background:var(--color-border); opacity:.5; position:relative; overflow:hidden; }
 @keyframes shimmerMove { 0%{transform:translateX(-100%);} 100%{transform:translateX(100%);} }
 .shimmer::after { content:""; position:absolute; top:0; left:0; width:100%; height:100%; background:linear-gradient(110deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.55) 45%, rgba(255,255,255,0) 80%); animation:shimmerMove 1.4s linear infinite; }
 .controls-bar select { padding:0.25rem 0.5rem; }
@@ -128,7 +128,7 @@ button { cursor: pointer; transition: background .25s ease, color .25s ease, bor
 .spotify-btn { background:#1db954; border:none; color:#fff; padding:.55rem 1rem; border-radius:4px; cursor:pointer; font-size:.85rem; font-weight:600; }
 .spotify-btn:hover { background:#19a34b; }
 .matches-list { display:flex; flex-direction:column; gap:1.5rem; margin:1.5rem 0; }
-.match-card { background:#fff; border:1px solid #e0e0e0; border-radius:12px; padding:1.5rem; box-shadow:0 2px 8px rgba(0,0,0,0.1); transition:transform .2s ease, box-shadow .2s ease; }
+.match-card { background:var(--color-surface); border:1px solid var(--color-border); border-radius:12px; padding:1.5rem; box-shadow:0 2px 8px rgba(0,0,0,0.1); transition:transform .2s ease, box-shadow .2s ease; }
 .match-card:hover { transform:translateY(-2px); box-shadow:0 4px 16px rgba(0,0,0,.15); }
 .match-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; padding-bottom:1rem; border-bottom:1px solid #f0f0f0; }
 .match-name { margin:0; font-size:1.25rem; font-weight:600; color:#2c3e50; }
@@ -141,7 +141,7 @@ button { cursor: pointer; transition: background .25s ease, color .25s ease, bor
 .info-icon:focus { outline:2px solid #667eea; }
 .tooltip { position:absolute; z-index:10; top:120%; left:50%; transform:translateX(-50%); background:#1e2530; color:#fff; padding:.5rem .6rem; font-size:.65rem; width:200px; border-radius:4px; box-shadow:0 2px 6px rgba(0,0,0,.25); }
 .tooltip::after { content:""; position:absolute; top:-6px; left:50%; transform:translateX(-50%); border-width:6px; border-style:solid; border-color:transparent transparent #1e2530 transparent; }
-.artist-pagination button { padding:0.25rem .75rem; font-size:.7rem; border:1px solid #ccc; background:#f8f8f8; border-radius:4px; cursor:pointer; }
+.artist-pagination button { padding:0.25rem .75rem; font-size:.7rem; border:1px solid var(--color-border); background:var(--color-input-bg); color:var(--color-text); border-radius:4px; cursor:pointer; }
 .artist-pagination button:disabled { opacity:.5; cursor:default; }
 .page-indicator { font-size:.7rem; color:#555; }
 .artist-actions { margin-top:.35rem; }
@@ -158,10 +158,10 @@ button { cursor: pointer; transition: background .25s ease, color .25s ease, bor
 .stat { display:flex; justify-content:space-between; align-items:center; }
 .stat-label { font-size:.875rem; color:#7f8c8d; font-weight:500; }
 .stat-value { font-size:.875rem; font-weight:600; color:#2c3e50; }
-.empty-msg { text-align:center; color:#7f8c8d; font-style:italic; padding:2rem; background:#f8f9fa; border-radius:8px; margin:1rem 0; }
-.note { text-align:center; color:#6c757d; font-size:.875rem; margin:1.5rem 0; padding:1rem; background:#e8f4f8; border-left:4px solid #17a2b8; border-radius:4px; }
+.empty-msg { text-align:center; color:var(--color-text-muted); font-style:italic; padding:2rem; background:var(--color-surface); border:1px solid var(--color-border); border-radius:8px; margin:1rem 0; }
+.note { text-align:center; color:var(--color-text-muted); font-size:.875rem; margin:1.5rem 0; padding:1rem; background:rgba(0,0,0,.04); border-left:4px solid #17a2b8; border-radius:4px; }
 .loading-container { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:3rem 1rem; margin:2rem 0; }
-.loading-spinner { width:40px; height:40px; border:4px solid #f3f3f3; border-top:4px solid #667eea; border-radius:50%; animation:spin 1s linear infinite; margin-bottom:1rem; }
+.loading-spinner { width:40px; height:40px; border:4px solid var(--color-border); border-top:4px solid var(--color-accent); border-radius:50%; animation:spin 1s linear infinite; margin-bottom:1rem; }
 @keyframes spin { 0%{transform:rotate(0);} 100%{transform:rotate(360deg);} }
 .loading-text { color:#6c757d; font-size:1rem; font-weight:500; margin:0; text-align:center; }
 .actions { text-align:center; margin-top:2rem; }
