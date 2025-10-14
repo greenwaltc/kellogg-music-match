@@ -14,6 +14,7 @@ import (
 	"github.com/greenwaltc/kellogg-music-match/backend/business/spotify"
 	"github.com/greenwaltc/kellogg-music-match/backend/config"
 
+	"github.com/google/uuid"
 	"github.com/greenwaltc/kellogg-music-match/backend/generated"
 	"github.com/greenwaltc/kellogg-music-match/backend/logger"
 	"github.com/greenwaltc/kellogg-music-match/backend/telemetry"
@@ -170,14 +171,7 @@ func main() {
 
 	router := generated.NewRouter(AuthenticationAPIController, HealthAPIController, MatchingAPIController, FeedbackAPIController, ConcertsAPIController)
 
-	// In-memory stub sync state (simple global; single-process dev usage)
-	var spotifySyncState struct {
-		status    string
-		lastStart time.Time
-	}
-	spotifySyncState.status = "complete"
-
-	// Wrap generated router; we still provide a manual status endpoint not yet modeled in spec (left as-is)
+	// Wrap generated router; override /sync/spotify/status with an extended handler that also reports readiness based on DB state.
 	mux := http.NewServeMux()
 	mux.Handle("/", router)
 	mux.HandleFunc("/sync/spotify/status", func(w http.ResponseWriter, r *http.Request) {
@@ -185,13 +179,35 @@ func main() {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
-		if _, ok := GetUserFromContext(r.Context()); !ok {
+		uctx, ok := GetUserFromContext(r.Context())
+		if !ok || uctx == nil || uctx.UserID == "" {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
+		// Determine current job status from spotify service
+		job := spotifyService.GetStatus(uctx.Username)
+		status := job.Status
+		// Compute readiness: true if we have any current Spotify snapshot rows (artists or tracks) for this user
+		ready := false
+		if pr, ok := userRepo.(*business.PostgreSQLUserRepository); ok {
+			if parsed, err := uuid.Parse(uctx.UserID); err == nil {
+				var hasArtists, hasTracks bool
+				// v_current_* views reflect the latest snapshot per range
+				q1 := `SELECT EXISTS(SELECT 1 FROM v_current_spotify_top_artists WHERE user_id=$1)`
+				q2 := `SELECT EXISTS(SELECT 1 FROM v_current_spotify_top_tracks WHERE user_id=$1)`
+				_ = pr.Pool().QueryRow(r.Context(), q1, parsed).Scan(&hasArtists)
+				_ = pr.Pool().QueryRow(r.Context(), q2, parsed).Scan(&hasTracks)
+				ready = hasArtists || hasTracks
+			}
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, `{"status":"%s","message":""}`, spotifySyncState.status)
+		// Include a minimal superset of the generated response: status + ready boolean for frontend consumption
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"status":  status,
+			"message": job.Message,
+			"ready":   ready,
+		})
 	})
 
 	// Push subscription endpoint

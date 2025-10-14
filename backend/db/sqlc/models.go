@@ -180,7 +180,7 @@ type User struct {
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 	// MBA program type: 2Y, 1Y, MMM, MBAi, JD-MBA, MD-MBA, EWMBA, JV
 	Program pgtype.Text `json:"program"`
-	// Expected graduation year (current year to 2030)
+	// Expected graduation year (current year to current year + 5)
 	GraduationYear pgtype.Int4 `json:"graduation_year"`
 }
 

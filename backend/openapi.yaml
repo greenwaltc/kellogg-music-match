@@ -1022,6 +1022,9 @@ components:
         status:
           type: string
           enum: [pending, in_progress, complete, failed, cancelled]
+        ready:
+          type: boolean
+          description: True if the user has any current Spotify snapshot data (artists or tracks) stored server-side
         progress:
           type: integer
           minimum: 0

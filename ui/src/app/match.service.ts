@@ -60,6 +60,8 @@ export class MatchService {
           if (!isNaN(num)) this.readyTimestamp = num;
         }
       }
+      // Also query backend status to ensure robustness
+      this.refreshReadyFromBackend();
     }
     const storedBasis = localStorage.getItem('kmmMatchBasis');
     if (storedBasis === 'tracks' || storedBasis === 'artists') {
@@ -113,9 +115,11 @@ export class MatchService {
       const ts = localStorage.getItem(tsKey);
       this.readyTimestamp = ts ? (()=>{ const n = parseInt(ts,10); return isNaN(n)? null : n; })() : null;
     }
-      // If not marked ready yet, do not auto-promote readiness based on generic endpoint success.
-      // We'll wait until explicit Spotify link completes and sets the flag.
-      if (!this.spotifyReady()) return;
+    // Ask backend for authoritative readiness; if not ready, schedule a check and return for now
+    if (!this.spotifyReady()) {
+      this.refreshReadyFromBackend();
+      return;
+    }
 
     // Previously we required manual artists; backend now uses stored Spotify data and ignores body list.
     // So we always attempt a fetch for a logged-in user (sending any existing artists array or empty list).
@@ -222,6 +226,29 @@ export class MatchService {
     this.clear();
     // Trigger a forced fresh fetch (respect stored overlaps limit and default limit)
     this.fetch(range, 50, this.overlapsLimit, true);
+  }
+
+  /** Query backend to determine if Spotify is ready for the current user; updates local flag/cache. */
+  private refreshReadyFromBackend() {
+    const u = this.auth.user();
+    if (!u) return;
+    this.http.get<{status: string; message?: string; ready?: boolean}>(this.url('/sync/spotify/status')).subscribe({
+      next: (resp) => {
+        if (resp && resp.ready) {
+          if (!this.spotifyReady()) {
+            this.spotifyReady.set(true);
+            this.readyTimestamp = Date.now();
+            localStorage.setItem(`kmmSpotifyReady:${u.username}`, 'true');
+            localStorage.setItem(`kmmSpotifyReadyTs:${u.username}`, this.readyTimestamp.toString());
+            // Now that we're ready, trigger a fetch
+            queueMicrotask(() => this.fetch('medium_term', 50, this.overlapsLimit, true));
+          }
+        }
+      },
+      error: () => {
+        // best-effort; ignore
+      }
+    });
   }
 
   /** Retrieve overlap count for a match from a previously cached range (if available). */
