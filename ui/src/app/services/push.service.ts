@@ -89,6 +89,12 @@ export class PushService {
     if (perm === 'default') {
       perm = await Notification.requestPermission();
       console.log('[Push] permission result:', perm);
+      // Immediately reflect permission change in UI
+      if (perm === 'granted') {
+        // We may not have a subscription yet, but permission is granted.
+        // Trigger a refresh to update device subscription flag ASAP.
+        try { await this.refreshDeviceSubscriptionFlag(); } catch {}
+      }
     }
     if (perm !== 'granted') {
       console.warn('[Push] Permission not granted:', perm);

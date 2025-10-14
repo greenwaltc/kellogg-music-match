@@ -1,6 +1,6 @@
 <section class="home-tiles" *ngIf="true">
   <!-- One-time per device: Enable Notifications tile -->
-  <div class="tile tile-notify small" *ngIf="!push.hasDeviceSubscription()"
+  <div class="tile tile-notify small" *ngIf="notifPerm() !== 'granted' && !push.hasDeviceSubscription()"
        (click)="push.ensureSubscribed()"
        (keydown.enter)="push.ensureSubscribed()" (keydown.space)="$event.preventDefault(); push.ensureSubscribed()"
        role="button" tabindex="0" aria-label="Enable notifications on this device">
