@@ -145,6 +145,7 @@ export class MatchService {
       },
       error: (err) => {
         if (this.basis()==='tracks' && err?.error?.message === 'track-based matching disabled') {
+          this.toast.show('Track-based matching is not enabled yet. Showing artist matches instead.', { type: 'info' });
           // auto-fallback to artists to stop spamming disabled endpoint
           this.basis.set('artists');
           localStorage.setItem('kmmMatchBasis','artists');
@@ -203,6 +204,7 @@ export class MatchService {
         this.lastFetchedForUser = user.username; },
       error: (err) => { 
         if (this.basis()==='tracks' && err?.error?.message === 'track-based matching disabled') {
+          this.toast.show('Track-based matching is not enabled yet. Reverting to artist matches.', { type: 'info' });
           this.basis.set('artists');
             localStorage.setItem('kmmMatchBasis','artists');
             this.loading.set(false);

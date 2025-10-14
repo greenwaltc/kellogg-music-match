@@ -76,7 +76,7 @@ type MatchingAPIServiceWrapper struct {
 }
 
 // context key type for matching basis
-type matchBasisCtxKey struct{}
+// (moved) matchBasisCtxKey replaced by business.MatchBasisContextKey in business/context_keys.go
 
 // In-memory per-user rate limiter for FindMusicMatches.
 // Simple sliding window allowing up to 3 requests per 10 second window.
@@ -126,7 +126,7 @@ func (w *MatchingAPIServiceWrapper) FindMusicMatches(ctx context.Context, artist
 		basis = "artists"
 	}
 	// Provide both typed key (future use) and legacy string key "match_basis" that business layer currently inspects.
-	ctx = context.WithValue(ctx, matchBasisCtxKey{}, basis)
+	ctx = context.WithValue(ctx, business.MatchBasisContextKey{}, basis)
 	username := ""
 	if user, ok := GetUserFromContext(ctx); ok && user.Username != "" {
 		username = user.Username

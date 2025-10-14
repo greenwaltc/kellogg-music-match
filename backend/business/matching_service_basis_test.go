@@ -54,7 +54,7 @@ func TestMatchingService_BasisArtistsDefault(t *testing.T) {
 func TestMatchingService_BasisTracksFlagDisabled(t *testing.T) {
 	repo := &mockUserRepoBasis{user: &sqlc.User{ID: uuid.New(), Username: "alice"}}
 	ms := NewMatchingService(repo, NewMatchingEngine())
-	ctx := context.WithValue(context.Background(), "match_basis", "tracks")
+	ctx := context.WithValue(context.Background(), MatchBasisContextKey{}, "tracks")
 	// Feature flag currently default false, expect 400 status
 	imp, err := ms.FindMusicMatches(ctx, generated.ArtistsRequest{}, "alice", "medium_term", 5)
 	if err != nil {

@@ -179,9 +179,15 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 		limit = int32(max)
 	}
 
-	// Determine basis (artists|tracks). For now, we look at a context value or artistsRequest future extension; fallback to default.
+	// Determine basis (artists|tracks). Priority:
+	// 1. business.MatchBasisContextKey{}
+	// 2. legacy string key "match_basis" (deprecated)
 	basis := "artists"
-	if v := ctx.Value("match_basis"); v != nil {
+	if v := ctx.Value(MatchBasisContextKey{}); v != nil {
+		if bs, ok := v.(string); ok && (bs == "artists" || bs == "tracks") {
+			basis = bs
+		}
+	} else if v := ctx.Value("match_basis"); v != nil { // legacy fallback
 		if bs, ok := v.(string); ok && (bs == "artists" || bs == "tracks") {
 			basis = bs
 		}

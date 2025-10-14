@@ -180,6 +180,29 @@ UI Behavior:
 - Warning toast on client-side throttle (fast manual/pull refresh attempts).
 - Warning toast when server returns 429 (includes Retry-After guidance when available).
 
+### Track-Based Matching (Experimental)
+
+Track similarity is currently behind a feature flag and disabled by default.
+
+Enable it before starting the backend:
+```bash
+export MATCH_TRACKS_ENABLED=true
+```
+
+When enabled:
+- The Matches UI "Tracks" toggle sends `/findMusicMatches?basis=tracks`.
+- Backend executes track similarity (`FindSimilarUsersBySpotifyTopTracks`).
+
+When disabled:
+- Selecting the Tracks toggle returns HTTP 400 (`track-based matching disabled`).
+- UI shows an informational toast and falls back to artist matches automatically.
+
+Config knobs:
+- MATCH_TRACKS_ENABLED (bool) master gate.
+- MATCHING_TRACK_TOPN (default 50) number of top tracks considered.
+
+Planned enhancements: separate caching metrics, progressive loading of track overlaps, and surfaced track overlap rank metadata in UI (partially present via tuples already).
+
 
 ## �🛠️ Development Commands
 
