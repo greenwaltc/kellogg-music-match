@@ -99,7 +99,7 @@ button { cursor: pointer; transition: background .25s ease, color .25s ease, bor
 /* Matches Component (extracted from inline to stay under anyComponentStyle budget) */
 .spotify-connect-bar { text-align:right; margin-top:.5rem; }
 .controls-bar { display:flex; justify-content:flex-end; gap:1rem; margin-top:.5rem; flex-wrap:wrap; }
-.controls-bar .matches-name-search { min-width: 360px; max-width: 560px; flex: 1 1 360px; }
+.controls-bar .matches-name-search { min-width: 360px; max-width: 640px; flex: 1 1 360px; margin: 0; width: 100%; }
 .controls-bar .search-input { font-size:1rem; padding:.9rem 2.5rem .9rem 1.1rem; border-radius:22px; box-shadow:0 2px 4px rgba(0,0,0,.04) inset; transition: box-shadow .25s ease, border-color .25s ease, background-color .25s ease; }
 .controls-bar .search-input { border:1px solid var(--color-border); background:var(--color-input-bg); color:var(--color-text); }
 .controls-bar .search-input:hover { border-color: var(--color-accent); }
