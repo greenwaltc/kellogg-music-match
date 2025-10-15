@@ -33,7 +33,7 @@ import { TooltipDirective } from './tooltip.directive';
     </div>
     <ng-container *ngIf="matches.spotifyReady()">
     <div class="controls-bar">
-      <div class="search-input-wrapper" style="min-width:280px;">
+  <div class="search-input-wrapper matches-name-search">
         <input 
           type="text" 
           class="search-input" 
@@ -43,7 +43,6 @@ import { TooltipDirective } from './tooltip.directive';
           placeholder="Search by name (e.g., Jane Doe)" 
           aria-label="Search by name"
           autocomplete="off" />
-        <span class="search-icon" aria-hidden="true">🔍</span>
         <button 
           *ngIf="(nameFilter || '').trim()"
           type="button"
