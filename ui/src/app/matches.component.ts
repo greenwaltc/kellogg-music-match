@@ -229,6 +229,10 @@ export class MatchesComponent implements OnInit, OnDestroy {
   pullHintVisible = false;
   private touchStartY: number | null = null;
   private ptrThreshold = 60; // px drag distance to trigger
+  // Keep pending selections to revert on rate limit
+  private pendingRange: ('short_term'|'medium_term'|'long_term') | null = null;
+  private pendingBasis: ('artists'|'tracks') | null = null;
+  private fetchEventsSub?: any;
 
   // Attach touch listeners (using host listeners would be more Angular-ish; inline minimal approach here)
   ngAfterViewInit() {
@@ -341,7 +345,9 @@ export class MatchesComponent implements OnInit, OnDestroy {
   }
   selectRange(r: 'short_term'|'medium_term'|'long_term') {
     if (this.range === r) return;
+    const prev = this.range;
     this.range = r;
+    this.armRateLimitReverter('range', prev);
     localStorage.setItem('kmmMatchRange', r);
     if (this.matches.loading()) {
       // defer until loading ends
@@ -362,6 +368,11 @@ export class MatchesComponent implements OnInit, OnDestroy {
     }
   }
   setBasis(b: 'artists'|'tracks') {
+    // Remember previous and tentative selection
+    const prev = this.matches.basis();
+    this.pendingBasis = b;
+    // Wire a one-shot listener in case rate limit triggers
+    this.armRateLimitReverter('basis', prev);
     this.matches.setBasis(b);
     // refetch current range if needed (service will pull from cache if present)
     this.refetch(false);
@@ -414,6 +425,24 @@ export class MatchesComponent implements OnInit, OnDestroy {
     return name;
   }
   ngOnDestroy(): void { if (this.limitDebounce) clearTimeout(this.limitDebounce); }
+
+  private armRateLimitReverter(kind: 'range'|'basis', previousValue: any) {
+    // Unsubscribe any existing temporary listener
+    if (this.fetchEventsSub) { this.fetchEventsSub.unsubscribe?.(); this.fetchEventsSub = undefined; }
+    this.fetchEventsSub = this.matches.fetchEvents$.subscribe(evt => {
+      if (evt.type === 'rate-limited') {
+        if (kind === 'range') {
+          this.range = previousValue;
+        } else {
+          this.matches.setBasis(previousValue);
+        }
+      }
+      // In any case (success or error), clear pending and stop listening
+      this.pendingRange = null; this.pendingBasis = null;
+      this.fetchEventsSub?.unsubscribe?.();
+      this.fetchEventsSub = undefined;
+    });
+  }
 
   // Determine if long_term overlap count for this match equals previously cached medium_term overlap (no delta)
   sameAsMedium(match: any): boolean {

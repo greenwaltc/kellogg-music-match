@@ -1,4 +1,5 @@
 import { Injectable, signal } from '@angular/core';
+import { Subject } from 'rxjs';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../environments/environment';
 import { ApiBaseService } from './api-base.service';
@@ -32,6 +33,8 @@ export interface Artist {
 export class MatchService {
   matches = signal<MatchUser[] | null>(null);
   loading = signal(false);
+  // Report fetch results to consumers so UI can adjust (e.g., revert toggle on rate limit)
+  fetchEvents$ = new Subject<{ type: 'success' | 'rate-limited' | 'error', basis: 'artists'|'tracks', range: 'short_term'|'medium_term'|'long_term', retryAfterSec?: number }>();
   private apiBase: string;
   private lastFetchedForUser: string | null = null;
   private overlapsLimit: number | null = null; // null means not sent
@@ -126,7 +129,7 @@ export class MatchService {
     // So we always attempt a fetch for a logged-in user (sending any existing artists array or empty list).
     this.loading.set(true);
     const username = currentUser.username;
-  const range = 'medium_term';
+  const range: 'short_term'|'medium_term'|'long_term' = 'medium_term';
   const limit = 50; // increased default to show more potential matches
   if (this.overlapsLimit === null) this.initStoredPrefs();
   const params: Record<string,string> = { range, limit: limit.toString(), basis: this.basis() };
@@ -142,6 +145,7 @@ export class MatchService {
   this.rangeHistory[range] = res;
         this.loading.set(false);
         this.lastFetchedForUser = username;
+        this.fetchEvents$.next({ type: 'success', basis: this.basis(), range });
       },
       error: (err) => {
         if (this.basis()==='tracks' && err?.error?.message === 'track-based matching disabled') {
@@ -155,9 +159,16 @@ export class MatchService {
           return;
         }
         if (err?.status === 429) {
-          this.toast.show('Match refresh rate limit exceeded. Please retry in a few seconds.', { type: 'warning' });
+          const raHeader = (err?.headers && typeof err.headers.get === 'function') ? err.headers.get('Retry-After') : undefined;
+          const retryAfterSec = raHeader ? parseInt(raHeader, 10) : undefined;
+          const msg = retryAfterSec && !isNaN(retryAfterSec)
+            ? `Match refresh rate limit exceeded. Try again in ~${retryAfterSec}s.`
+            : 'Match refresh rate limit exceeded. Please retry in a few seconds.';
+          this.toast.show(msg, { type: 'warning' });
+          this.fetchEvents$.next({ type: 'rate-limited', basis: this.basis(), range, retryAfterSec: (!isNaN(retryAfterSec||NaN) ? retryAfterSec : undefined) });
         } else {
           this.toast.show('Failed to load matches. Please try again.', { type: 'error' });
+          this.fetchEvents$.next({ type: 'error', basis: this.basis(), range });
         }
         console.warn('[MatchService] fetchIfReady failed', err);
         this.loading.set(false);
@@ -201,7 +212,9 @@ export class MatchService {
         this.set(res); 
         if (!this.basisHistory[this.basis()]) this.basisHistory[this.basis()] = {}; 
         this.basisHistory[this.basis()][range] = res;
-        this.lastFetchedForUser = user.username; },
+        this.lastFetchedForUser = user.username; 
+        this.fetchEvents$.next({ type: 'success', basis: this.basis(), range });
+      },
       error: (err) => { 
         if (this.basis()==='tracks' && err?.error?.message === 'track-based matching disabled') {
           this.toast.show('Track-based matching is not enabled yet. Reverting to artist matches.', { type: 'info' });
@@ -212,7 +225,15 @@ export class MatchService {
             return;
         }
         if (err?.status === 429) {
-          this.toast.show('Match refresh rate limit exceeded. Please retry shortly.', { type: 'warning' });
+          const raHeader = (err?.headers && typeof err.headers.get === 'function') ? err.headers.get('Retry-After') : undefined;
+          const retryAfterSec = raHeader ? parseInt(raHeader, 10) : undefined;
+          const msg = retryAfterSec && !isNaN(retryAfterSec)
+            ? `Match refresh rate limit exceeded. Try again in ~${retryAfterSec}s.`
+            : 'Match refresh rate limit exceeded. Please retry shortly.';
+          this.toast.show(msg, { type: 'warning' });
+          this.fetchEvents$.next({ type: 'rate-limited', basis: this.basis(), range, retryAfterSec: (!isNaN(retryAfterSec||NaN) ? retryAfterSec : undefined) });
+        } else {
+          this.fetchEvents$.next({ type: 'error', basis: this.basis(), range });
         }
         this.loading.set(false); 
       }
