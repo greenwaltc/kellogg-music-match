@@ -27,11 +27,12 @@ func TestFindMusicMatchesRateLimit(t *testing.T) {
 		var ar generated.ArtistsRequest
 		_ = json.Unmarshal(b, &ar)
 		ctx := context.WithValue(context.Background(), UserContextKey, &UserContext{Username: username, UserID: username})
-		resp, _ := mw.FindMusicMatches(ctx, ar, username, "medium_term", "artists", 10, 0)
+		resp, _ := mw.FindMusicMatches(ctx, ar, username, "medium_term", "artists", "", 10, 0)
 		return resp, ctx
 	}
 
-	for i := 1; i <= 3; i++ {
+	// With loosened policy, allow 5 requests in window
+	for i := 1; i <= 5; i++ {
 		resp, _ := call("user1")
 		if resp.Code == 429 {
 			t.Fatalf("unexpected 429 on attempt %d", i)
@@ -39,7 +40,7 @@ func TestFindMusicMatchesRateLimit(t *testing.T) {
 	}
 	resp, _ := call("user1")
 	if resp.Code != 429 {
-		t.Fatalf("expected 429 on 4th attempt, got %d", resp.Code)
+		t.Fatalf("expected 429 on 6th attempt, got %d", resp.Code)
 	}
 
 	// After window passes (sleep >10s) reset effect naturally; we shorten by directly manipulating time not implemented here — skip to keep test fast.

@@ -200,6 +200,14 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 		return generated.Response(http.StatusBadRequest, generated.ErrorResponse{Message: "track-based matching disabled"}), nil
 	}
 
+	// Optional user name filter for fuzzy search of classmates/friends
+	var nameFilter string
+	if v := ctx.Value(MatchNameFilterContextKey{}); v != nil {
+		if s, ok := v.(string); ok {
+			nameFilter = strings.TrimSpace(s)
+		}
+	}
+
 	// Determine overlaps limit (optional variadic for backward compatibility in tests not yet updated)
 	var ovLimit int32 = 0
 	if len(overlapsLimit) > 0 {
@@ -212,7 +220,7 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 		}
 	}
 
-	cacheKey := fmt.Sprintf("spotify:%s:%s:%s:%d:%d", basis, user.ID.String(), rng, limit, ovLimit)
+	cacheKey := fmt.Sprintf("spotify:%s:%s:%s:%d:%d:%s", basis, user.ID.String(), rng, limit, ovLimit, strings.ToLower(strings.TrimSpace(nameFilter)))
 	// Cache lookup (guard against nil cache for safety if constructed elsewhere)
 	if s.cache != nil {
 		if matches, ok := s.cache.get(cacheKey); ok {
@@ -224,9 +232,17 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 	// instead of fabricating a pseudo self-match placeholder which could be misleading post-auth.
 	var similar []SimilarUserResult
 	if basis == "tracks" {
-		similar, err = s.userRepo.FindSimilarUsersBySpotifyTopTracks(ctx, user.ID, rng, limit)
+		if nameFilter != "" {
+			similar, err = s.userRepo.FindSimilarUsersBySpotifyTopTracksFiltered(ctx, user.ID, rng, limit, nameFilter)
+		} else {
+			similar, err = s.userRepo.FindSimilarUsersBySpotifyTopTracks(ctx, user.ID, rng, limit)
+		}
 	} else {
-		similar, err = s.userRepo.FindSimilarUsersBySpotifyTopArtists(ctx, user.ID, rng, limit)
+		if nameFilter != "" {
+			similar, err = s.userRepo.FindSimilarUsersBySpotifyTopArtistsFiltered(ctx, user.ID, rng, limit, nameFilter)
+		} else {
+			similar, err = s.userRepo.FindSimilarUsersBySpotifyTopArtists(ctx, user.ID, rng, limit)
+		}
 	}
 	if err != nil {
 		fmt.Printf("ERROR: similarity query failed: %v\n", err)

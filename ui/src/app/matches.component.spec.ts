@@ -67,4 +67,33 @@ describe('MatchesComponent integration-ish flow', () => {
     expect(req).toBeTruthy();
     req.flush([]);
   }));
+
+  it('wires name filter input to userName query param (debounced)', fakeAsync(() => {
+    // Flush any initial status probe
+    const pending = http.match(() => true);
+    pending.forEach(r => r.flush({}));
+    // Mark ready; we don't assert the initial POST here
+    matchService.markSpotifyReadyAndRefetch('medium_term');
+    http.match(r => r.url.startsWith('http://test/findMusicMatches')).forEach(r => r.flush([]));
+    fixture.detectChanges();
+
+    // Type into name filter
+    component.onNameFilterChange('Jane');
+    tick(450); // allow 400ms debounce + buffer
+  let req = http.expectOne(r => r.url.includes('userName=Jane'));
+    req.flush([]);
+
+    // Update to full name
+    component.onNameFilterChange('Jane Doe');
+    tick(450); // allow 400ms debounce + buffer
+  req = http.expectOne(r => r.url.includes('userName=Jane+Doe'));
+    req.flush([]);
+
+    // Clear filter
+    component.onNameFilterChange('   ');
+    tick(450); // allow 400ms debounce + buffer
+    req = http.expectOne(r => r.url.startsWith('http://test/findMusicMatches?') && !r.url.includes('userName='));
+    req.flush([]);
+    expect(true).toBeTrue();
+  }));
 });

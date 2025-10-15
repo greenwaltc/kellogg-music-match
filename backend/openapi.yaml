@@ -617,6 +617,12 @@ paths:
         - **Final Score**: 70% overlap weight + 30% Jaccard weight
         
         Results are sorted by score (desc), then overlap (desc), then name (asc).
+        
+        ## Filtering by user name
+        Provide the optional `userName` query parameter to fuzzy-filter results by other users' first/last name
+        (or username). When provided, results are restricted to users whose name matches the filter, regardless
+        of their similarity rank, enabling you to look up a classmate and see your overlap even if they're not
+        in the top N matches.
       operationId: findMusicMatches
       parameters:
         - name: X-User-Username
@@ -641,10 +647,17 @@ paths:
           schema:
             type: string
             enum: [artists, tracks]
-            default: artists
           description: |-
             Similarity basis. "artists" (default) uses top artist snapshots; "tracks" uses top track snapshots. 
             Tracks is feature-flag gated server-side and will return 400 if disabled.
+        - name: userName
+          in: query
+          description: Optional fuzzy search to filter other users by first/last name or username.
+          required: false
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
         - name: limit
           in: query
           required: false

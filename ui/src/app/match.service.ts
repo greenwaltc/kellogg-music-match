@@ -37,6 +37,7 @@ export class MatchService {
   private apiBase: string;
   private lastFetchedForUser: string | null = null;
   private overlapsLimit: number | null = null; // null means not sent
+  private nameFilter: string | null = null; // optional fuzzy name filter for matches
   // Flag indicating backend has Spotify data for this user (set after successful sync callback)
   spotifyReady = signal<boolean>(false);
   private readyTimestamp: number | null = null; // epoch ms when readiness established
@@ -91,6 +92,14 @@ export class MatchService {
     }
   }
 
+  /** Set or clear the server-side name filter used for matching. Trims whitespace. */
+  setNameFilter(name: string | null | undefined) {
+    const trimmed = (name ?? '').trim();
+    this.nameFilter = trimmed.length > 0 ? trimmed : null;
+  }
+  /** Retrieve current name filter (for UI binding). */
+  getNameFilter(): string | null { return this.nameFilter; }
+
   private initStoredPrefs() {
     const stored = localStorage.getItem('overlapsLimit');
     if (stored) {
@@ -133,6 +142,7 @@ export class MatchService {
   if (this.overlapsLimit === null) this.initStoredPrefs();
   const params: Record<string,string> = { range, limit: limit.toString(), basis: this.basis() };
   if (this.overlapsLimit) params['overlapsLimit'] = this.overlapsLimit.toString();
+  if (this.nameFilter) params['userName'] = this.nameFilter;
   const qp = new URLSearchParams(params).toString();
     const bodyArtists = Array.isArray(currentUser.artists) ? currentUser.artists : [];
     this.http.post<MatchUser[]>(this.url(`/findMusicMatches?${qp}`), { artists: bodyArtists }).subscribe({
@@ -196,6 +206,7 @@ export class MatchService {
       params['fresh'] = now.toString();
     }
     if (this.overlapsLimit) params['overlapsLimit'] = this.overlapsLimit.toString();
+    if (this.nameFilter) params['userName'] = this.nameFilter;
     const qp = new URLSearchParams(params).toString();
     const bodyArtists = Array.isArray(user.artists) ? user.artists : [];
     // Check cache first

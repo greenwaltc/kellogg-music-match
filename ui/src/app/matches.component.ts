@@ -33,6 +33,25 @@ import { TooltipDirective } from './tooltip.directive';
     </div>
     <ng-container *ngIf="matches.spotifyReady()">
     <div class="controls-bar">
+      <div class="search-input-wrapper" style="min-width:280px;">
+        <input 
+          type="text" 
+          class="search-input" 
+          [class.loading]="matches.loading()"
+          [ngModel]="nameFilter" 
+          (ngModelChange)="onNameFilterChange($event)" 
+          placeholder="Search by name (e.g., Jane Doe)" 
+          aria-label="Search by name"
+          autocomplete="off" />
+        <span class="search-icon" aria-hidden="true">🔍</span>
+        <button 
+          *ngIf="(nameFilter || '').trim()"
+          type="button"
+          class="inline-clear-btn"
+          aria-label="Clear name search"
+          (click)="onNameFilterChange('')"
+          [disabled]="matches.loading()">×</button>
+      </div>
       <label>
         Results Limit:
         <select [(ngModel)]="limit" (change)="onLimitChange()">
@@ -205,6 +224,7 @@ export class MatchesComponent implements OnInit, OnDestroy {
   overlapsLimitOptions = [5,10,15,20,30,40,50];
   limit = 50;
   overlapsLimit: number | null = null;
+  nameFilter: string = '';
   range: 'short_term' | 'medium_term' | 'long_term' = 'medium_term';
   ranges = [
     { value: 'short_term' as const, label: 'Last 4 Weeks', tooltip: 'Short-term listening (past ~4 weeks)' },
@@ -220,6 +240,7 @@ export class MatchesComponent implements OnInit, OnDestroy {
   artistsPerPage = 25;
   showRankInfo = false;
   private limitDebounce: any;
+  private nameDebounce: any;
   // Manual refresh rate limiting (client side safety net) – align with backend 3 / 10s policy (slightly stricter: 1 every 4s, burst 3)
   private refreshTimestamps: number[] = [];
   private refreshMinIntervalMs = 4000; // 4 seconds between manual refresh attempts
@@ -334,6 +355,14 @@ export class MatchesComponent implements OnInit, OnDestroy {
     if (storedRange === 'short_term' || storedRange === 'medium_term' || storedRange === 'long_term') {
       this.range = storedRange;
     }
+    const qName = urlParams.get('userName');
+    const storedName = localStorage.getItem('kmmMatchNameFilter');
+    const initName = (qName ?? storedName ?? '').trim();
+    if (initName) {
+      this.nameFilter = initName;
+      this.matches.setNameFilter(initName);
+      // ensure initial fetch includes filter if it happens later
+    }
   }
   refetch(forceFresh: boolean = false) { this.matches.fetch(this.range, this.limit, this.overlapsLimit, forceFresh); }
   private updateUrlState() {
@@ -341,6 +370,8 @@ export class MatchesComponent implements OnInit, OnDestroy {
     params.set('range', this.range);
     params.set('limit', String(this.limit));
     if (this.overlapsLimit) params.set('overlapsLimit', String(this.overlapsLimit));
+    const nf = (this.nameFilter || '').trim();
+    if (nf) params.set('userName', nf); else params.delete('userName');
     history.replaceState({}, '', this.router.url.split('?')[0] + '?' + params.toString());
   }
   selectRange(r: 'short_term'|'medium_term'|'long_term') {
@@ -385,8 +416,11 @@ export class MatchesComponent implements OnInit, OnDestroy {
   resetControls() {
     this.limit = 50;
     this.overlapsLimit = null;
+    this.nameFilter = '';
+    this.matches.setNameFilter(null);
     localStorage.setItem('kmmMatchLimit', this.limit.toString());
     localStorage.removeItem('kmmOverlapsLimit');
+    localStorage.removeItem('kmmMatchNameFilter');
     this.updateUrlState();
     this.refetch();
   }
@@ -399,6 +433,21 @@ export class MatchesComponent implements OnInit, OnDestroy {
     }
     this.updateUrlState();
     this.refetch();
+  }
+  onNameFilterChange(val: string) {
+    const trimmed = (val || '').trim();
+    this.nameFilter = val;
+    if (this.nameDebounce) clearTimeout(this.nameDebounce);
+    this.nameDebounce = setTimeout(() => {
+      this.matches.setNameFilter(trimmed);
+      if (trimmed) {
+        localStorage.setItem('kmmMatchNameFilter', trimmed);
+      } else {
+        localStorage.removeItem('kmmMatchNameFilter');
+      }
+      this.updateUrlState();
+      this.refetch(true);
+    }, 400);
   }
   back(): void { this.router.navigateByUrl('/chicago-events'); }
   async connectSpotify() { await this.spotify.beginAuth(); }

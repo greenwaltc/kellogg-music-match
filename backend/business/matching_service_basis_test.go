@@ -30,7 +30,18 @@ func (m *mockUserRepoBasis) FindSimilarUsersBySpotifyTopArtists(ctx context.Cont
 	m.artistsCalled++
 	return m.artistResults, nil
 }
+func (m *mockUserRepoBasis) FindSimilarUsersBySpotifyTopArtistsFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string) ([]SimilarUserResult, error) {
+	m.artistsCalled++
+	return m.artistResults, nil
+}
 func (m *mockUserRepoBasis) FindSimilarUsersBySpotifyTopTracks(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]SimilarUserResult, error) {
+	m.tracksCalled++
+	if m.tracksErr != nil {
+		return nil, m.tracksErr
+	}
+	return m.tracksResults, nil
+}
+func (m *mockUserRepoBasis) FindSimilarUsersBySpotifyTopTracksFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string) ([]SimilarUserResult, error) {
 	m.tracksCalled++
 	if m.tracksErr != nil {
 		return nil, m.tracksErr

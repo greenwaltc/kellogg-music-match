@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -89,8 +90,10 @@ type matchRateState struct {
 var (
 	matchRateLimiterMu sync.Mutex
 	matchRateLimiter   = make(map[string]*matchRateState) // key: username (empty allowed for anonymous)
-	matchRateLimitMax  = 3
-	matchRateWindow    = 10 * time.Second
+	// Loosen: allow up to 5 requests within a 10s window
+	matchRateLimitMax = 5
+	// Keep 10s window; UI also debounces to reduce rapid bursts
+	matchRateWindow = 10 * time.Second
 )
 
 // typed context key to store rate header info
@@ -120,13 +123,17 @@ func NewMatchingAPIServiceWrapper(matchingService *business.MatchingService, spo
 }
 
 // FindMusicMatches delegates to business logic
-func (w *MatchingAPIServiceWrapper) FindMusicMatches(ctx context.Context, artistsRequest generated.ArtistsRequest, xUserUsername string, range_ string, basis string, limit int32, overlapsLimit int32) (generated.ImplResponse, error) {
+func (w *MatchingAPIServiceWrapper) FindMusicMatches(ctx context.Context, artistsRequest generated.ArtistsRequest, xUserUsername string, range_ string, basis string, userName string, limit int32, overlapsLimit int32) (generated.ImplResponse, error) {
 	// Inject basis into context for business layer until signature formally extended there (it already reads match_basis)
 	if basis == "" {
 		basis = "artists"
 	}
 	// Provide both typed key (future use) and legacy string key "match_basis" that business layer currently inspects.
 	ctx = context.WithValue(ctx, business.MatchBasisContextKey{}, basis)
+	// Inject optional fuzzy name filter if provided
+	if trimmed := strings.TrimSpace(userName); trimmed != "" {
+		ctx = context.WithValue(ctx, business.MatchNameFilterContextKey{}, trimmed)
+	}
 	username := ""
 	if user, ok := GetUserFromContext(ctx); ok && user.Username != "" {
 		username = user.Username

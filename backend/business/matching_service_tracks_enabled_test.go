@@ -25,7 +25,15 @@ func (m *mockUserRepoTracks) FindSimilarUsersBySpotifyTopArtists(ctx context.Con
 	m.artistsCalled++
 	return nil, nil
 }
+func (m *mockUserRepoTracks) FindSimilarUsersBySpotifyTopArtistsFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string) ([]SimilarUserResult, error) {
+	m.artistsCalled++
+	return nil, nil
+}
 func (m *mockUserRepoTracks) FindSimilarUsersBySpotifyTopTracks(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]SimilarUserResult, error) {
+	m.tracksCalled++
+	return nil, nil
+}
+func (m *mockUserRepoTracks) FindSimilarUsersBySpotifyTopTracksFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string) ([]SimilarUserResult, error) {
 	m.tracksCalled++
 	return nil, nil
 }

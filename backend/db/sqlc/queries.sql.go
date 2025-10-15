@@ -331,6 +331,116 @@ func (q *Queries) FindTopNSimilarUsersBySpotifyArtists(ctx context.Context, arg 
 	return items, nil
 }
 
+const findTopNSimilarUsersBySpotifyArtistsFiltered = `-- name: FindTopNSimilarUsersBySpotifyArtistsFiltered :many
+WITH anchor AS (
+  SELECT v.user_id AS anchor_user_id, v.item_rank AS anchor_item_rank, v.spotify_artist_id, v.name AS anchor_name
+  FROM v_current_spotify_top_artists v
+  WHERE v.user_id = $3 AND v.range = $4 AND v.item_rank <= $5
+), others AS (
+  SELECT v.user_id AS other_user_id, v.item_rank AS other_item_rank, v.spotify_artist_id, v.name AS other_name
+  FROM v_current_spotify_top_artists v
+  WHERE v.user_id <> $3 AND v.range = $4 AND v.item_rank <= $5
+), overlap AS (
+  SELECT o.other_user_id,
+         a.spotify_artist_id,
+         a.anchor_name AS name,
+         a.anchor_item_rank AS anchor_rank,
+         o.other_item_rank AS other_rank,
+         1.0 / (a.anchor_item_rank + o.other_item_rank)::float8 AS weight
+  FROM anchor a
+  JOIN others o USING (spotify_artist_id)
+), agg AS (
+  SELECT other_user_id,
+    SUM(weight)::float8 AS similarity,
+       jsonb_agg(jsonb_build_object(
+         'spotify_artist_id', spotify_artist_id,
+         'name', name,
+         'anchor_rank', anchor_rank,
+         'other_rank', other_rank
+       ) ORDER BY (anchor_rank + other_rank), anchor_rank, other_rank) AS overlaps_json
+  FROM overlap
+  GROUP BY other_user_id
+)
+SELECT u.id AS user_id,
+  u.username,
+  u.first_name,
+  u.last_name,
+  u.program,
+  u.graduation_year,
+  agg.similarity,
+  agg.overlaps_json
+FROM agg
+JOIN users u ON u.id = agg.other_user_id
+WHERE agg.similarity > 0
+  AND (
+    u.first_name ILIKE '%' || $1 || '%'
+    OR u.last_name ILIKE '%' || $1 || '%'
+    OR u.username ILIKE '%' || $1 || '%'
+    OR concat_ws(' ', u.first_name, u.last_name) ILIKE '%' || $1 || '%'
+    OR concat_ws(' ', u.last_name, u.first_name) ILIKE '%' || $1 || '%'
+  )
+ORDER BY agg.similarity DESC, u.created_at ASC
+LIMIT $2
+`
+
+type FindTopNSimilarUsersBySpotifyArtistsFilteredParams struct {
+	NameFilter   pgtype.Text `json:"name_filter"`
+	LimitN       int32       `json:"limit_n"`
+	AnchorUserID uuid.UUID   `json:"anchor_user_id"`
+	Range        string      `json:"range"`
+	TopN         int32       `json:"top_n"`
+}
+
+type FindTopNSimilarUsersBySpotifyArtistsFilteredRow struct {
+	UserID         uuid.UUID   `json:"user_id"`
+	Username       string      `json:"username"`
+	FirstName      string      `json:"first_name"`
+	LastName       string      `json:"last_name"`
+	Program        pgtype.Text `json:"program"`
+	GraduationYear pgtype.Int4 `json:"graduation_year"`
+	Similarity     float64     `json:"similarity"`
+	OverlapsJson   []byte      `json:"overlaps_json"`
+}
+
+// Same as FindTopNSimilarUsersBySpotifyArtists but with a fuzzy name filter on other users
+// Parameters add:
+//
+//	name_filter TEXT   -> case-insensitive partial match against first_name, last_name, or username
+func (q *Queries) FindTopNSimilarUsersBySpotifyArtistsFiltered(ctx context.Context, arg FindTopNSimilarUsersBySpotifyArtistsFilteredParams) ([]FindTopNSimilarUsersBySpotifyArtistsFilteredRow, error) {
+	rows, err := q.db.Query(ctx, findTopNSimilarUsersBySpotifyArtistsFiltered,
+		arg.NameFilter,
+		arg.LimitN,
+		arg.AnchorUserID,
+		arg.Range,
+		arg.TopN,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []FindTopNSimilarUsersBySpotifyArtistsFilteredRow{}
+	for rows.Next() {
+		var i FindTopNSimilarUsersBySpotifyArtistsFilteredRow
+		if err := rows.Scan(
+			&i.UserID,
+			&i.Username,
+			&i.FirstName,
+			&i.LastName,
+			&i.Program,
+			&i.GraduationYear,
+			&i.Similarity,
+			&i.OverlapsJson,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const findTopNSimilarUsersBySpotifyTracks = `-- name: FindTopNSimilarUsersBySpotifyTracks :many
 WITH anchor AS (
   SELECT v.user_id AS anchor_user_id, v.item_rank AS anchor_item_rank, v.spotify_track_id, v.name AS anchor_name
@@ -409,6 +519,113 @@ func (q *Queries) FindTopNSimilarUsersBySpotifyTracks(ctx context.Context, arg F
 	items := []FindTopNSimilarUsersBySpotifyTracksRow{}
 	for rows.Next() {
 		var i FindTopNSimilarUsersBySpotifyTracksRow
+		if err := rows.Scan(
+			&i.UserID,
+			&i.Username,
+			&i.FirstName,
+			&i.LastName,
+			&i.Program,
+			&i.GraduationYear,
+			&i.Similarity,
+			&i.OverlapsJson,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const findTopNSimilarUsersBySpotifyTracksFiltered = `-- name: FindTopNSimilarUsersBySpotifyTracksFiltered :many
+WITH anchor AS (
+  SELECT v.user_id AS anchor_user_id, v.item_rank AS anchor_item_rank, v.spotify_track_id, v.name AS anchor_name
+  FROM v_current_spotify_top_tracks v
+  WHERE v.user_id = $3 AND v.range = $4 AND v.item_rank <= $5
+), others AS (
+  SELECT v.user_id AS other_user_id, v.item_rank AS other_item_rank, v.spotify_track_id, v.name AS other_name
+  FROM v_current_spotify_top_tracks v
+  WHERE v.user_id <> $3 AND v.range = $4 AND v.item_rank <= $5
+), overlap AS (
+  SELECT o.other_user_id,
+         a.spotify_track_id,
+         a.anchor_name AS name,
+         a.anchor_item_rank AS anchor_rank,
+         o.other_item_rank AS other_rank,
+         1.0 / (a.anchor_item_rank + o.other_item_rank)::float8 AS weight
+  FROM anchor a
+  JOIN others o USING (spotify_track_id)
+), agg AS (
+  SELECT other_user_id,
+    SUM(weight)::float8 AS similarity,
+       jsonb_agg(jsonb_build_object(
+         'spotify_track_id', spotify_track_id,
+         'name', name,
+         'anchor_rank', anchor_rank,
+         'other_rank', other_rank
+       ) ORDER BY (anchor_rank + other_rank), anchor_rank, other_rank) AS overlaps_json
+  FROM overlap
+  GROUP BY other_user_id
+)
+SELECT u.id AS user_id,
+     u.username,
+     u.first_name,
+     u.last_name,
+     u.program,
+     u.graduation_year,
+     agg.similarity,
+     agg.overlaps_json
+FROM agg
+JOIN users u ON u.id = agg.other_user_id
+WHERE agg.similarity > 0
+  AND (
+    u.first_name ILIKE '%' || $1 || '%'
+    OR u.last_name ILIKE '%' || $1 || '%'
+    OR u.username ILIKE '%' || $1 || '%'
+    OR concat_ws(' ', u.first_name, u.last_name) ILIKE '%' || $1 || '%'
+    OR concat_ws(' ', u.last_name, u.first_name) ILIKE '%' || $1 || '%'
+  )
+ORDER BY agg.similarity DESC, u.created_at ASC
+LIMIT $2
+`
+
+type FindTopNSimilarUsersBySpotifyTracksFilteredParams struct {
+	NameFilter   pgtype.Text `json:"name_filter"`
+	LimitN       int32       `json:"limit_n"`
+	AnchorUserID uuid.UUID   `json:"anchor_user_id"`
+	Range        string      `json:"range"`
+	TopN         int32       `json:"top_n"`
+}
+
+type FindTopNSimilarUsersBySpotifyTracksFilteredRow struct {
+	UserID         uuid.UUID   `json:"user_id"`
+	Username       string      `json:"username"`
+	FirstName      string      `json:"first_name"`
+	LastName       string      `json:"last_name"`
+	Program        pgtype.Text `json:"program"`
+	GraduationYear pgtype.Int4 `json:"graduation_year"`
+	Similarity     float64     `json:"similarity"`
+	OverlapsJson   []byte      `json:"overlaps_json"`
+}
+
+// Tracks variant with a fuzzy name filter on other users
+func (q *Queries) FindTopNSimilarUsersBySpotifyTracksFiltered(ctx context.Context, arg FindTopNSimilarUsersBySpotifyTracksFilteredParams) ([]FindTopNSimilarUsersBySpotifyTracksFilteredRow, error) {
+	rows, err := q.db.Query(ctx, findTopNSimilarUsersBySpotifyTracksFiltered,
+		arg.NameFilter,
+		arg.LimitN,
+		arg.AnchorUserID,
+		arg.Range,
+		arg.TopN,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []FindTopNSimilarUsersBySpotifyTracksFilteredRow{}
+	for rows.Next() {
+		var i FindTopNSimilarUsersBySpotifyTracksFilteredRow
 		if err := rows.Scan(
 			&i.UserID,
 			&i.Username,

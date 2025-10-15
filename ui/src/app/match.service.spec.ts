@@ -42,4 +42,22 @@ describe('MatchService spotify gating', () => {
     expect(req.request.method).toBe('POST');
     req.flush([]);
   });
+
+  it('includes userName when name filter set', () => {
+    // mark ready to enable fetch path
+    svc.markSpotifyReadyAndRefetch('medium_term');
+    let req = http.expectOne(r => r.url.includes('range=medium_term'));
+    req.flush([]);
+    // set filter and trigger explicit fetch
+    svc.setNameFilter('Jane Doe');
+    svc.fetch('medium_term', 50, null, true);
+    req = http.expectOne(r => r.url.includes('userName=Jane+Doe'));
+    expect(req).toBeTruthy();
+    req.flush([]);
+    // clear filter and expect no userName param
+    svc.setNameFilter('');
+    svc.fetch('medium_term', 50, null, true);
+    req = http.expectOne(r => r.url.startsWith('http://test/findMusicMatches?') && !r.url.includes('userName='));
+    req.flush([]);
+  });
 });
