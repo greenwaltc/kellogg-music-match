@@ -1,7 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 import { Subject } from 'rxjs';
 import { HttpClient } from '@angular/common/http';
-import { environment } from '../environments/environment';
 import { ApiBaseService } from './api-base.service';
 import { ToastService } from './services/toast.service';
 import { AuthService } from './auth.service';

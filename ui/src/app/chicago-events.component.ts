@@ -109,13 +109,11 @@ interface ChicagoEventsResponse {
             <input type="checkbox" [(ngModel)]="onlyWithInterest" (change)="onAnyInterestToggle()" />
             <span>Only events with interested Kellogg students</span>
           </label>
-          <label style="display:inline-flex; align-items:center; gap:.4rem; cursor:pointer; user-select:none; opacity: {{ isAuthenticated ? 1 : 0.6 }};">
+          <label style="display:inline-flex; align-items:center; gap:.5rem; cursor:pointer; user-select:none; opacity: {{ isAuthenticated ? 1 : 0.6 }};">
             <input type="checkbox" [(ngModel)]="onlyMyTopArtists" (change)="onOnlyTopArtistsToggle()" [disabled]="!isAuthenticated" />
-            <span>Only my top artists</span>
-          </label>
-          <label style="display:inline-flex; align-items:center; gap:.35rem; user-select:none;">
-            <span style="opacity:.85;">Top N</span>
-            <input type="number" min="1" max="200" step="1" [(ngModel)]="topNArtists" (change)="onTopNArtistsChange()" [disabled]="!onlyMyTopArtists || !isAuthenticated" style="width:68px; padding:.25rem .4rem; border-radius:6px; border:1px solid var(--color-border); background: var(--color-bg-soft); color: var(--color-text);" />
+            <span>Filter by my top</span>
+            <input aria-label="Top artists count" type="number" min="1" max="200" step="1" [(ngModel)]="topNArtists" (change)="onTopNArtistsChange()" [disabled]="!onlyMyTopArtists || !isAuthenticated" style="width:72px; padding:.25rem .4rem; border-radius:6px; border:1px solid var(--color-border); background: var(--color-bg-soft); color: var(--color-text);" />
+            <span>artists</span>
           </label>
         </div>
         <div style="margin-top:0.75rem; text-align:center; display:flex; justify-content:center; gap:.5rem; flex-wrap:wrap;">
@@ -404,7 +402,7 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
   private ANY_INTEREST_STORAGE_KEY = 'kmm_chi_any_interest';
   // New: Only my top artists filter + Top N
   onlyMyTopArtists = false;
-  topNArtists = 20;
+  topNArtists = 200;
   private ONLY_TOP_STORAGE_KEY = 'kmm_chi_only_top_artists';
   private TOPN_STORAGE_KEY = 'kmm_chi_top_n_artists';
   // Observer scroll throttling
@@ -470,8 +468,8 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
     // Restore Top N value
     try {
       const rawN = localStorage.getItem(this.TOPN_STORAGE_KEY);
-      const n = rawN ? parseInt(rawN, 10) : NaN;
-      if (!isNaN(n) && n >= 1 && n <= 50) this.topNArtists = n;
+  const n = rawN ? parseInt(rawN, 10) : NaN;
+  if (!isNaN(n) && n >= 1 && n <= 200) this.topNArtists = n;
     } catch {}
   }
 
@@ -1002,7 +1000,7 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
 
   onTopNArtistsChange() {
     // Clamp and persist
-    let n = Number(this.topNArtists) || 20;
+  let n = Number(this.topNArtists) || 200;
   n = Math.max(1, Math.min(200, n));
     this.topNArtists = n;
     try { localStorage.setItem(this.TOPN_STORAGE_KEY, String(n)); } catch {}
