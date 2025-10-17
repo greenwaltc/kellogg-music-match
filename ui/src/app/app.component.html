@@ -11,18 +11,12 @@
     <nav *ngIf="isLoggedIn(); else loggedOut" class="nav desktop-nav">
   <a *ngIf="nav.visitedMatches()" routerLink="/matches" routerLinkActive="active">Matches</a>
   <a *ngIf="nav.visitedEvents()" routerLink="/chicago-events" routerLinkActive="active">Chicago Events</a>
-      <span class="perm-status" *ngIf="notifPermission() !== 'granted'">
-        Notifications: {{ notifPermission() }}
-        <a href="https://support.google.com/chrome/answer/3220216?hl=en" target="_blank" rel="noopener noreferrer">Manage</a>
-      </span>
   <button type="button" class="ghost" (click)="toggleTheme()" aria-label="Toggle theme">{{ theme.mode() === 'dark' ? '🌞' : '🌙' }}</button>
-  <button type="button" class="ghost" (click)="testPush()" aria-label="Send test notification">📩 Test notification</button>
       <button type="button" (click)="logout()">Logout</button>
     </nav>
     <ng-template #loggedOut>
       <nav class="nav desktop-nav">
   <button type="button" class="ghost" (click)="toggleTheme()" aria-label="Toggle theme">{{ theme.mode() === 'dark' ? '🌞' : '🌙' }}</button>
-  <button type="button" class="ghost" (click)="testPush()" aria-label="Send test notification">📩 Test notification</button>
       </nav>
     </ng-template>
 
@@ -42,18 +36,12 @@
     <nav *ngIf="isLoggedIn(); else mobileLoggedOut" class="mobile-nav" [class.open]="mobileMenuOpen()">
   <a *ngIf="nav.visitedMatches()" routerLink="/matches" routerLinkActive="active" (click)="closeMobileMenu()">Matches</a>
   <a *ngIf="nav.visitedEvents()" routerLink="/chicago-events" routerLinkActive="active" (click)="closeMobileMenu()">Chicago Events</a>
-      <span class="perm-status" *ngIf="notifPermission() !== 'granted'">
-        Notifications: {{ notifPermission() }}
-        <a href="https://support.google.com/chrome/answer/3220216?hl=en" target="_blank" rel="noopener noreferrer" (click)="$event.stopPropagation()">Manage</a>
-      </span>
   <button type="button" class="ghost" (click)="toggleTheme()" aria-label="Toggle theme">{{ theme.mode() === 'dark' ? '🌞' : '🌙' }}</button>
-  <button type="button" class="ghost" (click)="testPush(); closeMobileMenu()" aria-label="Send test notification">📩 Test notification</button>
       <button type="button" (click)="logout(); closeMobileMenu()">Logout</button>
     </nav>
     <ng-template #mobileLoggedOut>
       <nav class="mobile-nav" [class.open]="mobileMenuOpen()">
   <button type="button" class="ghost" (click)="toggleTheme()" aria-label="Toggle theme">{{ theme.mode() === 'dark' ? '🌞' : '🌙' }}</button>
-  <button type="button" class="ghost" (click)="testPush(); closeMobileMenu()" aria-label="Send test notification">📩 Test notification</button>
       </nav>
     </ng-template>
   </header>
@@ -67,14 +55,6 @@
     <button class="toast-close" (click)="toast.hide()" aria-label="Close">✕</button>
   </div>
   <footer class="site-footer">
-    <div class="footer-content">
-      <div class="footer-links">
-        <a routerLink="/feedback" class="footer-link">Feedback</a>
-        <a routerLink="/roadmap" class="footer-link">Roadmap</a>
-      </div>
-      <div class="footer-text">
-        Made by <a href="https://www.linkedin.com/in/greenwaltc/" target="_blank" rel="noopener noreferrer" class="footer-link">Cameron Greenwalt</a>
-      </div>
-    </div>
+    <a class="footer-cta-link" href="https://forms.gle/o4ngKkPN59psBFmTA" target="_blank" rel="noopener noreferrer" aria-label="Open Feedback Survey in a new tab">Feedback Survey</a>
   </footer>
 </div>
