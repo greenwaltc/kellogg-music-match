@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
+
 	"time"
 
 	webpush "github.com/SherClockHolmes/webpush-go"
@@ -172,7 +172,13 @@ func main() {
 	concertsAdapter := business.NewGeneratedConcertsAdapter(concertAPIService)
 	ConcertsAPIController := generated.NewConcertsAPIController(concertsAdapter)
 
-	router := generated.NewRouter(AuthenticationAPIController, HealthAPIController, MatchingAPIController, FeedbackAPIController, ConcertsAPIController)
+	// Events: create on-demand event search service + adapter
+	tmProxy := concert.NewTicketmasterProxy(&cfg.Ticketmaster)
+	eventsSvc := business.NewEventSearchService(tmProxy)
+	eventsAdapter := business.NewGeneratedEventsAdapter(eventsSvc, cfg)
+	EventsAPIController := generated.NewEventsAPIController(eventsAdapter)
+
+	router := generated.NewRouter(AuthenticationAPIController, HealthAPIController, MatchingAPIController, FeedbackAPIController, ConcertsAPIController, EventsAPIController)
 
 	// Wrap generated router; override /sync/spotify/status with an extended handler that also reports readiness based on DB state.
 	mux := http.NewServeMux()
@@ -213,44 +219,7 @@ func main() {
 		})
 	})
 
-	// When on-demand mode is enabled, expose /events/* aliases that proxy to existing concerts handlers
-	if cfg.Ticketmaster.OnDemand {
-		mux.HandleFunc("/events/search", func(w http.ResponseWriter, r *http.Request) {
-			// For now, delegate to existing /concerts/search route handled by generated router
-			r.URL.Path = "/concerts/search"
-			router.ServeHTTP(w, r)
-		})
-		mux.HandleFunc("/events/associated", func(w http.ResponseWriter, r *http.Request) {
-			// Temporary implementation: reuse Chicago events as "associated" placeholder until repository method is added
-			// In future, wire to repository.GetAssociatedEvents and return without Ticketmaster call
-			r.URL.Path = "/chicago/events"
-			router.ServeHTTP(w, r)
-		})
-		mux.HandleFunc("/events/", func(w http.ResponseWriter, r *http.Request) {
-			// Support /events/{id}/association mapping to existing interest endpoints
-			// Translate paths: POST/DELETE /events/{id}/association -> /concerts/{id}/interest
-			if r.URL.Path == "/events" || r.URL.Path == "/events/" {
-				http.NotFound(w, r)
-				return
-			}
-			// crude split, path like /events/{id}/association
-			parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/events/"), "/")
-			if len(parts) == 2 && parts[1] == "association" {
-				eventID := parts[0]
-				r.URL.Path = "/concerts/" + eventID + "/interest"
-				router.ServeHTTP(w, r)
-				return
-			}
-			// Fallback: GET /events/{id} -> /concerts/{id}
-			if len(parts) == 1 && parts[0] != "" {
-				r.URL.Path = "/concerts/" + parts[0]
-				router.ServeHTTP(w, r)
-				return
-			}
-			http.NotFound(w, r)
-		})
-		logger.L().Info("on-demand /events/* routes registered (temporary proxies)")
-	}
+	// No need for temporary /events proxies now; generated controller will handle them via EventsAPIController
 
 	// Push subscription endpoint
 	mux.HandleFunc("/push/subscribe", NewSubscribeHandler(userRepo))

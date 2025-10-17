@@ -87,6 +87,131 @@ type TicketmasterResponse struct {
 	} `json:"page"`
 }
 
+// DiscoverySearchOptions holds safe, whitelisted filters for on-demand search
+type DiscoverySearchOptions struct {
+	Keyword            string
+	SegmentName        string
+	ClassificationName string
+	CountryCode        string
+	StateCode          string
+	City               string
+	LatLong            string
+	Radius             int
+	StartDateTime      string // RFC3339
+	EndDateTime        string // RFC3339
+	Sort               string
+	Size               int
+	Page               int
+}
+
+// SearchDiscovery performs a flexible Discovery API query using whitelisted options
+func (p *TicketmasterProxy) SearchDiscovery(ctx context.Context, opts DiscoverySearchOptions) (*TicketmasterResponse, error) {
+	tr := otel.Tracer("external.ticketmaster")
+	ctx, span := tr.Start(ctx, "SearchDiscovery")
+	defer span.End()
+
+	params := url.Values{}
+	params.Set("apikey", p.config.ConsumerKey)
+	params.Set("locale", "*")
+
+	// Whitelisted params
+	if opts.Keyword != "" {
+		params.Set("keyword", opts.Keyword)
+		span.SetAttributes(attribute.String("ticketmaster.keyword", opts.Keyword))
+	}
+	if opts.SegmentName != "" {
+		params.Set("segmentName", opts.SegmentName)
+		span.SetAttributes(attribute.String("ticketmaster.segmentName", opts.SegmentName))
+	}
+	if opts.ClassificationName != "" {
+		params.Set("classificationName", opts.ClassificationName)
+		span.SetAttributes(attribute.String("ticketmaster.classificationName", opts.ClassificationName))
+	}
+	if opts.CountryCode != "" {
+		params.Set("countryCode", opts.CountryCode)
+	}
+	if opts.StateCode != "" {
+		params.Set("stateCode", opts.StateCode)
+	}
+	if opts.City != "" {
+		params.Set("city", opts.City)
+	}
+	// Geo
+	if opts.LatLong != "" {
+		params.Set("latlong", opts.LatLong)
+		if opts.Radius > 0 {
+			params.Set("radius", fmt.Sprintf("%d", opts.Radius))
+			if p.config.RadiusUnit != "" {
+				params.Set("unit", p.config.RadiusUnit)
+			}
+		}
+	}
+	// Dates
+	if opts.StartDateTime != "" {
+		params.Set("startDateTime", opts.StartDateTime)
+	}
+	if opts.EndDateTime != "" {
+		params.Set("endDateTime", opts.EndDateTime)
+	}
+	// Sort
+	if opts.Sort != "" {
+		params.Set("sort", opts.Sort)
+	}
+	// Pagination
+	size := opts.Size
+	if size <= 0 || size > 50 {
+		size = 20
+	}
+	page := opts.Page
+	if page < 0 {
+		page = 0
+	}
+	params.Set("size", fmt.Sprintf("%d", size))
+	params.Set("page", fmt.Sprintf("%d", page))
+
+	fullURL := fmt.Sprintf("%s/events.json?%s", p.config.BaseURL, params.Encode())
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fullURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "KelloggMusicMatch/1.0")
+
+	resp, err := p.httpClient.Do(req)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		span.SetAttributes(attribute.Int("http.status_code", resp.StatusCode))
+		span.SetStatus(codes.Error, fmt.Sprintf("status %d", resp.StatusCode))
+		bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+		preview := string(bodyBytes)
+		if len(preview) > 512 {
+			preview = preview[:512]
+		}
+		span.SetAttributes(attribute.String("ticketmaster.error_body", preview))
+		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, strings.TrimSpace(preview))
+	}
+
+	var tmResponse TicketmasterResponse
+	if err := json.NewDecoder(resp.Body).Decode(&tmResponse); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+	span.SetAttributes(
+		attribute.Int("app.events", len(tmResponse.Embedded.Events)),
+		attribute.Int("ticketmaster.page_number", tmResponse.Page.Number),
+		attribute.Int("ticketmaster.page_totalPages", tmResponse.Page.TotalPages),
+		attribute.Int("ticketmaster.page_totalElements", tmResponse.Page.TotalElements),
+	)
+	return &tmResponse, nil
+}
+
 // NewTicketmasterProxy creates a new instance of TicketmasterProxy
 func NewTicketmasterProxy(cfg *config.TicketmasterConfig) *TicketmasterProxy {
 	timeout := time.Duration(cfg.Timeout) * time.Second
