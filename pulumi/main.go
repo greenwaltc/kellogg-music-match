@@ -80,6 +80,8 @@ func main() {
 		tmCountry := get("ticketmasterDefaultCountry", "US")
 		// Inter-page delay for Ticketmaster pagination (ms)
 		tmPageDelayMs := get("ticketmasterPageDelayMs", "250")
+        // Feature flag: on-demand Ticketmaster mode (default disabled to preserve legacy sync)
+        tmOnDemand := getBoolStr("ticketmasterOnDemand", false)
 		emailEnabled := getBoolStr("emailEnabled", true)
 		emailProvider := get("emailProvider", "sendgrid")
 		emailFromEmail := get("emailFromEmail", "support@kelloggmatch.com")
@@ -437,6 +439,8 @@ func main() {
 									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_DEFAULT_COUNTRY"), Value: tmCountry},
 									// Pagination pacing between Ticketmaster page requests (milliseconds)
 									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_PAGE_DELAY_MS"), Value: tmPageDelayMs},
+									// Feature flag: enable on-demand TM search mode (disables background sync in backend)
+									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_ON_DEMAND"), Value: tmOnDemand},
 									// Optional geo override
 									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_GEO_LATLONG"), Value: geoLatLong},
 									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_RADIUS"), Value: geoRadius},

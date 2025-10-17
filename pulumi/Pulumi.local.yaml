@@ -1,2 +1,3 @@
 config:
   kellogg-music-match:ingressClass: "nginx"
+  kellogg-music-match:ticketmasterOnDemand: "false"

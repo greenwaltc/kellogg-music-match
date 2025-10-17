@@ -4,6 +4,7 @@
 ##   docker build --build-arg DEBUG=true -t backend:debug ./backend  (debug build)
 ## Runtime:
 ##   Set ENV DEBUG=true to launch under Delve (only works if built with DEBUG=true so dlv is present)
+##   Set ENV TICKETMASTER_ON_DEMAND=true to enable on-demand Ticketmaster mode (disables background sync)
 
 ARG DEBUG=false
 

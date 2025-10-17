@@ -67,6 +67,7 @@ config:
   kellogg-music-match:ticketmasterRadius: "50"
   kellogg-music-match:ticketmasterRadiusUnit: miles
   kellogg-music-match:ticketmasterTimeout: "30"
+  kellogg-music-match:ticketmasterOnDemand: "false"
   kellogg-music-match:tracingEnabled: "true"
   kellogg-music-match:tracingExporter: otlp
   kellogg-music-match:uiCpuLimit: 300m

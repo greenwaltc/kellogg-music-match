@@ -82,6 +82,8 @@ type TicketmasterConfig struct {
 	Radius      int    // distance from geo point
 	RadiusUnit  string // miles (default) or km
 	PageDelayMs int    // delay between paginated requests (milliseconds)
+	// Feature flag to enable on-demand Ticketmaster search and disable background ingest
+	OnDemand bool // when true, backend serves /events/* endpoints and disables sync job
 }
 
 // DebugConfig holds debug-related configuration
@@ -189,6 +191,7 @@ func Load() *Config {
 			Radius:          getEnvIntWithDefault("TICKETMASTER_RADIUS", 0),
 			RadiusUnit:      getEnvWithDefault("TICKETMASTER_RADIUS_UNIT", "miles"),
 			PageDelayMs:     getEnvIntWithDefault("TICKETMASTER_PAGE_DELAY_MS", 250),
+			OnDemand:        getEnvBoolWithDefault("TICKETMASTER_ON_DEMAND", false),
 		},
 		Debug: DebugConfig{
 			Enabled: getEnvBoolWithDefault("DEBUG_ENABLED", false),

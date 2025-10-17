@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	webpush "github.com/SherClockHolmes/webpush-go"
@@ -101,7 +102,7 @@ func main() {
 	// Initialize concert API service (will be enhanced with repository if available)
 	var concertAPIService *business.ConcertAPIService
 
-	// Initialize concert synchronization service
+	// Initialize concert synchronization service (disabled in on-demand mode)
 	var concertSyncService *concert.SyncService
 
 	// Try to initialize concert service with Ticketmaster API
@@ -128,17 +129,19 @@ func main() {
 			// Create concert API service with repository access
 			concertAPIService = business.NewConcertAPIServiceWithRepository(eventProvider, concertRepo, cfg)
 
-			// Initialize and start concert sync service
-			concertSyncService = concert.NewSyncService(eventProvider, concertRepo, cfg)
-
-			// Start the sync service in a separate goroutine
-			go func() {
-				if err := concertSyncService.Start(context.Background()); err != nil {
-					logger.L().Error("concert sync start failed", "error", err)
-				}
-			}()
-
-			logger.L().Info("concert sync scheduled", "intervalHours", 24)
+			// Initialize and start concert sync service only when not in on-demand mode
+			if !cfg.Ticketmaster.OnDemand {
+				concertSyncService = concert.NewSyncService(eventProvider, concertRepo, cfg)
+				// Start the sync service in a separate goroutine
+				go func() {
+					if err := concertSyncService.Start(context.Background()); err != nil {
+						logger.L().Error("concert sync start failed", "error", err)
+					}
+				}()
+				logger.L().Info("concert sync scheduled", "intervalHours", 24)
+			} else {
+				logger.L().Info("on-demand Ticketmaster mode enabled: background sync disabled")
+			}
 
 			// Ensure graceful shutdown of sync service
 			defer func() {
@@ -209,6 +212,45 @@ func main() {
 			"ready":   ready,
 		})
 	})
+
+	// When on-demand mode is enabled, expose /events/* aliases that proxy to existing concerts handlers
+	if cfg.Ticketmaster.OnDemand {
+		mux.HandleFunc("/events/search", func(w http.ResponseWriter, r *http.Request) {
+			// For now, delegate to existing /concerts/search route handled by generated router
+			r.URL.Path = "/concerts/search"
+			router.ServeHTTP(w, r)
+		})
+		mux.HandleFunc("/events/associated", func(w http.ResponseWriter, r *http.Request) {
+			// Temporary implementation: reuse Chicago events as "associated" placeholder until repository method is added
+			// In future, wire to repository.GetAssociatedEvents and return without Ticketmaster call
+			r.URL.Path = "/chicago/events"
+			router.ServeHTTP(w, r)
+		})
+		mux.HandleFunc("/events/", func(w http.ResponseWriter, r *http.Request) {
+			// Support /events/{id}/association mapping to existing interest endpoints
+			// Translate paths: POST/DELETE /events/{id}/association -> /concerts/{id}/interest
+			if r.URL.Path == "/events" || r.URL.Path == "/events/" {
+				http.NotFound(w, r)
+				return
+			}
+			// crude split, path like /events/{id}/association
+			parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/events/"), "/")
+			if len(parts) == 2 && parts[1] == "association" {
+				eventID := parts[0]
+				r.URL.Path = "/concerts/" + eventID + "/interest"
+				router.ServeHTTP(w, r)
+				return
+			}
+			// Fallback: GET /events/{id} -> /concerts/{id}
+			if len(parts) == 1 && parts[0] != "" {
+				r.URL.Path = "/concerts/" + parts[0]
+				router.ServeHTTP(w, r)
+				return
+			}
+			http.NotFound(w, r)
+		})
+		logger.L().Info("on-demand /events/* routes registered (temporary proxies)")
+	}
 
 	// Push subscription endpoint
 	mux.HandleFunc("/push/subscribe", NewSubscribeHandler(userRepo))
