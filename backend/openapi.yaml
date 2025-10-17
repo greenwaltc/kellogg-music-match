@@ -32,6 +32,8 @@ tags:
     description: Music taste matching and artist management
   - name: Concerts
     description: Concert and event discovery operations
+  - name: Events
+    description: On-demand Ticketmaster events search and association operations (new)
   - name: Feedback
     description: User feedback and suggestions
   - name: Health
@@ -212,6 +214,7 @@ paths:
       tags:
         - Concerts
       summary: Set or update the authenticated user's interest for an event
+      deprecated: true
       operationId: setEventInterest
       parameters:
         - name: eventId
@@ -257,6 +260,7 @@ paths:
       tags:
         - Concerts
       summary: Remove the authenticated user's interest for an event
+      deprecated: true
       operationId: removeEventInterest
       parameters:
         - name: eventId
@@ -742,6 +746,7 @@ paths:
         - Concerts
       summary: Search for upcoming concerts
       description: Search for upcoming concerts based on criteria like artist, location, or genre
+      deprecated: true
       operationId: searchConcerts
       parameters:
         - name: artist
@@ -845,6 +850,7 @@ paths:
         - Concerts
       summary: Get concert details by ID
       description: Retrieve detailed information about a specific concert event
+      deprecated: true
       operationId: getConcertById
       parameters:
         - name: eventId
@@ -883,6 +889,7 @@ paths:
         Retrieve upcoming concert events in the Chicago area with optional artist name filtering.
         Results are sorted chronologically (soonest first) and support efficient pagination.
         You can also filter to only events that currently have at least one user interest recorded.
+      deprecated: true
       operationId: getChicagoEvents
       parameters:
         - name: artistName
@@ -964,6 +971,7 @@ paths:
         - Concerts
       summary: Get a single Chicago event by ID (with interest enrichment)
       description: Retrieve a single Chicago event from the local database including aggregated interest user name buckets.
+      deprecated: true
       operationId: getChicagoEventById
       parameters:
         - name: eventId
@@ -992,8 +1000,396 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /events/search:
+    get:
+      tags:
+        - Events
+      summary: On-demand Ticketmaster event search
+      description: |
+        Search Ticketmaster events on-demand and optionally merge local association overlays.
+        Server enforces safe parameter whitelisting and caps page size to 50.
+      operationId: searchEvents
+      parameters:
+        - name: keyword
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 200
+          description: Free-text keyword search
+        - name: segmentName
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Ticketmaster segment name (e.g., Music)
+        - name: classificationName
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Ticketmaster classification/type
+        - name: countryCode
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 2
+          description: ISO 3166-1 alpha-2 country code (e.g., US)
+        - name: stateCode
+          in: query
+          required: false
+          schema:
+            type: string
+          description: State/province code
+        - name: city
+          in: query
+          required: false
+          schema:
+            type: string
+          description: City name
+        - name: latlong
+          in: query
+          required: false
+          schema:
+            type: string
+            pattern: "^-?\\d{1,2}\\.\\d+,-?\\d{1,3}\\.\\d+$"
+          description: Latitude,Longitude (e.g., 41.8781,-87.6298)
+        - name: radius
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+          description: Search radius in miles (requires latlong)
+        - name: startDateTime
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Start of date range (inclusive, UTC)
+        - name: endDateTime
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: End of date range (inclusive, UTC)
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            example: "date,asc"
+          description: Sort order (Ticketmaster format)
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+          description: Results per page (max 50)
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: Zero-based page index
+        - name: includeAssociated
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: true
+          description: If true, overlay local association info on matching events
+      responses:
+        '200':
+          description: Event search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventsPage'
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limited; client should back off
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /events/associated:
+    get:
+      tags:
+        - Events
+      summary: List all locally associated events
+      description: Returns events with at least one user association from the local database only.
+      operationId: getAssociatedEvents
+      parameters:
+        - name: startDateTime
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: endDateTime
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: segmentName
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: city
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Associated events page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventsPage'
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /events/{eventId}/association:
+    post:
+      tags:
+        - Events
+      summary: Set association status for an event
+      description: Create or update the current user's association status. Creates local event row on first association.
+      operationId: setEventAssociation
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Event external or internal identifier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetAssociationRequest'
+      responses:
+        '204':
+          description: Association updated
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Event not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags:
+        - Events
+      summary: Remove association for an event
+      description: Removes the current user's association. Deletes local event row when last association is removed.
+      operationId: removeEventAssociation
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Association removed
+        '404':
+          description: Event not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
 components:
   schemas:
+    # New unified event schemas for on-demand Ticketmaster endpoints
+    EventAssociation:
+      type: object
+      description: Association overlay with current user's status and aggregate counts
+      properties:
+        myStatus:
+          allOf:
+            - $ref: '#/components/schemas/EventInterestType'
+          nullable: true
+          description: Current user's association status or null if none
+        interestedCount:
+          type: integer
+          minimum: 0
+          description: Number of users marked INTERESTED
+        goingCount:
+          type: integer
+          minimum: 0
+          description: Number of users marked GOING
+        lfgCount:
+          type: integer
+          minimum: 0
+          description: Number of users marked LOOKING_FOR_GROUP
+        recentUsers:
+          type: array
+          description: Optional recent user full names associated with this event (sampled)
+          items:
+            type: string
+      required:
+        - interestedCount
+        - goingCount
+        - lfgCount
+
+    Event:
+      type: object
+      description: Normalized event returned from Ticketmaster search or local associations
+      properties:
+        id:
+          type: string
+          nullable: true
+          description: Internal event ID if persisted locally; null for pure on-demand results
+          example: "2d3b0f7e-0f2e-4d90-8a5e-8b9b9d1a0c3f"
+        externalId:
+          type: string
+          description: External source ID (e.g., Ticketmaster ID)
+          example: "G5vYZ9AJWlhKo"
+        source:
+          type: string
+          description: Event source system identifier
+          example: "ticketmaster"
+        name:
+          type: string
+          description: Event display name
+          example: "Taylor Swift | The Eras Tour"
+        startUtc:
+          type: string
+          format: date-time
+          description: Event start time in UTC
+          example: "2025-07-04T00:30:00Z"
+        url:
+          type: string
+          format: uri
+          description: Link to purchase or view tickets/details
+          example: "https://www.ticketmaster.com/event/123"
+        venue:
+          $ref: '#/components/schemas/Venue'
+        location:
+          type: object
+          description: Location summary for filtering and display
+          properties:
+            city:
+              type: string
+              example: "Chicago"
+            state:
+              type: string
+              example: "IL"
+            country:
+              type: string
+              example: "US"
+        association:
+          $ref: '#/components/schemas/EventAssociation'
+      required:
+        - externalId
+        - name
+        - startUtc
+        - url
+
+    EventsPage:
+      type: object
+      description: Paginated event response
+      properties:
+        page:
+          type: integer
+          minimum: 0
+          description: Zero-based page index
+        size:
+          type: integer
+          minimum: 1
+          description: Page size
+        total:
+          type: integer
+          minimum: 0
+          description: Total matching items in primary source (TM for /search; local for /associated)
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Event'
+      required:
+        - page
+        - size
+        - total
+        - items
+
+    SetAssociationRequest:
+      type: object
+      description: Request to set the current user's association status for an event
+      properties:
+        status:
+          $ref: '#/components/schemas/EventInterestType'
+      required:
+        - status
     SpotifySyncStartRequest:
       type: object
       description: Payload sent by the frontend after redirect carrying the authorization code & original state
