@@ -1015,6 +1015,7 @@ paths:
           required: false
           schema:
             type: string
+            minLength: 1
             maxLength: 200
           description: Free-text keyword search
         - name: segmentName
@@ -1022,31 +1023,35 @@ paths:
           required: false
           schema:
             type: string
+            maxLength: 100
           description: Ticketmaster segment name (e.g., Music)
         - name: classificationName
           in: query
           required: false
           schema:
             type: string
+            maxLength: 100
           description: Ticketmaster classification/type
         - name: countryCode
           in: query
           required: false
           schema:
             type: string
-            maxLength: 2
+            pattern: "^[A-Z]{2}$"
           description: ISO 3166-1 alpha-2 country code (e.g., US)
         - name: stateCode
           in: query
           required: false
           schema:
             type: string
-          description: State/province code
+            pattern: "^[A-Z]{2,3}$"
+          description: State/province code (e.g., IL, CA, ON)
         - name: city
           in: query
           required: false
           schema:
             type: string
+            maxLength: 80
           description: City name
         - name: latlong
           in: query
@@ -1082,8 +1087,9 @@ paths:
           required: false
           schema:
             type: string
-            example: "date,asc"
-          description: Sort order (Ticketmaster format)
+            enum: ["date,asc", "date,desc", "name,asc", "name,desc", "relevance,desc", "distance,asc"]
+            default: "date,asc"
+          description: Whitelisted sort orders (subset of Ticketmaster supported values)
         - name: size
           in: query
           required: false
@@ -1099,6 +1105,7 @@ paths:
           schema:
             type: integer
             minimum: 0
+            maximum: 1000
             default: 0
           description: Zero-based page index
         - name: includeAssociated

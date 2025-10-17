@@ -77,6 +77,28 @@ type ConcertEventArtist struct {
 	CreatedAt pgtype.Timestamp `json:"created_at"`
 }
 
+// Minimal on-demand event snapshot (Ticketmaster and future sources). Rows exist only when at least one user association is present.
+type Event struct {
+	ID         uuid.UUID          `json:"id"`
+	Source     string             `json:"source"`
+	ExternalID string             `json:"external_id"`
+	Name       string             `json:"name"`
+	Venue      pgtype.Text        `json:"venue"`
+	City       pgtype.Text        `json:"city"`
+	State      pgtype.Text        `json:"state"`
+	Country    pgtype.Text        `json:"country"`
+	StartUtc   pgtype.Timestamptz `json:"start_utc"`
+	Url        pgtype.Text        `json:"url"`
+	// Minimal raw event payload snapshot for rendering; not a full denormalization.
+	RawJson   []byte             `json:"raw_json"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	// High-level Ticketmaster segment (e.g., Music, Sports, Arts & Theatre)
+	SegmentName pgtype.Text `json:"segment_name"`
+	// Finer classification/type within the segment (e.g., Rock, Football)
+	ClassificationName pgtype.Text `json:"classification_name"`
+}
+
 type Feedback struct {
 	ID           int32              `json:"id"`
 	UserID       uuid.UUID          `json:"user_id"`
@@ -199,6 +221,15 @@ type UserConcertEventInterest struct {
 	InterestStatus string `json:"interest_status"`
 	// Optional free-form note by user about their attendance plans
 	Note      pgtype.Text        `json:"note"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+// User association state for events: INTERESTED | GOING | LOOKING_FOR_GROUP
+type UserEventAssociation struct {
+	UserID    uuid.UUID          `json:"user_id"`
+	EventID   uuid.UUID          `json:"event_id"`
+	Status    string             `json:"status"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
