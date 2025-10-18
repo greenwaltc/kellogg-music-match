@@ -10,7 +10,7 @@
     <!-- Desktop Navigation -->
     <nav *ngIf="isLoggedIn(); else loggedOut" class="nav desktop-nav">
   <a *ngIf="nav.visitedMatches()" routerLink="/matches" routerLinkActive="active">Matches</a>
-  <a *ngIf="nav.visitedEvents()" routerLink="/chicago-events" routerLinkActive="active">Chicago Events</a>
+  <a *ngIf="nav.visitedEvents()" routerLink="/events" routerLinkActive="active">Events</a>
   <button type="button" class="ghost" (click)="toggleTheme()" aria-label="Toggle theme">{{ theme.mode() === 'dark' ? '🌞' : '🌙' }}</button>
       <button type="button" (click)="logout()">Logout</button>
     </nav>
@@ -35,7 +35,7 @@
     <!-- Mobile Navigation Menu -->
     <nav *ngIf="isLoggedIn(); else mobileLoggedOut" class="mobile-nav" [class.open]="mobileMenuOpen()">
   <a *ngIf="nav.visitedMatches()" routerLink="/matches" routerLinkActive="active" (click)="closeMobileMenu()">Matches</a>
-  <a *ngIf="nav.visitedEvents()" routerLink="/chicago-events" routerLinkActive="active" (click)="closeMobileMenu()">Chicago Events</a>
+  <a *ngIf="nav.visitedEvents()" routerLink="/events" routerLinkActive="active" (click)="closeMobileMenu()">Events</a>
   <button type="button" class="ghost" (click)="toggleTheme()" aria-label="Toggle theme">{{ theme.mode() === 'dark' ? '🌞' : '🌙' }}</button>
       <button type="button" (click)="logout(); closeMobileMenu()">Logout</button>
     </nav>
