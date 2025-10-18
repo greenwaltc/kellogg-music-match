@@ -104,6 +104,8 @@ func main() {
 
 	// Initialize concert synchronization service (disabled in on-demand mode)
 	var concertSyncService *concert.SyncService
+	// Initialize cleanup service (always enabled)
+	var cleanupService *business.CleanupService
 
 	// Try to initialize concert service with Ticketmaster API
 	tempConcertAPIService := business.NewConcertAPIService(cfg)
@@ -179,6 +181,9 @@ func main() {
 	if pr, ok := userRepo.(*business.PostgreSQLUserRepository); ok && pr.Pool() != nil {
 		queries := sqlc.New(pr.Pool())
 		eventsAdapter = business.NewGeneratedEventsAdapterWithQuerier(eventsSvc, cfg, queries)
+		// Start cleanup service
+		cleanupService = business.NewCleanupService(queries)
+		go cleanupService.Start(context.Background())
 	} else {
 		eventsAdapter = business.NewGeneratedEventsAdapter(eventsSvc, cfg)
 	}
@@ -244,6 +249,11 @@ func main() {
 	logger.L().Info("server listening", "addr", serverAddr, "cors.origins", cfg.CORS.AllowedOrigins)
 	if err := http.ListenAndServe(serverAddr, corsRouter); err != nil {
 		logger.L().Error("server crashed", "error", err)
+	}
+
+	// Stop cleanup service on shutdown
+	if cleanupService != nil {
+		cleanupService.Stop()
 	}
 }
 

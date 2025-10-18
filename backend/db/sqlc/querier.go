@@ -23,9 +23,12 @@ type Querier interface {
 	// Users
 	// =======================
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	// Cleanup orphaned and past on-demand events (events + user_event_associations)
+	DeleteAllOrphanedEvents(ctx context.Context) error
 	DeleteEventIfNoAssociations(ctx context.Context, eventID uuid.UUID) error
 	DeleteExpiredPasswordResetTokens(ctx context.Context) error
 	DeleteOldConcertEvents(ctx context.Context, cutoffDate pgtype.Timestamp) error
+	DeletePastEvents(ctx context.Context, cutoffDate pgtype.Timestamptz) error
 	DeletePushSubscriptionByEndpoint(ctx context.Context, endpoint string) error
 	DeleteSpotifyTopArtistSnapshotForRange(ctx context.Context, arg DeleteSpotifyTopArtistSnapshotForRangeParams) error
 	DeleteSpotifyTopTrackSnapshotForRange(ctx context.Context, arg DeleteSpotifyTopTrackSnapshotForRangeParams) error

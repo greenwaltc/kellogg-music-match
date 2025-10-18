@@ -117,6 +117,19 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 	return i, err
 }
 
+const deleteAllOrphanedEvents = `-- name: DeleteAllOrphanedEvents :exec
+DELETE FROM events e
+WHERE NOT EXISTS (
+  SELECT 1 FROM user_event_associations uea WHERE uea.event_id = e.id
+)
+`
+
+// Cleanup orphaned and past on-demand events (events + user_event_associations)
+func (q *Queries) DeleteAllOrphanedEvents(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, deleteAllOrphanedEvents)
+	return err
+}
+
 const deleteEventIfNoAssociations = `-- name: DeleteEventIfNoAssociations :exec
 DELETE FROM events e
 WHERE e.id = $1
@@ -145,6 +158,16 @@ WHERE event_date < $1
 
 func (q *Queries) DeleteOldConcertEvents(ctx context.Context, cutoffDate pgtype.Timestamp) error {
 	_, err := q.db.Exec(ctx, deleteOldConcertEvents, cutoffDate)
+	return err
+}
+
+const deletePastEvents = `-- name: DeletePastEvents :exec
+DELETE FROM events 
+WHERE start_utc < $1
+`
+
+func (q *Queries) DeletePastEvents(ctx context.Context, cutoffDate pgtype.Timestamptz) error {
+	_, err := q.db.Exec(ctx, deletePastEvents, cutoffDate)
 	return err
 }
 

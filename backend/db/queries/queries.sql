@@ -622,6 +622,17 @@ DELETE FROM push_subscriptions WHERE endpoint = sqlc.arg(endpoint);
 DELETE FROM concert_events 
 WHERE event_date < sqlc.arg(cutoff_date);
 
+-- Cleanup orphaned and past on-demand events (events + user_event_associations)
+-- name: DeleteAllOrphanedEvents :exec
+DELETE FROM events e
+WHERE NOT EXISTS (
+  SELECT 1 FROM user_event_associations uea WHERE uea.event_id = e.id
+);
+
+-- name: DeletePastEvents :exec
+DELETE FROM events 
+WHERE start_utc < sqlc.arg(cutoff_date);
+
 -- name: GetConcertEventCount :one
 -- Optional interest_status filter: if provided (non-empty), counts events having at least one user with that status
 SELECT COUNT(DISTINCT ce.id)
