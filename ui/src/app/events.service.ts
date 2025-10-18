@@ -78,6 +78,17 @@ export class EventsService {
     return this.http.get<EventsPage>(this.api.url('/events/search'), { params });
   }
 
+  // Fetch all locally associated events (no Ticketmaster call). Optional filters and pagination.
+  getAssociated(params: { startDateTime?: string; endDateTime?: string; segmentName?: string; city?: string } = {}, page = 0, size = 20): Observable<EventsPage> {
+    let q = new HttpParams().set('page', String(page)).set('size', String(size));
+    const add = (k: string, v: any) => { if (v !== undefined && v !== null && v !== '') q = q.set(k, String(v)); };
+    add('startDateTime', params.startDateTime);
+    add('endDateTime', params.endDateTime);
+    add('segmentName', params.segmentName);
+    add('city', params.city);
+    return this.http.get<EventsPage>(this.api.url('/events/associated'), { params: q });
+  }
+
   setAssociation(eventId: string, status: 'INTERESTED'|'GOING'|'LFG'|'NONE') {
     const body = { status } as any;
     return this.http.post(this.api.url(`/events/${encodeURIComponent(eventId)}/association`), body);

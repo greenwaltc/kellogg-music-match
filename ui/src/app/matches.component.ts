@@ -17,6 +17,9 @@ import { TooltipDirective } from './tooltip.directive';
   <section class="matches-page">
     <div class="ptr-indicator" *ngIf="pullHintVisible">↓ Release to refresh</div>
     <h2>Your Top Music Matches ({{ matches.basis() | titlecase }})</h2>
+    <div class="associated-shortcut">
+      <a routerLink="/events/associated" class="link-tile" aria-label="View all associated events">⭐ View all associated events</a>
+    </div>
     <!-- Pre-Spotify connection placeholder -->
     <div *ngIf="!matches.spotifyReady()" class="pre-connect-placeholder">
       <div class="placeholder-panel">
