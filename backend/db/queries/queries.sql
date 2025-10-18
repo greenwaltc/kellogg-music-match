@@ -441,6 +441,45 @@ GROUP BY e.id
 ORDER BY e.start_utc ASC
 LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off_set);
 
+-- name: GetEventByID :one
+SELECT * FROM events WHERE id = sqlc.arg(id) LIMIT 1;
+
+-- name: GetEventBySourceExternal :one
+SELECT * FROM events WHERE source = sqlc.arg(source) AND external_id = sqlc.arg(external_id) LIMIT 1;
+
+-- name: InsertEvent :one
+INSERT INTO events (source, external_id, name, venue, city, state, country, start_utc, url, raw_json, segment_name, classification_name)
+VALUES (
+  COALESCE(sqlc.arg(source), 'ticketmaster'),
+  sqlc.arg(external_id),
+  sqlc.arg(name),
+  sqlc.arg(venue),
+  sqlc.arg(city),
+  sqlc.arg(state),
+  sqlc.arg(country),
+  sqlc.arg(start_utc),
+  sqlc.arg(url),
+  sqlc.arg(raw_json),
+  sqlc.arg(segment_name),
+  sqlc.arg(classification_name)
+)
+RETURNING *;
+
+-- name: UpsertUserEventAssociation :exec
+INSERT INTO user_event_associations (user_id, event_id, status)
+VALUES (sqlc.arg(user_id), sqlc.arg(event_id), sqlc.arg(status))
+ON CONFLICT (user_id, event_id) DO UPDATE SET
+  status = EXCLUDED.status,
+  updated_at = NOW();
+
+-- name: DeleteUserEventAssociation :exec
+DELETE FROM user_event_associations WHERE user_id = sqlc.arg(user_id) AND event_id = sqlc.arg(event_id);
+
+-- name: DeleteEventIfNoAssociations :exec
+DELETE FROM events e
+WHERE e.id = sqlc.arg(event_id)
+  AND NOT EXISTS (SELECT 1 FROM user_event_associations uea WHERE uea.event_id = e.id);
+
 -- name: FindTopNSimilarUsersBySpotifyTracksFiltered :many
 -- Tracks variant with a fuzzy name filter on other users
 WITH anchor AS (

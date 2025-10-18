@@ -117,6 +117,17 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 	return i, err
 }
 
+const deleteEventIfNoAssociations = `-- name: DeleteEventIfNoAssociations :exec
+DELETE FROM events e
+WHERE e.id = $1
+  AND NOT EXISTS (SELECT 1 FROM user_event_associations uea WHERE uea.event_id = e.id)
+`
+
+func (q *Queries) DeleteEventIfNoAssociations(ctx context.Context, eventID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteEventIfNoAssociations, eventID)
+	return err
+}
+
 const deleteExpiredPasswordResetTokens = `-- name: DeleteExpiredPasswordResetTokens :exec
 DELETE FROM password_reset_tokens 
 WHERE expires_at < NOW() - INTERVAL '1 hour'
@@ -199,6 +210,20 @@ type DeleteUserConcertEventInterestParams struct {
 
 func (q *Queries) DeleteUserConcertEventInterest(ctx context.Context, arg DeleteUserConcertEventInterestParams) error {
 	_, err := q.db.Exec(ctx, deleteUserConcertEventInterest, arg.UserID, arg.EventID)
+	return err
+}
+
+const deleteUserEventAssociation = `-- name: DeleteUserEventAssociation :exec
+DELETE FROM user_event_associations WHERE user_id = $1 AND event_id = $2
+`
+
+type DeleteUserEventAssociationParams struct {
+	UserID  uuid.UUID `json:"user_id"`
+	EventID uuid.UUID `json:"event_id"`
+}
+
+func (q *Queries) DeleteUserEventAssociation(ctx context.Context, arg DeleteUserEventAssociationParams) error {
+	_, err := q.db.Exec(ctx, deleteUserEventAssociation, arg.UserID, arg.EventID)
 	return err
 }
 
@@ -1440,6 +1465,65 @@ func (q *Queries) GetEventArtists(ctx context.Context, eventID string) ([]GetEve
 	return items, nil
 }
 
+const getEventByID = `-- name: GetEventByID :one
+SELECT id, source, external_id, name, venue, city, state, country, start_utc, url, raw_json, created_at, updated_at, segment_name, classification_name FROM events WHERE id = $1 LIMIT 1
+`
+
+func (q *Queries) GetEventByID(ctx context.Context, id uuid.UUID) (Event, error) {
+	row := q.db.QueryRow(ctx, getEventByID, id)
+	var i Event
+	err := row.Scan(
+		&i.ID,
+		&i.Source,
+		&i.ExternalID,
+		&i.Name,
+		&i.Venue,
+		&i.City,
+		&i.State,
+		&i.Country,
+		&i.StartUtc,
+		&i.Url,
+		&i.RawJson,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.SegmentName,
+		&i.ClassificationName,
+	)
+	return i, err
+}
+
+const getEventBySourceExternal = `-- name: GetEventBySourceExternal :one
+SELECT id, source, external_id, name, venue, city, state, country, start_utc, url, raw_json, created_at, updated_at, segment_name, classification_name FROM events WHERE source = $1 AND external_id = $2 LIMIT 1
+`
+
+type GetEventBySourceExternalParams struct {
+	Source     string `json:"source"`
+	ExternalID string `json:"external_id"`
+}
+
+func (q *Queries) GetEventBySourceExternal(ctx context.Context, arg GetEventBySourceExternalParams) (Event, error) {
+	row := q.db.QueryRow(ctx, getEventBySourceExternal, arg.Source, arg.ExternalID)
+	var i Event
+	err := row.Scan(
+		&i.ID,
+		&i.Source,
+		&i.ExternalID,
+		&i.Name,
+		&i.Venue,
+		&i.City,
+		&i.State,
+		&i.Country,
+		&i.StartUtc,
+		&i.Url,
+		&i.RawJson,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.SegmentName,
+		&i.ClassificationName,
+	)
+	return i, err
+}
+
 const getEventsForArtist = `-- name: GetEventsForArtist :many
 SELECT 
     ce.id, ce.name, ce.event_date, ce.venue_id, ce.genres, ce.price_min, ce.price_max, ce.price_currency, ce.ticket_url, ce.description, ce.status, ce.age_restriction, ce.provider, ce.external_url, ce.created_at, ce.updated_at,
@@ -1852,6 +1936,76 @@ func (q *Queries) GetUserByUsernameWithPassword(ctx context.Context, username st
 	return i, err
 }
 
+const insertEvent = `-- name: InsertEvent :one
+INSERT INTO events (source, external_id, name, venue, city, state, country, start_utc, url, raw_json, segment_name, classification_name)
+VALUES (
+  COALESCE($1, 'ticketmaster'),
+  $2,
+  $3,
+  $4,
+  $5,
+  $6,
+  $7,
+  $8,
+  $9,
+  $10,
+  $11,
+  $12
+)
+RETURNING id, source, external_id, name, venue, city, state, country, start_utc, url, raw_json, created_at, updated_at, segment_name, classification_name
+`
+
+type InsertEventParams struct {
+	Source             interface{}        `json:"source"`
+	ExternalID         string             `json:"external_id"`
+	Name               string             `json:"name"`
+	Venue              pgtype.Text        `json:"venue"`
+	City               pgtype.Text        `json:"city"`
+	State              pgtype.Text        `json:"state"`
+	Country            pgtype.Text        `json:"country"`
+	StartUtc           pgtype.Timestamptz `json:"start_utc"`
+	Url                pgtype.Text        `json:"url"`
+	RawJson            []byte             `json:"raw_json"`
+	SegmentName        pgtype.Text        `json:"segment_name"`
+	ClassificationName pgtype.Text        `json:"classification_name"`
+}
+
+func (q *Queries) InsertEvent(ctx context.Context, arg InsertEventParams) (Event, error) {
+	row := q.db.QueryRow(ctx, insertEvent,
+		arg.Source,
+		arg.ExternalID,
+		arg.Name,
+		arg.Venue,
+		arg.City,
+		arg.State,
+		arg.Country,
+		arg.StartUtc,
+		arg.Url,
+		arg.RawJson,
+		arg.SegmentName,
+		arg.ClassificationName,
+	)
+	var i Event
+	err := row.Scan(
+		&i.ID,
+		&i.Source,
+		&i.ExternalID,
+		&i.Name,
+		&i.Venue,
+		&i.City,
+		&i.State,
+		&i.Country,
+		&i.StartUtc,
+		&i.Url,
+		&i.RawJson,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.SegmentName,
+		&i.ClassificationName,
+	)
+	return i, err
+}
+
 const insertSpotifyTopArtistSnapshot = `-- name: InsertSpotifyTopArtistSnapshot :exec
 INSERT INTO spotify_top_artist_snapshots (user_id, fetched_at, range, item_rank, spotify_artist_id, name, genres, popularity, image_url)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -2229,6 +2383,25 @@ type UpsertUserConcertEventInterestParams struct {
 
 func (q *Queries) UpsertUserConcertEventInterest(ctx context.Context, arg UpsertUserConcertEventInterestParams) error {
 	_, err := q.db.Exec(ctx, upsertUserConcertEventInterest, arg.UserID, arg.EventID, arg.InterestStatus)
+	return err
+}
+
+const upsertUserEventAssociation = `-- name: UpsertUserEventAssociation :exec
+INSERT INTO user_event_associations (user_id, event_id, status)
+VALUES ($1, $2, $3)
+ON CONFLICT (user_id, event_id) DO UPDATE SET
+  status = EXCLUDED.status,
+  updated_at = NOW()
+`
+
+type UpsertUserEventAssociationParams struct {
+	UserID  uuid.UUID `json:"user_id"`
+	EventID uuid.UUID `json:"event_id"`
+	Status  string    `json:"status"`
+}
+
+func (q *Queries) UpsertUserEventAssociation(ctx context.Context, arg UpsertUserEventAssociationParams) error {
+	_, err := q.db.Exec(ctx, upsertUserEventAssociation, arg.UserID, arg.EventID, arg.Status)
 	return err
 }
 

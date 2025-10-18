@@ -2,6 +2,7 @@ package business
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"time"
 
@@ -16,6 +17,12 @@ import (
 // AssociatedEventsQuerier captures the sqlc method we need; enables fakes in tests.
 type AssociatedEventsQuerier interface {
 	GetAssociatedEventsPaged(ctx context.Context, arg sqlc.GetAssociatedEventsPagedParams) ([]sqlc.GetAssociatedEventsPagedRow, error)
+	GetEventByID(ctx context.Context, id uuid.UUID) (sqlc.Event, error)
+	GetEventBySourceExternal(ctx context.Context, arg sqlc.GetEventBySourceExternalParams) (sqlc.Event, error)
+	InsertEvent(ctx context.Context, arg sqlc.InsertEventParams) (sqlc.Event, error)
+	UpsertUserEventAssociation(ctx context.Context, arg sqlc.UpsertUserEventAssociationParams) error
+	DeleteUserEventAssociation(ctx context.Context, arg sqlc.DeleteUserEventAssociationParams) error
+	DeleteEventIfNoAssociations(ctx context.Context, eventID uuid.UUID) error
 }
 
 type GeneratedEventsAdapter struct {
@@ -213,12 +220,107 @@ func (a *GeneratedEventsAdapter) GetAssociatedEvents(ctx context.Context, startD
 
 // SetEventAssociation is not yet implemented in Phase 1
 func (a *GeneratedEventsAdapter) SetEventAssociation(ctx context.Context, eventId string, req generated.SetAssociationRequest) (generated.ImplResponse, error) {
-	return generated.Response(http.StatusNotImplemented, generated.ErrorResponse{Message: "not implemented", CreatedAt: time.Now().UTC()}), nil
+	// Resolve user id
+	type userIDGetter interface{ GetUserID() string }
+	var myUser uuid.UUID
+	if v := ctx.Value("user"); v != nil {
+		if u, ok := v.(userIDGetter); ok {
+			if id := u.GetUserID(); id != "" {
+				if uid, err := uuid.Parse(id); err == nil {
+					myUser = uid
+				}
+			}
+		}
+	}
+	if myUser == uuid.Nil {
+		return generated.Response(http.StatusUnauthorized, generated.ErrorResponse{Message: "unauthorized", CreatedAt: time.Now().UTC()}), nil
+	}
+	if a.db == nil {
+		return generated.Response(http.StatusInternalServerError, generated.ErrorResponse{Message: "database unavailable", CreatedAt: time.Now().UTC()}), nil
+	}
+	// Determine if eventId is internal UUID or external id
+	var ev sqlc.Event
+	var evID uuid.UUID
+	if uid, err := uuid.Parse(eventId); err == nil {
+		evID = uid
+		if e, err := a.db.GetEventByID(ctx, uid); err == nil {
+			ev = e
+		}
+	}
+	if ev.ID == uuid.Nil {
+		if e, err := a.db.GetEventBySourceExternal(ctx, sqlc.GetEventBySourceExternalParams{Source: "ticketmaster", ExternalID: eventId}); err == nil {
+			ev = e
+			evID = e.ID
+		}
+	}
+	if ev.ID == uuid.Nil {
+		// Create minimal event row on first association
+		now := time.Now().UTC()
+		raw, _ := json.Marshal(map[string]any{"externalId": eventId, "source": "ticketmaster"})
+		newEv, err := a.db.InsertEvent(ctx, sqlc.InsertEventParams{
+			Source:             ptr("ticketmaster"),
+			ExternalID:         eventId,
+			Name:               "",
+			Venue:              pgtype.Text{},
+			City:               pgtype.Text{},
+			State:              pgtype.Text{},
+			Country:            pgtype.Text{String: "US", Valid: true},
+			StartUtc:           pgtype.Timestamptz{Time: now, Valid: true},
+			Url:                pgtype.Text{},
+			RawJson:            raw,
+			SegmentName:        pgtype.Text{},
+			ClassificationName: pgtype.Text{},
+		})
+		if err != nil {
+			return generated.Response(http.StatusInternalServerError, generated.ErrorResponse{Message: err.Error(), CreatedAt: time.Now().UTC()}), nil
+		}
+		ev = newEv
+		evID = newEv.ID
+	}
+	// Upsert association
+	if err := a.db.UpsertUserEventAssociation(ctx, sqlc.UpsertUserEventAssociationParams{UserID: myUser, EventID: evID, Status: string(req.Status)}); err != nil {
+		return generated.Response(http.StatusInternalServerError, generated.ErrorResponse{Message: err.Error(), CreatedAt: time.Now().UTC()}), nil
+	}
+	return generated.Response(http.StatusNoContent, nil), nil
 }
 
 // RemoveEventAssociation is not yet implemented in Phase 1
 func (a *GeneratedEventsAdapter) RemoveEventAssociation(ctx context.Context, eventId string) (generated.ImplResponse, error) {
-	return generated.Response(http.StatusNotImplemented, generated.ErrorResponse{Message: "not implemented", CreatedAt: time.Now().UTC()}), nil
+	// Resolve user id
+	type userIDGetter interface{ GetUserID() string }
+	var myUser uuid.UUID
+	if v := ctx.Value("user"); v != nil {
+		if u, ok := v.(userIDGetter); ok {
+			if id := u.GetUserID(); id != "" {
+				if uid, err := uuid.Parse(id); err == nil {
+					myUser = uid
+				}
+			}
+		}
+	}
+	if myUser == uuid.Nil {
+		return generated.Response(http.StatusUnauthorized, generated.ErrorResponse{Message: "unauthorized", CreatedAt: time.Now().UTC()}), nil
+	}
+	if a.db == nil {
+		return generated.Response(http.StatusInternalServerError, generated.ErrorResponse{Message: "database unavailable", CreatedAt: time.Now().UTC()}), nil
+	}
+	// Resolve event id (internal or external)
+	var evID uuid.UUID
+	if uid, err := uuid.Parse(eventId); err == nil {
+		evID = uid
+	} else {
+		if e, err := a.db.GetEventBySourceExternal(ctx, sqlc.GetEventBySourceExternalParams{Source: "ticketmaster", ExternalID: eventId}); err == nil {
+			evID = e.ID
+		}
+	}
+	if evID == uuid.Nil {
+		return generated.Response(http.StatusNotFound, generated.ErrorResponse{Message: "event not found", CreatedAt: time.Now().UTC()}), nil
+	}
+	if err := a.db.DeleteUserEventAssociation(ctx, sqlc.DeleteUserEventAssociationParams{UserID: myUser, EventID: evID}); err != nil {
+		return generated.Response(http.StatusInternalServerError, generated.ErrorResponse{Message: err.Error(), CreatedAt: time.Now().UTC()}), nil
+	}
+	_ = a.db.DeleteEventIfNoAssociations(ctx, evID)
+	return generated.Response(http.StatusNoContent, nil), nil
 }
 
 func ptr[T any](v T) *T { return &v }

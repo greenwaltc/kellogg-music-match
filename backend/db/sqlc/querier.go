@@ -23,6 +23,7 @@ type Querier interface {
 	// Users
 	// =======================
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	DeleteEventIfNoAssociations(ctx context.Context, eventID uuid.UUID) error
 	DeleteExpiredPasswordResetTokens(ctx context.Context) error
 	DeleteOldConcertEvents(ctx context.Context, cutoffDate pgtype.Timestamp) error
 	DeletePushSubscriptionByEndpoint(ctx context.Context, endpoint string) error
@@ -30,6 +31,7 @@ type Querier interface {
 	DeleteSpotifyTopTrackSnapshotForRange(ctx context.Context, arg DeleteSpotifyTopTrackSnapshotForRangeParams) error
 	DeleteUser(ctx context.Context, id uuid.UUID) error
 	DeleteUserConcertEventInterest(ctx context.Context, arg DeleteUserConcertEventInterestParams) error
+	DeleteUserEventAssociation(ctx context.Context, arg DeleteUserEventAssociationParams) error
 	DeleteUserPasswordResetTokens(ctx context.Context, userID uuid.UUID) error
 	// =======================
 	// Spotify Top Items
@@ -76,6 +78,8 @@ type Querier interface {
 	// Returns events within date range plus associated venue, artists, and user interest buckets
 	GetConcertEventsInDateRangeWithInterest(ctx context.Context, arg GetConcertEventsInDateRangeWithInterestParams) ([]GetConcertEventsInDateRangeWithInterestRow, error)
 	GetEventArtists(ctx context.Context, eventID string) ([]GetEventArtistsRow, error)
+	GetEventByID(ctx context.Context, id uuid.UUID) (Event, error)
+	GetEventBySourceExternal(ctx context.Context, arg GetEventBySourceExternalParams) (Event, error)
 	GetEventsForArtist(ctx context.Context, arg GetEventsForArtistParams) ([]GetEventsForArtistRow, error)
 	GetFeedbackByUser(ctx context.Context, userID uuid.UUID) ([]Feedback, error)
 	GetPasswordResetToken(ctx context.Context, token string) (PasswordResetToken, error)
@@ -86,6 +90,7 @@ type Querier interface {
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
 	GetUserByUsernameWithPassword(ctx context.Context, username string) (User, error)
+	InsertEvent(ctx context.Context, arg InsertEventParams) (Event, error)
 	InsertSpotifyTopArtistSnapshot(ctx context.Context, arg InsertSpotifyTopArtistSnapshotParams) error
 	InsertSpotifyTopTrackSnapshot(ctx context.Context, arg InsertSpotifyTopTrackSnapshotParams) error
 	MarkPasswordResetTokenAsUsed(ctx context.Context, token string) error
@@ -103,6 +108,7 @@ type Querier interface {
 	// =======================
 	UpsertSpotifyTokens(ctx context.Context, arg UpsertSpotifyTokensParams) error
 	UpsertUserConcertEventInterest(ctx context.Context, arg UpsertUserConcertEventInterestParams) error
+	UpsertUserEventAssociation(ctx context.Context, arg UpsertUserEventAssociationParams) error
 	// =======================
 	// Concert Events
 	// =======================

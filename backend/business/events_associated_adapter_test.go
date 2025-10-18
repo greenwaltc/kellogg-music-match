@@ -27,6 +27,26 @@ func (f *fakeQuerier) GetAssociatedEventsPaged(ctx context.Context, arg sqlc.Get
 	return f.rows, nil
 }
 
+// Stubs to satisfy the full AssociatedEventsQuerier interface; unused in these tests
+func (f *fakeQuerier) GetEventByID(ctx context.Context, id uuid.UUID) (sqlc.Event, error) {
+	return sqlc.Event{}, nil
+}
+func (f *fakeQuerier) GetEventBySourceExternal(ctx context.Context, arg sqlc.GetEventBySourceExternalParams) (sqlc.Event, error) {
+	return sqlc.Event{}, nil
+}
+func (f *fakeQuerier) InsertEvent(ctx context.Context, arg sqlc.InsertEventParams) (sqlc.Event, error) {
+	return sqlc.Event{}, nil
+}
+func (f *fakeQuerier) UpsertUserEventAssociation(ctx context.Context, arg sqlc.UpsertUserEventAssociationParams) error {
+	return nil
+}
+func (f *fakeQuerier) DeleteUserEventAssociation(ctx context.Context, arg sqlc.DeleteUserEventAssociationParams) error {
+	return nil
+}
+func (f *fakeQuerier) DeleteEventIfNoAssociations(ctx context.Context, eventID uuid.UUID) error {
+	return nil
+}
+
 // userCtx is a minimal type that satisfies the adapter's userIDGetter via method name
 type userCtx struct{ id string }
 
