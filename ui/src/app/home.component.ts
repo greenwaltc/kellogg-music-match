@@ -23,7 +23,7 @@ export class HomeComponent {
   ) {}
 
   gotoMatches() { this.nav.markAllPrimaryVisited(); this.router.navigateByUrl('/matches'); }
-  gotoEvents() { this.nav.markAllPrimaryVisited(); this.router.navigateByUrl('/chicago-events'); }
+  gotoEvents() { this.nav.markAllPrimaryVisited(); this.router.navigateByUrl('/events'); }
   async connectSpotify() { await this.spotify.beginAuth(); }
 
   async ngOnInit() {

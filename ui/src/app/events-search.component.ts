@@ -1,8 +1,9 @@
-import { Component, signal, effect, computed, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
+import { Component, signal, effect, computed, ElementRef, ViewChild, AfterViewInit, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { EventsService, EventsSearchFilters, EventDTO, EventsPage } from './events.service';
 import { debounceTime, Subject, switchMap, catchError, of } from 'rxjs';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-events-search',
@@ -34,7 +35,7 @@ import { debounceTime, Subject, switchMap, catchError, of } from 'rxjs';
       <div class="row">
         <label>
           <span>City</span>
-          <input type="text" [(ngModel)]="filters.city" name="city" placeholder="Chicago"/>
+          <input type="text" [(ngModel)]="filters.city" name="city" placeholder="City"/>
         </label>
         <label>
           <span>State</span>
@@ -100,10 +101,10 @@ import { debounceTime, Subject, switchMap, catchError, of } from 'rxjs';
           <div class="time" *ngIf="ev.startUtc">{{ev.startUtc | date:'medium'}}</div>
           <a class="link" *ngIf="ev.url" [href]="ev.url" target="_blank" rel="noopener">Open</a>
           <div class="assoc" *ngIf="ev.association">
-            <span>Mine: {{ev.association?.myStatus || 'NONE'}}</span>
-            <span>Interested: {{ev.association?.interestedCount || 0}}</span>
-            <span>Going: {{ev.association?.goingCount || 0}}</span>
-            <span>LFG: {{ev.association?.lfgCount || 0}}</span>
+            <span>Mine: {{ev.association.myStatus || 'NONE'}}</span>
+            <span>Interested: {{ev.association.interestedCount || 0}}</span>
+            <span>Going: {{ev.association.goingCount || 0}}</span>
+            <span>LFG: {{ev.association.lfgCount || 0}}</span>
           </div>
           <div class="actions" *ngIf="ev.externalId || ev.id">
             <button (click)="mark(ev,'INTERESTED')" [disabled]="loading">★ Interested</button>
@@ -140,7 +141,7 @@ import { debounceTime, Subject, switchMap, catchError, of } from 'rxjs';
     .error{color:#b00020;margin-top:.5rem}
   `]
 })
-export class EventsSearchComponent implements AfterViewInit {
+export class EventsSearchComponent implements AfterViewInit, OnInit {
   filters: EventsSearchFilters = { includeAssociated: true };
   startLocal = '';
   endLocal = '';
@@ -160,7 +161,7 @@ export class EventsSearchComponent implements AfterViewInit {
   @ViewChild('sentinel') sentinel?: ElementRef<HTMLDivElement>;
   private io?: IntersectionObserver;
 
-  constructor(private events: EventsService) {
+  constructor(private events: EventsService, private router: Router) {
     this.search$
       .pipe(
         debounceTime(150),
@@ -193,9 +194,43 @@ export class EventsSearchComponent implements AfterViewInit {
       });
   }
 
+  ngOnInit(): void {
+    // Hydrate from URL query parameters (deep link)
+    try {
+      const qp = new URLSearchParams(window.location.search);
+      const get = (k: string) => qp.get(k) || undefined;
+      const bool = (k: string) => {
+        const v = qp.get(k); return v == null ? undefined : (v === 'true');
+      };
+      const num = (k: string) => {
+        const v = qp.get(k); if (v == null) return undefined; const n = parseInt(v, 10); return isNaN(n) ? undefined : n;
+      };
+      this.filters.keyword = get('keyword');
+      this.filters.segmentName = get('segmentName');
+      this.filters.classificationName = get('classificationName');
+      this.filters.countryCode = get('countryCode');
+      this.filters.stateCode = get('stateCode');
+      this.filters.city = get('city');
+      this.filters.latlong = get('latlong');
+      this.filters.radius = num('radius');
+      this.filters.sort = get('sort');
+      const start = get('startDateTime');
+      const end = get('endDateTime');
+      if (start) this.startLocal = this.isoToLocalInput(start);
+      if (end) this.endLocal = this.isoToLocalInput(end);
+      const inc = bool('includeAssociated');
+      this.includeAssociated = (inc === undefined) ? true : inc;
+      const p = num('page'); if (p !== undefined) this.page = p;
+      const s = num('size'); if (s !== undefined) this.size = s;
+      // If any query is present, auto-run search
+      if ([...qp.keys()].length) this.runSearch(false);
+    } catch {}
+  }
+
   runSearch(reset = false) {
     if (reset) this.page = 0;
     this.hint = null;
+    this.updateUrlState();
     this.search$.next();
   }
 
@@ -206,6 +241,7 @@ export class EventsSearchComponent implements AfterViewInit {
     this.page = 0; this.total = undefined; this.items = [];
     this.hint = 'Tip: start with a keyword or set a city/radius';
     this.error = null;
+    this.updateUrlState();
   }
 
   prevPage() { if (this.page > 0) { this.page--; this.runSearch(); } }
@@ -258,5 +294,42 @@ export class EventsSearchComponent implements AfterViewInit {
       next: () => { if (ev.association) ev.association.myStatus = 'NONE'; },
       error: () => { this.error = 'Failed to clear association'; }
     });
+  }
+
+  private updateUrlState() {
+    try {
+      const qp = new URLSearchParams();
+      const add = (k: string, v: any) => { if (v !== undefined && v !== null && String(v).trim() !== '') qp.set(k, String(v)); };
+      add('keyword', this.filters.keyword);
+      add('segmentName', this.filters.segmentName);
+      add('classificationName', this.filters.classificationName);
+      add('countryCode', this.filters.countryCode);
+      add('stateCode', this.filters.stateCode);
+      add('city', this.filters.city);
+      add('latlong', this.filters.latlong);
+      add('radius', this.filters.radius);
+      add('sort', this.filters.sort);
+      // Map local datetime-local inputs back to ISO for the API contract
+      const toIso = (s: string) => s ? new Date(s).toISOString() : undefined;
+      add('startDateTime', toIso(this.startLocal));
+      add('endDateTime', toIso(this.endLocal));
+      add('includeAssociated', this.includeAssociated);
+      add('page', this.page);
+      add('size', this.size);
+      const base = this.router.url.split('?')[0];
+      history.replaceState({}, '', base + (qp.toString() ? ('?' + qp.toString()) : ''));
+    } catch {}
+  }
+
+  private isoToLocalInput(iso: string): string {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    const mm = pad(d.getMonth() + 1);
+    const dd = pad(d.getDate());
+    const hh = pad(d.getHours());
+    const mi = pad(d.getMinutes());
+    return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
   }
 }

@@ -44,10 +44,10 @@ describe('HomeComponent', () => {
     expect(router.navigateByUrl).toHaveBeenCalledWith('/matches');
   });
 
-  it('marks both menus visited when clicking Chicago Events', () => {
+  it('marks both menus visited when clicking Events', () => {
     component.gotoEvents();
     expect(nav.visitedMatches()).toBeTrue();
     expect(nav.visitedEvents()).toBeTrue();
-    expect(router.navigateByUrl).toHaveBeenCalledWith('/chicago-events');
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/events');
   });
 });

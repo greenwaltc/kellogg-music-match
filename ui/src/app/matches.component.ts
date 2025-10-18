@@ -451,7 +451,7 @@ export class MatchesComponent implements OnInit, OnDestroy {
       this.refetch(true);
     }, 400);
   }
-  back(): void { this.router.navigateByUrl('/chicago-events'); }
+  back(): void { this.router.navigateByUrl('/home'); }
   async connectSpotify() { await this.spotify.beginAuth(); }
   onSpotifyConnected() { /* placeholder for future actions, e.g., refresh */ }
 

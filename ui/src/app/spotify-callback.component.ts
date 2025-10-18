@@ -28,8 +28,8 @@ import { MatchService } from './match.service';
         </ng-container>
       </ng-container>
       <ng-template #doneTpl>
-        <p *ngIf="denied && !error" class="warn">Spotify access is required to find musically similar students and concerts relevant to you. However, you can still interact with the concerts page!</p>
-        <button *ngIf="denied && !error" (click)="goConcerts()">Go to Chicago Concerts</button>
+  <p *ngIf="denied && !error" class="warn">Spotify access helps personalize matches and events, but you can still browse the Events page.</p>
+  <button *ngIf="denied && !error" (click)="goEvents()">Go to Events</button>
         <p *ngIf="error" class="error">{{ error }}</p>
         <p *ngIf="!error && !denied">Done.</p>
       </ng-template>
@@ -131,5 +131,5 @@ export class SpotifyCallbackComponent implements OnInit {
     });
   }
 
-  goConcerts() { this.router.navigate(['/concerts']); }
+  goEvents() { this.router.navigate(['/events']); }
 }

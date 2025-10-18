@@ -74,7 +74,7 @@ export class AppComponent implements OnInit {
     // Track router navigation to set visited flags
     this.router.events.subscribe(() => {
       const url = this.router.url || '';
-      if (url.startsWith('/matches') || url.startsWith('/chicago-events')) {
+      if (url.startsWith('/matches') || url.startsWith('/events') || url.startsWith('/chicago-events')) {
         this.nav.markAllPrimaryVisited();
       }
     });

@@ -19,7 +19,7 @@ import { catchError, debounceTime, of, Subject, switchMap } from 'rxjs';
       <div class="row">
         <label>
           <span>City</span>
-          <input type="text" [(ngModel)]="city" name="city" placeholder="Chicago" />
+          <input type="text" [(ngModel)]="city" name="city" placeholder="City" />
         </label>
         <label>
           <span>Segment</span>

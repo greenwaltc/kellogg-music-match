@@ -7,7 +7,6 @@ import { ArtistsComponent } from './app/artists.component';
 import { MatchesComponent } from './app/matches.component';
 import { FeedbackComponent } from './app/feedback.component';
 import { RoadmapComponent } from './app/roadmap.component';
-import { ChicagoEventsComponent } from './app/chicago-events.component';
 import { EventsSearchComponent } from './app/events-search.component';
 import { AssociatedEventsComponent } from './app/associated-events.component';
 import { SpotifyConnectComponent } from './app/spotify-connect.component';
@@ -36,9 +35,9 @@ const routes: Routes = [
   { path: 'matches', component: MatchesComponent, canActivate: [authGuard] },
   { path: 'feedback', component: FeedbackComponent, canActivate: [authGuard] },
   { path: 'roadmap', component: RoadmapComponent, canActivate: [authGuard] },
-  { path: 'chicago-events', component: ChicagoEventsComponent, canActivate: [authGuard] },
   { path: 'events', component: EventsSearchComponent, canActivate: [authGuard] },
   { path: 'events/associated', component: AssociatedEventsComponent, canActivate: [authGuard] },
+  { path: 'chicago-events', redirectTo: 'events', pathMatch: 'full' },
   { path: 'spotify/callback', component: SpotifyCallbackComponent },
   { path: '**', redirectTo: '' }
   // Artists & standalone Spotify connect page removed (Spotify connect now on Matches page)
