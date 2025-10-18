@@ -76,14 +76,13 @@ type TicketmasterConfig struct {
 	DefaultCity     string
 	DefaultState    string
 	DefaultCountry  string
-	DateRangeMonths int // number of months to look ahead for events
+	DateRangeMonths int  // number of months to look ahead for events
+	OnDemand        bool // feature flag: enable on-demand Discovery + local overlay
 	// Optional geo-based search (overrides city/state when provided)
 	GeoLatLong  string // e.g. "41.8781,-87.6298"
 	Radius      int    // distance from geo point
 	RadiusUnit  string // miles (default) or km
 	PageDelayMs int    // delay between paginated requests (milliseconds)
-	// Feature flag to enable on-demand Ticketmaster search and disable background ingest
-	OnDemand bool // when true, backend serves /events/* endpoints and disables sync job
 }
 
 // DebugConfig holds debug-related configuration
@@ -187,11 +186,11 @@ func Load() *Config {
 			DefaultState:    getEnvWithDefault("TICKETMASTER_DEFAULT_STATE", "IL"),
 			DefaultCountry:  getEnvWithDefault("TICKETMASTER_DEFAULT_COUNTRY", "US"),
 			DateRangeMonths: getEnvIntWithDefault("TICKETMASTER_DATE_RANGE_MONTHS", 12),
+			OnDemand:        getEnvBoolWithDefault("TICKETMASTER_ON_DEMAND", false),
 			GeoLatLong:      getEnvWithDefault("TICKETMASTER_GEO_LATLONG", ""),
 			Radius:          getEnvIntWithDefault("TICKETMASTER_RADIUS", 0),
 			RadiusUnit:      getEnvWithDefault("TICKETMASTER_RADIUS_UNIT", "miles"),
 			PageDelayMs:     getEnvIntWithDefault("TICKETMASTER_PAGE_DELAY_MS", 250),
-			OnDemand:        getEnvBoolWithDefault("TICKETMASTER_ON_DEMAND", false),
 		},
 		Debug: DebugConfig{
 			Enabled: getEnvBoolWithDefault("DEBUG_ENABLED", false),

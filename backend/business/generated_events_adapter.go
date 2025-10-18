@@ -5,18 +5,33 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/greenwaltc/kellogg-music-match/backend/config"
+	sqlc "github.com/greenwaltc/kellogg-music-match/backend/db/sqlc"
 	"github.com/greenwaltc/kellogg-music-match/backend/generated"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // GeneratedEventsAdapter adapts EventSearchService to the generated.EventsAPIServicer interface
+// AssociatedEventsQuerier captures the sqlc method we need; enables fakes in tests.
+type AssociatedEventsQuerier interface {
+	GetAssociatedEventsPaged(ctx context.Context, arg sqlc.GetAssociatedEventsPagedParams) ([]sqlc.GetAssociatedEventsPagedRow, error)
+}
+
 type GeneratedEventsAdapter struct {
 	svc *EventSearchService
 	cfg *config.Config
+	db  AssociatedEventsQuerier
 }
 
 func NewGeneratedEventsAdapter(svc *EventSearchService, cfg *config.Config) *GeneratedEventsAdapter {
+	// Best-effort: attach queries if we can get a pool from a repository in main; for now keep nil-safe.
 	return &GeneratedEventsAdapter{svc: svc, cfg: cfg}
+}
+
+// NewGeneratedEventsAdapterWithQuerier allows injecting a DB querier (sqlc or fake)
+func NewGeneratedEventsAdapterWithQuerier(svc *EventSearchService, cfg *config.Config, db AssociatedEventsQuerier) *GeneratedEventsAdapter {
+	return &GeneratedEventsAdapter{svc: svc, cfg: cfg, db: db}
 }
 
 // SearchEvents implements GET /events/search via on-demand Ticketmaster Discovery
@@ -103,7 +118,97 @@ func (a *GeneratedEventsAdapter) SearchEvents(ctx context.Context, keyword, segm
 
 // GetAssociatedEvents is not yet implemented in Phase 1
 func (a *GeneratedEventsAdapter) GetAssociatedEvents(ctx context.Context, startDateTime, endDateTime time.Time, segmentName, city string, size, page int32) (generated.ImplResponse, error) {
-	return generated.Response(http.StatusNotImplemented, generated.ErrorResponse{Message: "not implemented", CreatedAt: time.Now().UTC()}), nil
+	// Public regardless of on-demand flag; this is local-only.
+	// We require a DB handle. If not available, return empty page.
+	if a.db == nil {
+		empty := generated.EventsPage{Page: page, Size: size, Total: 0, Items: []generated.Event{}}
+		return generated.Response(http.StatusOK, empty), nil
+	}
+	// Resolve current user (for myStatus) using a duck-typed interface stored under the legacy "user" key.
+	type userIDGetter interface{ GetUserID() string }
+	var myUserID *uuid.UUID
+	if v := ctx.Value("user"); v != nil {
+		if u, ok := v.(userIDGetter); ok {
+			if id := u.GetUserID(); id != "" {
+				if uid, err := uuid.Parse(id); err == nil {
+					myUserID = &uid
+				}
+			}
+		}
+	}
+	// sqlc args
+	var startArg, endArg pgtype.Timestamptz
+	if !startDateTime.IsZero() {
+		startArg = pgtype.Timestamptz{Time: startDateTime, Valid: true}
+	}
+	if !endDateTime.IsZero() {
+		endArg = pgtype.Timestamptz{Time: endDateTime, Valid: true}
+	}
+	seg := segmentName
+	cty := city
+	off := page * size
+	lim := size
+	uid := uuid.Nil
+	if myUserID != nil {
+		uid = *myUserID
+	}
+	rows, err := a.db.GetAssociatedEventsPaged(ctx, sqlc.GetAssociatedEventsPagedParams{
+		MyUserID:    uid,
+		StartFrom:   startArg,
+		EndTo:       endArg,
+		SegmentName: seg,
+		City:        cty,
+		OffSet:      off,
+		Lim:         lim,
+	})
+	if err != nil {
+		return generated.Response(http.StatusInternalServerError, generated.ErrorResponse{Message: err.Error(), CreatedAt: time.Now().UTC()}), nil
+	}
+	items := make([]generated.Event, 0, len(rows))
+	var total int64 = 0
+	for _, r := range rows {
+		total = r.TotalCount
+		// counts as int32
+		interested := toInt32(r.InterestedCount)
+		going := toInt32(r.GoingCount)
+		lfg := toInt32(r.LfgCount)
+		// myStatus optional
+		var my *generated.EventInterestType
+		if s, ok := r.MyStatus.(string); ok && s != "" {
+			st, _ := generated.NewEventInterestTypeFromValue(s)
+			my = &st
+		}
+		// Nullable fields
+		venueName := valText(r.Venue, "Unknown Venue")
+		cityName := valText(r.City, "")
+		stateName := valText(r.State, "")
+		country := valText(r.Country, "US")
+		start := time.Now().UTC()
+		if r.StartUtc.Valid {
+			start = r.StartUtc.Time
+		}
+		url := valText(r.Url, "")
+
+		ev := generated.Event{
+			Id:         ptr(r.ID.String()),
+			ExternalId: r.ExternalID,
+			Source:     r.Source,
+			Name:       r.Name,
+			StartUtc:   start,
+			Url:        url,
+			Venue:      generated.Venue{Name: venueName},
+			Location:   generated.EventLocation{City: cityName, State: stateName, Country: country},
+			Association: generated.EventAssociation{
+				MyStatus:        my,
+				InterestedCount: interested,
+				GoingCount:      going,
+				LfgCount:        lfg,
+			},
+		}
+		items = append(items, ev)
+	}
+	pageResp := generated.EventsPage{Page: page, Size: size, Total: int32(total), Items: items}
+	return generated.Response(http.StatusOK, pageResp), nil
 }
 
 // SetEventAssociation is not yet implemented in Phase 1
@@ -117,3 +222,25 @@ func (a *GeneratedEventsAdapter) RemoveEventAssociation(ctx context.Context, eve
 }
 
 func ptr[T any](v T) *T { return &v }
+
+// helpers
+func toInt32(v any) int32 {
+	switch t := v.(type) {
+	case int64:
+		return int32(t)
+	case int32:
+		return t
+	case int:
+		return int32(t)
+	case float64:
+		return int32(t)
+	default:
+		return 0
+	}
+}
+func valText(t pgtype.Text, def string) string {
+	if t.Valid {
+		return t.String
+	}
+	return def
+}

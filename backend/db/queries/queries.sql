@@ -405,6 +405,42 @@ WHERE agg.similarity > 0
 ORDER BY agg.similarity DESC, u.created_at ASC
 LIMIT sqlc.arg(limit_n);
 
+-- =======================
+-- On-demand Events (associations)
+-- =======================
+
+-- name: GetAssociatedEventsPaged :many
+-- Returns locally associated events with aggregate counts and the current user's status.
+-- Supports optional filters and pagination, and returns a total count via window function.
+SELECT
+  e.id,
+  e.source,
+  e.external_id,
+  e.name,
+  e.venue,
+  e.city,
+  e.state,
+  e.country,
+  e.start_utc,
+  e.url,
+  e.segment_name,
+  e.classification_name,
+  COALESCE(SUM(CASE WHEN uea.status = 'INTERESTED' THEN 1 ELSE 0 END), 0) AS interested_count,
+  COALESCE(SUM(CASE WHEN uea.status = 'GOING' THEN 1 ELSE 0 END), 0)       AS going_count,
+  COALESCE(SUM(CASE WHEN uea.status = 'LOOKING_FOR_GROUP' THEN 1 ELSE 0 END), 0) AS lfg_count,
+  MAX(CASE WHEN uea.user_id = sqlc.arg(my_user_id) THEN uea.status ELSE NULL END) AS my_status,
+  COUNT(*) OVER() AS total_count
+FROM events e
+JOIN user_event_associations uea ON uea.event_id = e.id
+WHERE 1=1
+  AND (sqlc.arg(start_from)::timestamptz IS NULL OR e.start_utc >= sqlc.arg(start_from))
+  AND (sqlc.arg(end_to)::timestamptz IS NULL OR e.start_utc <= sqlc.arg(end_to))
+  AND (sqlc.arg(segment_name)::text IS NULL OR e.segment_name = sqlc.arg(segment_name))
+  AND (sqlc.arg(city)::text IS NULL OR e.city ILIKE '%' || sqlc.arg(city) || '%')
+GROUP BY e.id
+ORDER BY e.start_utc ASC
+LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off_set);
+
 -- name: FindTopNSimilarUsersBySpotifyTracksFiltered :many
 -- Tracks variant with a fuzzy name filter on other users
 WITH anchor AS (

@@ -61,6 +61,12 @@ type Querier interface {
 	GetAllFeedback(ctx context.Context, lim int32) ([]GetAllFeedbackRow, error)
 	GetAllUsers(ctx context.Context) ([]User, error)
 	GetAnyPushSubscriptions(ctx context.Context, lim int32) ([]PushSubscription, error)
+	// =======================
+	// On-demand Events (associations)
+	// =======================
+	// Returns locally associated events with aggregate counts and the current user's status.
+	// Supports optional filters and pagination, and returns a total count via window function.
+	GetAssociatedEventsPaged(ctx context.Context, arg GetAssociatedEventsPagedParams) ([]GetAssociatedEventsPagedRow, error)
 	GetChicagoEventsCountWithArtistSearch(ctx context.Context, arg GetChicagoEventsCountWithArtistSearchParams) (int64, error)
 	GetChicagoEventsWithArtistSearch(ctx context.Context, arg GetChicagoEventsWithArtistSearchParams) ([]GetChicagoEventsWithArtistSearchRow, error)
 	GetConcertEventByID(ctx context.Context, id string) (GetConcertEventByIDRow, error)

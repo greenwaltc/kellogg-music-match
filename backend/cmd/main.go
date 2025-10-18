@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-
 	"time"
 
 	webpush "github.com/SherClockHolmes/webpush-go"
@@ -14,6 +13,7 @@ import (
 	"github.com/greenwaltc/kellogg-music-match/backend/business/concert"
 	"github.com/greenwaltc/kellogg-music-match/backend/business/spotify"
 	"github.com/greenwaltc/kellogg-music-match/backend/config"
+	sqlc "github.com/greenwaltc/kellogg-music-match/backend/db/sqlc"
 
 	"github.com/google/uuid"
 	"github.com/greenwaltc/kellogg-music-match/backend/generated"
@@ -172,10 +172,16 @@ func main() {
 	concertsAdapter := business.NewGeneratedConcertsAdapter(concertAPIService)
 	ConcertsAPIController := generated.NewConcertsAPIController(concertsAdapter)
 
-	// Events: create on-demand event search service + adapter
+	// Events: on-demand Ticketmaster search + associated local overlay
 	tmProxy := concert.NewTicketmasterProxy(&cfg.Ticketmaster)
 	eventsSvc := business.NewEventSearchService(tmProxy)
-	eventsAdapter := business.NewGeneratedEventsAdapter(eventsSvc, cfg)
+	var eventsAdapter *business.GeneratedEventsAdapter
+	if pr, ok := userRepo.(*business.PostgreSQLUserRepository); ok && pr.Pool() != nil {
+		queries := sqlc.New(pr.Pool())
+		eventsAdapter = business.NewGeneratedEventsAdapterWithQuerier(eventsSvc, cfg, queries)
+	} else {
+		eventsAdapter = business.NewGeneratedEventsAdapter(eventsSvc, cfg)
+	}
 	EventsAPIController := generated.NewEventsAPIController(eventsAdapter)
 
 	router := generated.NewRouter(AuthenticationAPIController, HealthAPIController, MatchingAPIController, FeedbackAPIController, ConcertsAPIController, EventsAPIController)
@@ -218,8 +224,6 @@ func main() {
 			"ready":   ready,
 		})
 	})
-
-	// No need for temporary /events proxies now; generated controller will handle them via EventsAPIController
 
 	// Push subscription endpoint
 	mux.HandleFunc("/push/subscribe", NewSubscribeHandler(userRepo))

@@ -763,6 +763,119 @@ func (q *Queries) GetAnyPushSubscriptions(ctx context.Context, lim int32) ([]Pus
 	return items, nil
 }
 
+const getAssociatedEventsPaged = `-- name: GetAssociatedEventsPaged :many
+
+SELECT
+  e.id,
+  e.source,
+  e.external_id,
+  e.name,
+  e.venue,
+  e.city,
+  e.state,
+  e.country,
+  e.start_utc,
+  e.url,
+  e.segment_name,
+  e.classification_name,
+  COALESCE(SUM(CASE WHEN uea.status = 'INTERESTED' THEN 1 ELSE 0 END), 0) AS interested_count,
+  COALESCE(SUM(CASE WHEN uea.status = 'GOING' THEN 1 ELSE 0 END), 0)       AS going_count,
+  COALESCE(SUM(CASE WHEN uea.status = 'LOOKING_FOR_GROUP' THEN 1 ELSE 0 END), 0) AS lfg_count,
+  MAX(CASE WHEN uea.user_id = $1 THEN uea.status ELSE NULL END) AS my_status,
+  COUNT(*) OVER() AS total_count
+FROM events e
+JOIN user_event_associations uea ON uea.event_id = e.id
+WHERE 1=1
+  AND ($2::timestamptz IS NULL OR e.start_utc >= $2)
+  AND ($3::timestamptz IS NULL OR e.start_utc <= $3)
+  AND ($4::text IS NULL OR e.segment_name = $4)
+  AND ($5::text IS NULL OR e.city ILIKE '%' || $5 || '%')
+GROUP BY e.id
+ORDER BY e.start_utc ASC
+LIMIT $7 OFFSET $6
+`
+
+type GetAssociatedEventsPagedParams struct {
+	MyUserID    uuid.UUID          `json:"my_user_id"`
+	StartFrom   pgtype.Timestamptz `json:"start_from"`
+	EndTo       pgtype.Timestamptz `json:"end_to"`
+	SegmentName string             `json:"segment_name"`
+	City        string             `json:"city"`
+	OffSet      int32              `json:"off_set"`
+	Lim         int32              `json:"lim"`
+}
+
+type GetAssociatedEventsPagedRow struct {
+	ID                 uuid.UUID          `json:"id"`
+	Source             string             `json:"source"`
+	ExternalID         string             `json:"external_id"`
+	Name               string             `json:"name"`
+	Venue              pgtype.Text        `json:"venue"`
+	City               pgtype.Text        `json:"city"`
+	State              pgtype.Text        `json:"state"`
+	Country            pgtype.Text        `json:"country"`
+	StartUtc           pgtype.Timestamptz `json:"start_utc"`
+	Url                pgtype.Text        `json:"url"`
+	SegmentName        pgtype.Text        `json:"segment_name"`
+	ClassificationName pgtype.Text        `json:"classification_name"`
+	InterestedCount    interface{}        `json:"interested_count"`
+	GoingCount         interface{}        `json:"going_count"`
+	LfgCount           interface{}        `json:"lfg_count"`
+	MyStatus           interface{}        `json:"my_status"`
+	TotalCount         int64              `json:"total_count"`
+}
+
+// =======================
+// On-demand Events (associations)
+// =======================
+// Returns locally associated events with aggregate counts and the current user's status.
+// Supports optional filters and pagination, and returns a total count via window function.
+func (q *Queries) GetAssociatedEventsPaged(ctx context.Context, arg GetAssociatedEventsPagedParams) ([]GetAssociatedEventsPagedRow, error) {
+	rows, err := q.db.Query(ctx, getAssociatedEventsPaged,
+		arg.MyUserID,
+		arg.StartFrom,
+		arg.EndTo,
+		arg.SegmentName,
+		arg.City,
+		arg.OffSet,
+		arg.Lim,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetAssociatedEventsPagedRow{}
+	for rows.Next() {
+		var i GetAssociatedEventsPagedRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Source,
+			&i.ExternalID,
+			&i.Name,
+			&i.Venue,
+			&i.City,
+			&i.State,
+			&i.Country,
+			&i.StartUtc,
+			&i.Url,
+			&i.SegmentName,
+			&i.ClassificationName,
+			&i.InterestedCount,
+			&i.GoingCount,
+			&i.LfgCount,
+			&i.MyStatus,
+			&i.TotalCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getChicagoEventsCountWithArtistSearch = `-- name: GetChicagoEventsCountWithArtistSearch :one
 SELECT COUNT(DISTINCT ce.id)
 FROM concert_events ce

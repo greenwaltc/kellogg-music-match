@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"testing"
 	"time"
 
 	business "github.com/greenwaltc/kellogg-music-match/backend/business"
@@ -15,11 +14,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
-
-func TestEventsAdapter(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Events Adapter Suite")
-}
 
 var _ = Describe("GeneratedEventsAdapter", func() {
 	It("returns 404-like result when on-demand is disabled", func() {
