@@ -1,4 +1,4 @@
-import { Component, signal, effect, computed } from '@angular/core';
+import { Component, signal, effect, computed, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { EventsService, EventsSearchFilters, EventDTO, EventsPage } from './events.service';
@@ -105,8 +105,15 @@ import { debounceTime, Subject, switchMap, catchError, of } from 'rxjs';
             <span>Going: {{ev.association?.goingCount || 0}}</span>
             <span>LFG: {{ev.association?.lfgCount || 0}}</span>
           </div>
+          <div class="actions" *ngIf="ev.externalId || ev.id">
+            <button (click)="mark(ev,'INTERESTED')" [disabled]="loading">★ Interested</button>
+            <button (click)="mark(ev,'GOING')" [disabled]="loading">✅ Going</button>
+            <button (click)="mark(ev,'LFG')" [disabled]="loading">👥 LFG</button>
+            <button (click)="clearAssociation(ev)" [disabled]="loading">✖ Clear</button>
+          </div>
         </div>
       </div>
+      <div #sentinel class="sentinel" *ngIf="items.length"></div>
       <div class="pager">
         <button (click)="prevPage()" [disabled]="page===0 || loading">Prev</button>
         <span>Page {{page+1}}</span>
@@ -133,7 +140,7 @@ import { debounceTime, Subject, switchMap, catchError, of } from 'rxjs';
     .error{color:#b00020;margin-top:.5rem}
   `]
 })
-export class EventsSearchComponent {
+export class EventsSearchComponent implements AfterViewInit {
   filters: EventsSearchFilters = { includeAssociated: true };
   startLocal = '';
   endLocal = '';
@@ -148,6 +155,10 @@ export class EventsSearchComponent {
   hint: string | null = 'Tip: start with a keyword or set a city/radius';
 
   private search$ = new Subject<void>();
+  private appendMode = false;
+  private lastBatchLen = 0;
+  @ViewChild('sentinel') sentinel?: ElementRef<HTMLDivElement>;
+  private io?: IntersectionObserver;
 
   constructor(private events: EventsService) {
     this.search$
@@ -169,7 +180,14 @@ export class EventsSearchComponent {
         })
       )
       .subscribe((res) => {
-        this.items = res.items || [];
+        const batch = res.items || [];
+        if (this.appendMode) {
+          this.items = [...this.items, ...batch];
+        } else {
+          this.items = batch;
+        }
+        this.lastBatchLen = batch.length;
+        this.appendMode = false;
         this.total = res.total;
         this.loading = false;
       });
@@ -193,5 +211,52 @@ export class EventsSearchComponent {
   prevPage() { if (this.page > 0) { this.page--; this.runSearch(); } }
   nextPage() { this.page++; this.runSearch(); }
 
+  ngAfterViewInit(): void {
+    if (typeof window === 'undefined' || !('IntersectionObserver' in window)) return;
+    this.io = new IntersectionObserver(entries => {
+      const entry = entries[0];
+      if (entry.isIntersecting && this.canLoadMore()) {
+        this.appendMode = true;
+        this.page++;
+        this.runSearch();
+      }
+    }, { root: null, rootMargin: '0px', threshold: 0.1 });
+    setTimeout(() => {
+      const el = this.sentinel?.nativeElement;
+      if (el) this.io?.observe(el);
+    });
+  }
+
+  private canLoadMore(): boolean {
+    if (this.loading) return false;
+    if (this.total !== undefined) return (this.page + 1) * this.size < (this.total || 0);
+    return this.lastBatchLen === this.size; // heuristic when total unknown
+  }
+
   trackId(i: number, ev: EventDTO) { return ev.id || ev.externalId || i; }
+
+  private eventKey(ev: EventDTO) {
+    return ev.id || ev.externalId || '';
+  }
+
+  mark(ev: EventDTO, status: 'INTERESTED'|'GOING'|'LFG') {
+    const id = this.eventKey(ev);
+    if (!id) return;
+    // optimistic update
+    ev.association = ev.association || { myStatus: 'NONE', interestedCount: 0, goingCount: 0, lfgCount: 0 };
+    ev.association.myStatus = status as any;
+    this.events.setAssociation(id, status).subscribe({
+      next: () => {},
+      error: () => { this.error = 'Failed to update association'; }
+    });
+  }
+
+  clearAssociation(ev: EventDTO) {
+    const id = this.eventKey(ev);
+    if (!id) return;
+    this.events.clearAssociation(id).subscribe({
+      next: () => { if (ev.association) ev.association.myStatus = 'NONE'; },
+      error: () => { this.error = 'Failed to clear association'; }
+    });
+  }
 }

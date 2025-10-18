@@ -77,4 +77,13 @@ export class EventsService {
 
     return this.http.get<EventsPage>(this.api.url('/events/search'), { params });
   }
+
+  setAssociation(eventId: string, status: 'INTERESTED'|'GOING'|'LFG'|'NONE') {
+    const body = { status } as any;
+    return this.http.post(this.api.url(`/events/${encodeURIComponent(eventId)}/association`), body);
+  }
+
+  clearAssociation(eventId: string) {
+    return this.http.delete(this.api.url(`/events/${encodeURIComponent(eventId)}/association`));
+  }
 }
