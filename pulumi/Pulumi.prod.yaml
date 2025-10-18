@@ -57,6 +57,9 @@ config:
   kellogg-music-match:ticketmasterDefaultCountry: "US"
   # On-demand Ticketmaster mode flag (default disabled to preserve legacy ingest)
   kellogg-music-match:ticketmasterOnDemand: "false"
+  # Guardrails for on-demand Ticketmaster mode
+  kellogg-music-match:ticketmasterPerUserRpm: "30"
+  kellogg-music-match:ticketmasterSearchCacheTtlSeconds: "30"
   # Geo-based concert search defaults (Chicago downtown 50 mile radius)
   # Adjust per-region deployment if needed.
   kellogg-music-match:ticketmasterGeoLatLong: "41.8781,-87.6298"

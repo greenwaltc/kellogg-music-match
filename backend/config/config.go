@@ -83,6 +83,9 @@ type TicketmasterConfig struct {
 	Radius      int    // distance from geo point
 	RadiusUnit  string // miles (default) or km
 	PageDelayMs int    // delay between paginated requests (milliseconds)
+	// Guardrails & resilience
+	PerUserRequestsPerMinute int // rate limit for /events/search per user
+	SearchCacheTTLSeconds    int // short TTL for cached search results
 }
 
 // DebugConfig holds debug-related configuration
@@ -177,20 +180,22 @@ func Load() *Config {
 			TrackTopN:     getEnvIntWithDefault("MATCHING_TRACK_TOPN", 50),
 		},
 		Ticketmaster: TicketmasterConfig{
-			ConsumerKey:     getEnvWithDefault("TICKETMASTER_CONSUMER_KEY", ""),
-			ConsumerSecret:  getEnvWithDefault("TICKETMASTER_CONSUMER_SECRET", ""),
-			BaseURL:         getEnvWithDefault("TICKETMASTER_BASE_URL", "https://app.ticketmaster.com/discovery/v2"),
-			Timeout:         getEnvIntWithDefault("TICKETMASTER_TIMEOUT", 30),
-			MaxResults:      getEnvIntWithDefault("TICKETMASTER_MAX_RESULTS", 200),
-			DefaultCity:     getEnvWithDefault("TICKETMASTER_DEFAULT_CITY", "Chicago"),
-			DefaultState:    getEnvWithDefault("TICKETMASTER_DEFAULT_STATE", "IL"),
-			DefaultCountry:  getEnvWithDefault("TICKETMASTER_DEFAULT_COUNTRY", "US"),
-			DateRangeMonths: getEnvIntWithDefault("TICKETMASTER_DATE_RANGE_MONTHS", 12),
-			OnDemand:        getEnvBoolWithDefault("TICKETMASTER_ON_DEMAND", false),
-			GeoLatLong:      getEnvWithDefault("TICKETMASTER_GEO_LATLONG", ""),
-			Radius:          getEnvIntWithDefault("TICKETMASTER_RADIUS", 0),
-			RadiusUnit:      getEnvWithDefault("TICKETMASTER_RADIUS_UNIT", "miles"),
-			PageDelayMs:     getEnvIntWithDefault("TICKETMASTER_PAGE_DELAY_MS", 250),
+			ConsumerKey:              getEnvWithDefault("TICKETMASTER_CONSUMER_KEY", ""),
+			ConsumerSecret:           getEnvWithDefault("TICKETMASTER_CONSUMER_SECRET", ""),
+			BaseURL:                  getEnvWithDefault("TICKETMASTER_BASE_URL", "https://app.ticketmaster.com/discovery/v2"),
+			Timeout:                  getEnvIntWithDefault("TICKETMASTER_TIMEOUT", 30),
+			MaxResults:               getEnvIntWithDefault("TICKETMASTER_MAX_RESULTS", 200),
+			DefaultCity:              getEnvWithDefault("TICKETMASTER_DEFAULT_CITY", "Chicago"),
+			DefaultState:             getEnvWithDefault("TICKETMASTER_DEFAULT_STATE", "IL"),
+			DefaultCountry:           getEnvWithDefault("TICKETMASTER_DEFAULT_COUNTRY", "US"),
+			DateRangeMonths:          getEnvIntWithDefault("TICKETMASTER_DATE_RANGE_MONTHS", 12),
+			OnDemand:                 getEnvBoolWithDefault("TICKETMASTER_ON_DEMAND", false),
+			GeoLatLong:               getEnvWithDefault("TICKETMASTER_GEO_LATLONG", ""),
+			Radius:                   getEnvIntWithDefault("TICKETMASTER_RADIUS", 0),
+			RadiusUnit:               getEnvWithDefault("TICKETMASTER_RADIUS_UNIT", "miles"),
+			PageDelayMs:              getEnvIntWithDefault("TICKETMASTER_PAGE_DELAY_MS", 250),
+			PerUserRequestsPerMinute: getEnvIntWithDefault("TICKETMASTER_PER_USER_RPM", 30),
+			SearchCacheTTLSeconds:    getEnvIntWithDefault("TICKETMASTER_SEARCH_CACHE_TTL_SECONDS", 30),
 		},
 		Debug: DebugConfig{
 			Enabled: getEnvBoolWithDefault("DEBUG_ENABLED", false),

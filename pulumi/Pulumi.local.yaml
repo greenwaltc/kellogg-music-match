@@ -1,3 +1,5 @@
 config:
   kellogg-music-match:ingressClass: "nginx"
   kellogg-music-match:ticketmasterOnDemand: "false"
+  kellogg-music-match:ticketmasterPerUserRpm: "30"
+  kellogg-music-match:ticketmasterSearchCacheTtlSeconds: "30"

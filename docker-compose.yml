@@ -83,6 +83,10 @@ services:
       TICKETMASTER_RADIUS_UNIT: miles
       # Inter-page delay for Ticketmaster pagination (milliseconds)
       TICKETMASTER_PAGE_DELAY_MS: 600
+      # On-demand mode and guardrails
+      TICKETMASTER_ON_DEMAND: "${TICKETMASTER_ON_DEMAND:-false}"
+      TICKETMASTER_PER_USER_RPM: "${TICKETMASTER_PER_USER_RPM:-30}"
+      TICKETMASTER_SEARCH_CACHE_TTL_SECONDS: "${TICKETMASTER_SEARCH_CACHE_TTL_SECONDS:-30}"
       EMAIL_ENABLED: "true"
       EMAIL_PROVIDER: sendgrid
       EMAIL_FROM_EMAIL: support@kelloggmatch.com

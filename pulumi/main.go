@@ -82,6 +82,9 @@ func main() {
 		tmPageDelayMs := get("ticketmasterPageDelayMs", "250")
 		// Feature flag: on-demand Ticketmaster mode (default disabled to preserve legacy sync)
 		tmOnDemand := getBoolStr("ticketmasterOnDemand", false)
+		// Guardrails for on-demand search
+		tmPerUserRPM := get("ticketmasterPerUserRpm", "30")
+		tmSearchCacheTTL := get("ticketmasterSearchCacheTtlSeconds", "30")
 		emailEnabled := getBoolStr("emailEnabled", true)
 		emailProvider := get("emailProvider", "sendgrid")
 		emailFromEmail := get("emailFromEmail", "support@kelloggmatch.com")
@@ -441,6 +444,9 @@ func main() {
 									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_PAGE_DELAY_MS"), Value: tmPageDelayMs},
 									// Feature flag: enable on-demand TM search mode (disables background sync in backend)
 									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_ON_DEMAND"), Value: tmOnDemand},
+									// Guardrails & resilience for on-demand search
+									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_PER_USER_RPM"), Value: tmPerUserRPM},
+									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_SEARCH_CACHE_TTL_SECONDS"), Value: tmSearchCacheTTL},
 									// Optional geo override
 									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_GEO_LATLONG"), Value: geoLatLong},
 									&corev1.EnvVarArgs{Name: pulumi.String("TICKETMASTER_RADIUS"), Value: geoRadius},

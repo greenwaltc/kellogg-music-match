@@ -185,6 +185,31 @@ func (p *TicketmasterProxy) SearchDiscovery(ctx context.Context, opts DiscoveryS
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusTooManyRequests {
+		// Respect Retry-After when provided; retry once
+		ra := resp.Header.Get("Retry-After")
+		var wait time.Duration
+		if ra != "" {
+			if secs, err := time.ParseDuration(ra + "s"); err == nil {
+				wait = secs
+			}
+		}
+		if wait <= 0 {
+			wait = 500 * time.Millisecond
+		}
+		// drain body before retry
+		io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(wait):
+		}
+		resp, err = p.httpClient.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("failed after retry: %w", err)
+		}
+	}
 	if resp.StatusCode != http.StatusOK {
 		span.SetAttributes(attribute.Int("http.status_code", resp.StatusCode))
 		span.SetStatus(codes.Error, fmt.Sprintf("status %d", resp.StatusCode))

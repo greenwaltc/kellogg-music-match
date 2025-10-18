@@ -3,6 +3,7 @@ package business
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -29,16 +30,18 @@ type GeneratedEventsAdapter struct {
 	svc *EventSearchService
 	cfg *config.Config
 	db  AssociatedEventsQuerier
+	rl  *rateLimiter
+	sc  *searchCache
 }
 
 func NewGeneratedEventsAdapter(svc *EventSearchService, cfg *config.Config) *GeneratedEventsAdapter {
 	// Best-effort: attach queries if we can get a pool from a repository in main; for now keep nil-safe.
-	return &GeneratedEventsAdapter{svc: svc, cfg: cfg}
+	return &GeneratedEventsAdapter{svc: svc, cfg: cfg, rl: newRateLimiter(cfg.Ticketmaster.PerUserRequestsPerMinute), sc: newSearchCache(time.Duration(cfg.Ticketmaster.SearchCacheTTLSeconds) * time.Second)}
 }
 
 // NewGeneratedEventsAdapterWithQuerier allows injecting a DB querier (sqlc or fake)
 func NewGeneratedEventsAdapterWithQuerier(svc *EventSearchService, cfg *config.Config, db AssociatedEventsQuerier) *GeneratedEventsAdapter {
-	return &GeneratedEventsAdapter{svc: svc, cfg: cfg, db: db}
+	return &GeneratedEventsAdapter{svc: svc, cfg: cfg, db: db, rl: newRateLimiter(cfg.Ticketmaster.PerUserRequestsPerMinute), sc: newSearchCache(time.Duration(cfg.Ticketmaster.SearchCacheTTLSeconds) * time.Second)}
 }
 
 // SearchEvents implements GET /events/search via on-demand Ticketmaster Discovery
@@ -46,6 +49,20 @@ func (a *GeneratedEventsAdapter) SearchEvents(ctx context.Context, keyword, segm
 	if !a.cfg.Ticketmaster.OnDemand {
 		// Not enabled; return 404 to mirror temporary behavior
 		return generated.Response(http.StatusNotFound, generated.ErrorResponse{Message: "on-demand events not enabled", CreatedAt: time.Now().UTC()}), nil
+	}
+	// Per-user rate limiting
+	userKey := getUserKey(ctx)
+	if !a.rl.Allow(userKey) {
+		// Return 429 with a minimal error and implicit retry-after via config (not set header here as generated helpers don't expose headers)
+		return generated.Response(http.StatusTooManyRequests, generated.ErrorResponse{Message: "rate limit exceeded; please retry shortly", CreatedAt: time.Now().UTC()}), nil
+	}
+	if a.svc == nil {
+		return generated.Response(http.StatusInternalServerError, generated.ErrorResponse{Message: "search service unavailable", CreatedAt: time.Now().UTC()}), nil
+	}
+	// Short-TTL cache for identical queries
+	cacheKey := buildCacheKey(keyword, segmentName, classificationName, countryCode, stateCode, city, latlong, int(radius), startDateTime, endDateTime, sort, int(size), int(page), includeAssociated)
+	if v, ok := a.sc.Get(cacheKey); ok {
+		return generated.Response(http.StatusOK, v), nil
 	}
 	// Map inputs for the service
 	var startPtr, endPtr *time.Time
@@ -120,6 +137,7 @@ func (a *GeneratedEventsAdapter) SearchEvents(ctx context.Context, keyword, segm
 		items = append(items, ev)
 	}
 	pageResp := generated.EventsPage{Page: int32(in.Page), Size: int32(in.Size), Total: int32(tmResp.Page.TotalElements), Items: items}
+	a.sc.Set(cacheKey, pageResp)
 	return generated.Response(http.StatusOK, pageResp), nil
 }
 
@@ -324,6 +342,98 @@ func (a *GeneratedEventsAdapter) RemoveEventAssociation(ctx context.Context, eve
 }
 
 func ptr[T any](v T) *T { return &v }
+
+// -------- Guardrails helpers (rate limiter + cache) ---------
+
+type rateLimiter struct {
+	maxPerMin int
+	windowEnd time.Time
+	counts    map[string]int
+}
+
+func newRateLimiter(rpm int) *rateLimiter {
+	if rpm <= 0 {
+		rpm = 60
+	}
+	return &rateLimiter{maxPerMin: rpm, windowEnd: time.Now().Add(time.Minute), counts: map[string]int{}}
+}
+
+func (r *rateLimiter) Allow(key string) bool {
+	now := time.Now()
+	if now.After(r.windowEnd) {
+		r.windowEnd = now.Add(time.Minute)
+		r.counts = map[string]int{}
+	}
+	if key == "" {
+		key = "anon"
+	}
+	c := r.counts[key]
+	if c >= r.maxPerMin {
+		return false
+	}
+	r.counts[key] = c + 1
+	return true
+}
+
+type searchCacheEntry struct {
+	value   any
+	expires time.Time
+}
+
+type searchCache struct {
+	ttl   time.Duration
+	store map[string]searchCacheEntry
+}
+
+func newSearchCache(ttl time.Duration) *searchCache {
+	if ttl <= 0 {
+		ttl = 30 * time.Second
+	}
+	return &searchCache{ttl: ttl, store: map[string]searchCacheEntry{}}
+}
+
+func (c *searchCache) Get(key string) (any, bool) {
+	if e, ok := c.store[key]; ok {
+		if time.Now().Before(e.expires) {
+			return e.value, true
+		}
+		delete(c.store, key)
+	}
+	return nil, false
+}
+
+func (c *searchCache) Set(key string, v any) {
+	c.store[key] = searchCacheEntry{value: v, expires: time.Now().Add(c.ttl)}
+}
+
+func getUserKey(ctx context.Context) string {
+	type userIDGetter interface{ GetUserID() string }
+	if v := ctx.Value("user"); v != nil {
+		if u, ok := v.(userIDGetter); ok {
+			return u.GetUserID()
+		}
+	}
+	return ""
+}
+
+func buildCacheKey(keyword, segmentName, classificationName, countryCode, stateCode, city, latlong string, radius int, start, end time.Time, sort string, size, page int, includeAssociated bool) string {
+	// Note: not cryptographic; simple concatenation sufficient for in-memory cache key
+	return keyword + "|" + segmentName + "|" + classificationName + "|" + countryCode + "|" + stateCode + "|" + city + "|" + latlong + "|r=" + itoa(radius) + "|s=" + itoa(size) + "|p=" + itoa(page) + "|ia=" + boolToStr(includeAssociated) + "|t1=" + timeStr(start) + "|t2=" + timeStr(end) + "|sort=" + sort
+}
+
+func itoa(i int) string { return fmt.Sprintf("%d", i) }
+func boolToStr(b bool) string {
+	if b {
+		return "1"
+	}
+	return "0"
+}
+func timeStr(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.UTC().Format(time.RFC3339)
+}
 
 // helpers
 func toInt32(v any) int32 {
