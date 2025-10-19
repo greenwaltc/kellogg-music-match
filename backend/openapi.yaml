@@ -36,6 +36,8 @@ tags:
     description: User feedback and suggestions
   - name: Health
     description: Service health and monitoring
+  - name: Push
+    description: Web Push subscription and test utilities
 
 paths:
   /health:
@@ -379,6 +381,54 @@ paths:
                   summary: Database error
                   value:
                     message: "failed to save feedback"
+
+  /push/test/enqueue:
+    post:
+      tags:
+        - Push
+      summary: Enqueue a test web push notification for the authenticated user
+      description: |
+        Enqueues a small test notification using the async dispatcher. Intended for validation.
+        Requires Web Push to be configured on the server.
+      operationId: enqueueTestPush
+      responses:
+        '202':
+          description: Notification enqueued for delivery
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: enqueued
+              examples:
+                enqueued:
+                  value: { status: enqueued }
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '412':
+          description: Push not configured on server
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many requests (rate limited)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Failed to enqueue notification
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /register:
     post:

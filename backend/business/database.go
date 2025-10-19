@@ -67,6 +67,8 @@ type UserRepository interface {
 	GetPushSubscriptionsByUser(ctx context.Context, userID uuid.UUID) ([]sqlc.PushSubscription, error)
 	GetAnyPushSubscriptions(ctx context.Context, lim int32) ([]sqlc.PushSubscription, error)
 	DeletePushSubscriptionByEndpoint(ctx context.Context, endpoint string) error
+	// GetDistinctPushUserIDs returns distinct user IDs that have at least one stored push subscription.
+	GetDistinctPushUserIDs(ctx context.Context, limit, offset int32) ([]uuid.UUID, error)
 }
 
 // PostgreSQLUserRepository implements UserRepository using pgxpool
@@ -209,6 +211,28 @@ func (r *PostgreSQLUserRepository) GetAnyPushSubscriptions(ctx context.Context, 
 
 func (r *PostgreSQLUserRepository) DeletePushSubscriptionByEndpoint(ctx context.Context, endpoint string) error {
 	return r.queries.DeletePushSubscriptionByEndpoint(ctx, endpoint)
+}
+
+// GetDistinctPushUserIDs enumerates distinct non-null user IDs that have at least one push subscription.
+// Paged with limit/offset; order by user_id for stable pagination.
+func (r *PostgreSQLUserRepository) GetDistinctPushUserIDs(ctx context.Context, limit, offset int32) ([]uuid.UUID, error) {
+	if limit <= 0 {
+		limit = 1000
+	}
+	rows, err := r.pool.Query(ctx, `SELECT DISTINCT user_id FROM push_subscriptions WHERE user_id IS NOT NULL ORDER BY user_id OFFSET $1 LIMIT $2`, offset, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
 }
 
 // CreateUser creates a new user in the database

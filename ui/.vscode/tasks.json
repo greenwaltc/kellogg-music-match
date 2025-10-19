@@ -1,0 +1,19 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build Angular UI (prod)",
+			"type": "shell",
+			"command": "npm run build --silent --if-present --workspaces=false --",
+			"args": [
+				"--",
+				"--configuration=production"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$eslint-stylish"
+			],
+			"group": "build"
+		}
+	]
+}

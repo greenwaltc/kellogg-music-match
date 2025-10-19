@@ -39,6 +39,9 @@ func (f *fakeRepo) DeletePushSubscriptionByEndpoint(ctx context.Context, endpoin
 	f.deleted = append(f.deleted, endpoint)
 	return nil
 }
+func (f *fakeRepo) GetDistinctPushUserIDs(ctx context.Context, limit, offset int32) ([]uuid.UUID, error) {
+	return []uuid.UUID{}, nil
+}
 
 func TestSubscribeHandler_Unauthorized(t *testing.T) {
 	repo := &fakeRepo{}

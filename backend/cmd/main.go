@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"time"
+	"strings"
 
 	webpush "github.com/SherClockHolmes/webpush-go"
 	"github.com/greenwaltc/kellogg-music-match/backend/business"
@@ -31,9 +32,26 @@ func corsMiddleware(cfg *config.Config) func(http.Handler) http.Handler {
 			// Check if the origin is allowed
 			var allowedOrigin string
 			for _, allowed := range cfg.CORS.AllowedOrigins {
+				if allowed == "*" && origin != "" {
+					allowedOrigin = origin
+					break
+				}
 				if origin == allowed {
 					allowedOrigin = origin
 					break
+				}
+				// Simple wildcard match for subdomains, e.g., https://*.ngrok-free.app
+				if strings.Contains(allowed, "*") {
+					// convert pattern to suffix match after '*.'
+					// supports patterns like https://*.example.com
+					if i := strings.Index(allowed, "*"); i >= 0 {
+						prefix := allowed[:i]
+						suffix := allowed[i+1:]
+						if strings.HasPrefix(origin, prefix) && strings.HasSuffix(origin, suffix) {
+							allowedOrigin = origin
+							break
+						}
+					}
 				}
 			}
 
@@ -154,6 +172,17 @@ func main() {
 		}
 	}
 
+	// Initialize Push Notification infrastructure (service + async dispatcher)
+	// Use the narrow subset of the repository required by the service.
+	pushService := business.NewWebPushService(cfg, userRepo)
+	pushDispatcher := business.NewPushDispatcher(pushService)
+	// Start workers and ensure graceful shutdown
+	pushDispatcher.Start(context.Background())
+	defer func() {
+		logger.L().Info("push dispatcher shutdown")
+		pushDispatcher.Stop()
+	}()
+
 	// Create service wrappers that implement the OpenAPI service interfaces
 	authAPIService := NewAuthAPIServiceWrapper(authService, passwordResetService)
 	healthAPIService := NewHealthAPIServiceWrapper(healthService)
@@ -213,8 +242,14 @@ func main() {
 	// Push subscription endpoint
 	mux.HandleFunc("/push/subscribe", NewSubscribeHandler(userRepo))
 
-	// Test send endpoint (requires server to have VAPID keys)
+	// Legacy direct-send test endpoint (requires server to have VAPID keys)
 	mux.HandleFunc("/push/test", NewTestHandler(userRepo, cfg, sendWebPush))
+
+	// VAPID debug endpoint (protected by JWT)
+	mux.HandleFunc("/push/debug/vapid", NewVapidDebugHandler(userRepo, cfg))
+
+	// Async enqueue test endpoint using dispatcher (preferred)
+	mux.HandleFunc("/push/test/enqueue", NewEnqueueTestHandler(pushDispatcher, cfg))
 
 	// Initialize JWT middleware
 	jwtMiddleware := NewJWTMiddleware(jwtService)

@@ -22,12 +22,42 @@ export class PushService {
 
   constructor() {
     // Log push messages delivered to the SW and forwarded to the app
-    this.swPush.messages.subscribe(msg => {
+    this.swPush.messages.subscribe((msg: any) => {
       console.log('[Push] message', msg);
+      // Fallback: only show a page-level notification if the SW did NOT include a notification.
+      // This avoids duplicate notifications when the SW already displayed one.
+      try {
+        const noti = msg?.notification;
+        if (!noti && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+          const d = msg?.data || {};
+          const n = new Notification(d.title ?? 'Notification', {
+            body: d.body,
+            icon: d.icon,
+            badge: d.badge,
+            data: d,
+          });
+          n.onclick = () => {
+            try {
+              const url = (d && (d.url || d.link)) || '/';
+              if (url && typeof window !== 'undefined') {
+                window.focus?.();
+                window.location.assign(url);
+              }
+            } catch {}
+          };
+        }
+      } catch {}
     });
-    // Log notification clicks
-    this.swPush.notificationClicks.subscribe(event => {
+    // Log notification clicks and navigate when possible
+    this.swPush.notificationClicks.subscribe((event: any) => {
       console.log('[Push] notification click', event);
+      try {
+        const url = event?.notification?.data?.url || event?.notification?.data?.link;
+        if (url && typeof window !== 'undefined') {
+          window.focus?.();
+          window.location.assign(url);
+        }
+      } catch {}
     });
   }
 
@@ -42,6 +72,20 @@ export class PushService {
     } catch {
       this.hasDeviceSubscription.set(false);
     }
+  }
+
+  // Fetch a fresh VAPID public key bypassing SW cache; fallback to current in-memory config
+  private async getFreshVapidKey(): Promise<string> {
+    try {
+      const res = await fetch('/config.json?ngsw-bypass=true', { cache: 'no-store' });
+      if (res.ok) {
+        const fresh = await res.json();
+        const key = this.normalizeVapidKey(fresh?.vapidPublicKey);
+        if (key) return key;
+      }
+    } catch {}
+    const { vapidPublicKey } = this.cfg.get<ExtendedConfig>();
+    return this.normalizeVapidKey(vapidPublicKey);
   }
 
   private normalizeVapidKey(k: string | undefined | null): string {
@@ -120,8 +164,8 @@ export class PushService {
       return null;
     }
 
-  const { vapidPublicKey } = this.cfg.get<ExtendedConfig>();
-    const serverPublicKey = this.normalizeVapidKey(vapidPublicKey);
+    // Always prefer a fresh key from the network to avoid stale SW-cached config
+    const serverPublicKey = await this.getFreshVapidKey();
     if (!serverPublicKey) {
       console.error('[Push] Missing vapidPublicKey in config.json');
       this.toast.show('Push is not configured on the server (missing VAPID key).', { type: 'error', durationMs: 5000 });
@@ -149,7 +193,10 @@ export class PushService {
         }
       } catch {}
 
-  const sub = await this.swPush.requestSubscription({ serverPublicKey });
+    // Log fingerprint to help correlate which key is used client-side (first 8 chars)
+    try { console.log('[Push] Using VAPID key (prefix):', serverPublicKey.substring(0, 12)); } catch {}
+
+    const sub = await this.swPush.requestSubscription({ serverPublicKey });
       console.log('[Push] Subscription created:', JSON.stringify(sub));
 
       try {

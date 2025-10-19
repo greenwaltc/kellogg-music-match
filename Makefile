@@ -5,7 +5,7 @@ IMAGE_TAG ?= $(shell date +%Y%m%d-%H%M%S)
 GIT_SHA ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 IMAGE_VERSION ?= $(IMAGE_TAG)-$(GIT_SHA)
 
-.PHONY: help docs dev status events-status events-sample clean backend-test build docker-build docker-run docker-stop docker-logs docker-clean test infra-preview infra-deploy infra-destroy k3s-import k3s-build-import k3s-deploy k3s-status db-migrate db-connect
+.PHONY: help docs dev status events-status events-sample clean backend-test build docker-build docker-run docker-stop docker-logs docker-clean test infra-preview infra-deploy infra-destroy k3s-import k3s-build-import k3s-deploy k3s-status db-migrate db-connect generate-vapid-keys
 
 help:
 	@echo "🎵 Kellogg Music Match - Available Commands:"
@@ -48,6 +48,9 @@ help:
 	@echo ""
 	@echo "🧹 Cleanup:"
 	@echo "  make clean          Clean containers"
+	@echo ""
+	@echo "🔐 Web Push / VAPID:"
+	@echo "  make generate-vapid-keys  Generate a new VAPID key pair and print .env lines"
 
 docs:
 	@echo "📚 Documentation Navigation:"
@@ -203,4 +206,21 @@ ngrok-tunnel: ## Start ngrok tunnel for backend
 .DEFAULT_GOAL := help
 
 generate-vapid-keys:
-	npx web-push generate-vapid-keys
+	@set -e; \
+	if command -v npx >/dev/null 2>&1; then \
+	  CMD="npx --yes web-push generate-vapid-keys"; \
+	else \
+	  echo "[vapid] npx not found; falling back to Docker (node:20-alpine)"; \
+	  CMD="docker run --rm node:20-alpine sh -lc 'npx --yes web-push generate-vapid-keys'"; \
+	fi; \
+	OUT=$$(sh -lc "$$CMD"); \
+	echo "$$OUT"; \
+	PUB=$$(printf "%s\n" "$$OUT" | awk -F': ' '/Public Key/{print $$2}'); \
+	PRIV=$$(printf "%s\n" "$$OUT" | awk -F': ' '/Private Key/{print $$2}'); \
+	echo ""; \
+	echo "🔐 Copy-paste into your .env (or export in shell):"; \
+	echo "VAPID_PUBLIC_KEY=$$PUB"; \
+	echo "VAPID_PRIVATE_KEY=$$PRIV"; \
+	echo "VAPID_SUBJECT=mailto:support@kelloggmatch.com"; \
+	echo ""; \
+	echo "Tip: update docker-compose and restart: docker compose up -d --build"

@@ -57,6 +57,49 @@ export class AppComponent implements OnInit {
     });
   }
 
+  testPushEnqueue() {
+    this.http.post(this.api.url('/push/test/enqueue'), {}).subscribe({
+      next: () => this.toast.show('Async test notification enqueued', { type: 'success', durationMs: 3000 }),
+      error: (err) => {
+        console.error('Enqueue test push failed', err);
+        let msg = 'Failed to enqueue notification.';
+        if (err?.status === 429) msg = 'Too many requests. Try again in a minute.';
+        if (err?.status === 412) msg = 'Push not configured on the server.';
+        this.toast.show(msg, { type: 'error', durationMs: 5000 });
+      }
+    });
+  }
+
+  // Debug visibility guard: enable by running in console `localStorage.setItem('kmm_debug_ui','1')`
+  debugVisible(): boolean {
+    try { return !!localStorage.getItem('kmm_debug_ui'); } catch { return false; }
+  }
+
+  // Call backend VAPID debug endpoint and show summary
+  vapidDebug() {
+    // Try to include bearer token if present; otherwise rely on cookies
+    let headers: any = {};
+    try {
+      const tok = localStorage.getItem('kmm_token');
+      if (tok) headers['Authorization'] = `Bearer ${tok}`;
+    } catch {}
+    this.http.get<any>(this.api.url('/push/debug/vapid'), { headers, withCredentials: true }).subscribe({
+      next: (res) => {
+        console.log('[VAPID Debug]', res);
+        const match = res?.pairMatch ? 'match' : 'MISMATCH';
+        const msg = `VAPID ${match}. pub:${res?.publicKeyPrefix || ''} derived:${res?.derivedPublicPrefix || ''} host:${res?.endpointHost || ''} aud:${res?.audienceComputed || ''}${res?.usedFallbackAny ? ' (fallback)' : ''}`;
+        this.toast.show(msg, { type: res?.pairMatch ? 'success' : 'warning', durationMs: 6000 });
+      },
+      error: (err) => {
+        console.error('VAPID debug failed', err);
+        let msg = 'VAPID debug failed';
+        if (err?.status === 401) msg = 'Unauthorized (login required)';
+        if (err?.status === 412) msg = 'Push disabled on server';
+        this.toast.show(msg, { type: 'error', durationMs: 5000 });
+      }
+    });
+  }
+
   logout(): void {
     this.auth.logout();
     this.nav.resetVisited();

@@ -175,8 +175,9 @@ button[disabled] { opacity:0.6; cursor:not-allowed; }
   position: fixed;
   top: 1rem;
   right: 1rem;
-  display: inline-flex;
-  align-items: center;
+  display: flex;
+  align-items: flex-start; /* better for multi-line text */
+  flex-wrap: wrap; /* allow content to wrap to new lines */
   gap: 0.5rem;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -185,11 +186,18 @@ button[disabled] { opacity:0.6; cursor:not-allowed; }
   padding: 0.6rem 0.75rem;
   z-index: 2000;
   color: var(--color-text);
+  max-width: min(90vw, 520px); /* constrain width so text wraps */
 }
 .toast.success { border-color: #16a34a; }
 .toast.error { border-color: #dc2626; }
 .toast.warning { border-color: #d97706; }
-.toast-text { font-size: 0.9rem; }
-.toast-action { background: transparent; border: 1px solid var(--color-border); color: var(--color-text); padding: 0.3rem 0.5rem; border-radius: 6px; font-size: 0.8rem; }
-.toast-close { background: transparent; border: none; color: var(--color-text-muted); font-size: 1rem; line-height: 1; padding: 0.2rem; }
+.toast-text { 
+  font-size: 0.9rem; 
+  white-space: normal; /* allow line wrapping */
+  overflow-wrap: anywhere; /* break long tokens like URLs */
+  word-break: break-word;
+  flex: 1 1 auto; /* take remaining width so buttons stay visible */
+}
+.toast-action { background: transparent; border: 1px solid var(--color-border); color: var(--color-text); padding: 0.3rem 0.5rem; border-radius: 6px; font-size: 0.8rem; flex-shrink: 0; }
+.toast-close { background: transparent; border: none; color: var(--color-text-muted); font-size: 1rem; line-height: 1; padding: 0.2rem; flex-shrink: 0; }
 

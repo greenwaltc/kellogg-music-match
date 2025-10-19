@@ -59,7 +59,7 @@ services:
       DB_USER: kellogg_user
       DB_PASSWORD: ${DB_PASSWORD:-}
       DB_SSLMODE: disable
-      DEBUG_ENABLED: "false"
+      DEBUG_ENABLED: "true"
       # Spotify API credentials (provide via .env; do NOT hardcode secrets)
       # Ensure your .env file contains:
       #   SPOTIFY_CLIENT_ID=your_spotify_app_client_id
@@ -98,7 +98,7 @@ services:
       PUSH_ENABLED: ${PUSH_ENABLED:-true}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
-      VAPID_SUBJECT: "${VAPID_SUBJECT:-mailto:support@kelloggmatch.com}"
+      VAPID_SUBJECT: "${VAPID_SUBJECT:-https://kelloggmatch.com}"
     depends_on:
       flyway:
         condition: service_completed_successfully

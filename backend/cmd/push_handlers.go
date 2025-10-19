@@ -10,8 +10,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/greenwaltc/kellogg-music-match/backend/business"
 	"github.com/greenwaltc/kellogg-music-match/backend/config"
 	sqlc "github.com/greenwaltc/kellogg-music-match/backend/db/sqlc"
+	"github.com/greenwaltc/kellogg-music-match/backend/logger"
+	"net/url"
 )
 
 // PushSender abstracts sending a Web Push payload to a subscription
@@ -59,6 +62,12 @@ func NewSubscribeHandler(repo PushRepo) http.HandlerFunc {
 			http.Error(w, "failed to store subscription", http.StatusInternalServerError)
 			return
 		}
+		// Diagnostics: log endpoint host and UA
+		if u, _ := url.Parse(sub.Endpoint); u != nil {
+			logger.L().Info("push subscription stored", "userId", uidPtr.String(), "host", u.Host, "ua", ua)
+		} else {
+			logger.L().Info("push subscription stored", "userId", uidPtr.String(), "endpoint", sub.Endpoint, "ua", ua)
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{"status": "ok"})
@@ -100,29 +109,35 @@ func NewTestHandler(repo PushRepo, cfg *config.Config, sender PushSender) http.H
 			userID = parsed
 		}
 
-		// rate limit check
-		limiter.mu.Lock()
-		st := limiter.m[userID]
-		now := time.Now()
-		if st == nil || now.Sub(st.windowStart) > 60*time.Second {
-			st = &rlState{count: 0, windowStart: now}
-			limiter.m[userID] = st
-		}
-		st.count++
-		cur := st.count
-		limiter.mu.Unlock()
+		// rate limit check (bypass in debug mode to ease testing)
+		if !cfg.Debug.Enabled {
+			limiter.mu.Lock()
+			st := limiter.m[userID]
+			now := time.Now()
+			if st == nil || now.Sub(st.windowStart) > 60*time.Second {
+				st = &rlState{count: 0, windowStart: now}
+				limiter.m[userID] = st
+			}
+			st.count++
+			cur := st.count
+			limiter.mu.Unlock()
 
-		// Set basic rate limit headers for visibility
-		w.Header().Set("X-RateLimit-Limit", "3")
-		w.Header().Set("X-RateLimit-Window", "60s")
-		rem := 3 - cur
-		if rem < 0 {
-			rem = 0
-		}
-		w.Header().Set("X-RateLimit-Remaining", strconv.Itoa(rem))
-		if cur > 3 {
-			http.Error(w, "too many requests", http.StatusTooManyRequests)
-			return
+			// Set basic rate limit headers for visibility
+			w.Header().Set("X-RateLimit-Limit", "3")
+			w.Header().Set("X-RateLimit-Window", "60s")
+			rem := 3 - cur
+			if rem < 0 {
+				rem = 0
+			}
+			w.Header().Set("X-RateLimit-Remaining", strconv.Itoa(rem))
+			if cur > 3 {
+				http.Error(w, "too many requests", http.StatusTooManyRequests)
+				return
+			}
+		} else {
+			w.Header().Set("X-RateLimit-Limit", "debug")
+			w.Header().Set("X-RateLimit-Window", "0s")
+			w.Header().Set("X-RateLimit-Remaining", "debug")
 		}
 
 		subs, err := repo.GetPushSubscriptionsByUser(r.Context(), userID)
@@ -153,5 +168,94 @@ func NewTestHandler(repo PushRepo, cfg *config.Config, sender PushSender) http.H
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{"status": "sent", "sent": sent, "failed": failed, "deleted": deleted})
+	}
+}
+
+// NewEnqueueTestHandler enqueues a basic push notification for the authenticated user via the async dispatcher
+func NewEnqueueTestHandler(notifier business.PushNotifier, cfg *config.Config) http.HandlerFunc {
+	// reuse the same simple limiter shape
+	type rlState struct {
+		count       int
+		windowStart time.Time
+	}
+	limiter := struct {
+		m  map[uuid.UUID]*rlState
+		mu sync.Mutex
+	}{m: make(map[uuid.UUID]*rlState)}
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		if !cfg.Push.Enabled || cfg.Push.VAPIDPrivate == "" || cfg.Push.VAPIDPublic == "" {
+			http.Error(w, "push not configured", http.StatusPreconditionFailed)
+			return
+		}
+
+		// user auth required
+		var userID uuid.UUID
+		if u, ok := GetUserFromContext(r.Context()); !ok || u == nil || u.UserID == "" {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		} else {
+			parsed, err := uuid.Parse(u.UserID)
+			if err != nil {
+				http.Error(w, "invalid user id", http.StatusUnauthorized)
+				return
+			}
+			userID = parsed
+		}
+
+		// rate limit (bypass in debug mode)
+		if !cfg.Debug.Enabled {
+			limiter.mu.Lock()
+			st := limiter.m[userID]
+			now := time.Now()
+			if st == nil || now.Sub(st.windowStart) > 60*time.Second {
+				st = &rlState{count: 0, windowStart: now}
+				limiter.m[userID] = st
+			}
+			st.count++
+			cur := st.count
+			limiter.mu.Unlock()
+			w.Header().Set("X-RateLimit-Limit", "3")
+			w.Header().Set("X-RateLimit-Window", "60s")
+			rem := 3 - cur
+			if rem < 0 {
+				rem = 0
+			}
+			w.Header().Set("X-RateLimit-Remaining", strconv.Itoa(rem))
+			if cur > 3 {
+				http.Error(w, "too many requests", http.StatusTooManyRequests)
+				return
+			}
+		} else {
+			w.Header().Set("X-RateLimit-Limit", "debug")
+			w.Header().Set("X-RateLimit-Window", "0s")
+			w.Header().Set("X-RateLimit-Remaining", "debug")
+		}
+
+		// Build a tiny test notification; business layer wraps into SW-compatible envelope
+		n := business.WebPushNotification{
+			Title:              "Kellogg Music Match",
+			Body:               "Async test notification queued",
+			Icon:               "/assets/icons/icon-192x192.png",
+			Badge:              "/assets/icons/badge-72x72.png",
+			ClickURL:           "/matches",
+			RequireInteraction: false,
+			Data:               map[string]any{"source": "enqueue-test"},
+		}
+		// Enqueue one job for this user. The dispatcher will call SendToUser which fans out
+		// to ALL of the user's stored subscriptions (desktop + phone), so each device gets it.
+		// Use a short timeout to avoid blocking on a full queue.
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+		if err := notifier.EnqueueToUser(ctx, userID, n); err != nil {
+			http.Error(w, "failed to enqueue notification: "+err.Error(), http.StatusServiceUnavailable)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusAccepted)
+		_ = json.NewEncoder(w).Encode(map[string]any{"status": "enqueued"})
 	}
 }

@@ -56,5 +56,7 @@
   </div>
   <footer class="site-footer">
     <a class="footer-cta-link" href="https://forms.gle/o4ngKkPN59psBFmTA" target="_blank" rel="noopener noreferrer" aria-label="Open Feedback Survey in a new tab">Feedback Survey</a>
+    <button *ngIf="isLoggedIn()" type="button" class="ghost" (click)="testPushEnqueue()" aria-label="Send test notification">Send Test Notification</button>
+    <button *ngIf="isLoggedIn()" type="button" class="ghost" (click)="vapidDebug()" aria-label="Run VAPID debug">VAPID Debug</button>
   </footer>
 </div>
