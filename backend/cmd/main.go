@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 	"strings"
+	"time"
 
 	webpush "github.com/SherClockHolmes/webpush-go"
 	"github.com/greenwaltc/kellogg-music-match/backend/business"

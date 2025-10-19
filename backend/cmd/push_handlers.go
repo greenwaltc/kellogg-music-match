@@ -9,12 +9,13 @@ import (
 	"sync"
 	"time"
 
+	"net/url"
+
 	"github.com/google/uuid"
 	"github.com/greenwaltc/kellogg-music-match/backend/business"
 	"github.com/greenwaltc/kellogg-music-match/backend/config"
 	sqlc "github.com/greenwaltc/kellogg-music-match/backend/db/sqlc"
 	"github.com/greenwaltc/kellogg-music-match/backend/logger"
-	"net/url"
 )
 
 // PushSender abstracts sending a Web Push payload to a subscription
