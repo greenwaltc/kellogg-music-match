@@ -1,4 +1,4 @@
--- Migration: 031_rolling_graduation_year_constraint.sql
+-- Migration: 032_rolling_graduation_year_constraint.sql
 -- Purpose: Replace fixed graduation_year CHECK constraint (2025..2030)
 --          with a rolling validation of [current year .. current year + 5]
 

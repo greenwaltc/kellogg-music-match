@@ -8,7 +8,7 @@
 ARG DEBUG=false
 
 # 1. Build stage
-FROM golang:1.23-alpine AS build
+FROM golang:1.24-alpine AS build
 ARG DEBUG
 
 RUN apk --no-cache add ca-certificates git curl bash
