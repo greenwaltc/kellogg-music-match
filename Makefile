@@ -227,3 +227,7 @@ generate-vapid-keys:
 
 run-iphone-17:
 	xcrun simctl boot D67581D4-2783-4A81-BA85-B67358FB94AA
+
+flutter-run-ngrok: ## Run Flutter app with API base set to current ngrok URL
+	@cd ui_flutter && flutter run -d ios \
+	  --dart-define=API_BASE_URL=https://twolegged-leonida-interchangeably.ngrok-free.dev

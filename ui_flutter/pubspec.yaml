@@ -1,0 +1,31 @@
+name: ui_flutter
+description: "Kellogg Music Match Flutter app"
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.2
+  shared_preferences: ^2.3.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/icons/
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icons/icon-512x512.png"
+  adaptive_icon_foreground: "assets/icons/icon-512x512.png"
+  adaptive_icon_background: "#ffffff"
