@@ -224,3 +224,6 @@ generate-vapid-keys:
 	echo "VAPID_SUBJECT=mailto:support@kelloggmatch.com"; \
 	echo ""; \
 	echo "Tip: update docker-compose and restart: docker compose up -d --build"
+
+run-iphone-17:
+	xcrun simctl boot D67581D4-2783-4A81-BA85-B67358FB94AA
