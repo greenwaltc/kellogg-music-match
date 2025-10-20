@@ -42,6 +42,7 @@ func (f *fakeRepo) DeletePushSubscriptionByEndpoint(ctx context.Context, endpoin
 func (f *fakeRepo) GetDistinctPushUserIDs(ctx context.Context, limit, offset int32) ([]uuid.UUID, error) {
 	return []uuid.UUID{}, nil
 }
+
 // Satisfy interface after refactor: no-op stubs for device token repo not required here
 
 func TestSubscribeHandler_Unauthorized(t *testing.T) {

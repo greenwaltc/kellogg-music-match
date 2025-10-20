@@ -280,7 +280,10 @@ func NewRegisterDeviceTokenHandler(repo DeviceTokenRepo) http.HandlerFunc {
 		AppVersion  string `json:"appVersion,omitempty"`
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost { w.WriteHeader(http.StatusMethodNotAllowed); return }
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
 		var body req
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Token == "" || (body.Platform != "ios" && body.Platform != "android") {
 			http.Error(w, "invalid payload", http.StatusBadRequest)
@@ -304,18 +307,32 @@ func NewRegisterDeviceTokenHandler(repo DeviceTokenRepo) http.HandlerFunc {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{"status":"ok"})
+		_ = json.NewEncoder(w).Encode(map[string]any{"status": "ok"})
 	}
 }
 
 // NewListDeviceTokensHandler returns device tokens for the authenticated user
 func NewListDeviceTokensHandler(repo DeviceTokenRepo) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet { w.WriteHeader(http.StatusMethodNotAllowed); return }
-		uctx, ok := GetUserFromContext(r.Context()); if !ok || uctx == nil || uctx.UserID == "" { http.Error(w, "unauthorized", http.StatusUnauthorized); return }
-		userID, err := uuid.Parse(uctx.UserID); if err != nil { http.Error(w, "invalid user id", http.StatusUnauthorized); return }
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		uctx, ok := GetUserFromContext(r.Context())
+		if !ok || uctx == nil || uctx.UserID == "" {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		userID, err := uuid.Parse(uctx.UserID)
+		if err != nil {
+			http.Error(w, "invalid user id", http.StatusUnauthorized)
+			return
+		}
 		toks, err := repo.ListDeviceTokensByUser(r.Context(), userID)
-		if err != nil { http.Error(w, "failed to load tokens", http.StatusInternalServerError); return }
+		if err != nil {
+			http.Error(w, "failed to load tokens", http.StatusInternalServerError)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{"tokens": toks})
 	}
@@ -323,19 +340,35 @@ func NewListDeviceTokensHandler(repo DeviceTokenRepo) http.HandlerFunc {
 
 // NewDeleteDeviceTokenHandler deletes a token for the authenticated user
 func NewDeleteDeviceTokenHandler(repo DeviceTokenRepo) http.HandlerFunc {
-	type req struct{ Platform string `json:"platform"`; Token string `json:"token"` }
+	type req struct {
+		Platform string `json:"platform"`
+		Token    string `json:"token"`
+	}
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodDelete { w.WriteHeader(http.StatusMethodNotAllowed); return }
+		if r.Method != http.MethodDelete {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
 		var body req
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Token == "" || (body.Platform != "ios" && body.Platform != "android") {
-			http.Error(w, "invalid payload", http.StatusBadRequest); return
+			http.Error(w, "invalid payload", http.StatusBadRequest)
+			return
 		}
-		uctx, ok := GetUserFromContext(r.Context()); if !ok || uctx == nil || uctx.UserID == "" { http.Error(w, "unauthorized", http.StatusUnauthorized); return }
-		userID, err := uuid.Parse(uctx.UserID); if err != nil { http.Error(w, "invalid user id", http.StatusUnauthorized); return }
+		uctx, ok := GetUserFromContext(r.Context())
+		if !ok || uctx == nil || uctx.UserID == "" {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		userID, err := uuid.Parse(uctx.UserID)
+		if err != nil {
+			http.Error(w, "invalid user id", http.StatusUnauthorized)
+			return
+		}
 		if err := repo.DeleteDeviceToken(r.Context(), userID, body.Platform, body.Token); err != nil {
-			http.Error(w, "failed to delete", http.StatusInternalServerError); return
+			http.Error(w, "failed to delete", http.StatusInternalServerError)
+			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{"status":"deleted"})
+		_ = json.NewEncoder(w).Encode(map[string]any{"status": "deleted"})
 	}
 }

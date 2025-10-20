@@ -145,19 +145,19 @@ type NativePushConfig struct {
 
 // APNsConfig for Apple Push Notifications
 type APNsConfig struct {
-	Enabled     bool
-	Env         string // "production" or "development"
-	TeamID      string
-	KeyID       string
-	KeyPEM      string // contents of the .p8 private key (or path via KEY_PEM_PATH)
-	BundleID    string // app bundle identifier
+	Enabled  bool
+	Env      string // "production" or "development"
+	TeamID   string
+	KeyID    string
+	KeyPEM   string // contents of the .p8 private key (or path via KEY_PEM_PATH)
+	BundleID string // app bundle identifier
 }
 
 // FCMConfig for Firebase Cloud Messaging
 type FCMConfig struct {
-	Enabled          bool
-	ProjectID        string
-	ServiceAccount   string // JSON credentials (or path via SERVICE_ACCOUNT_PATH)
+	Enabled        bool
+	ProjectID      string
+	ServiceAccount string // JSON credentials (or path via SERVICE_ACCOUNT_PATH)
 }
 
 // Load creates a new Config instance from environment variables

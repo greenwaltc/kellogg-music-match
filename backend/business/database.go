@@ -266,13 +266,17 @@ ON CONFLICT (user_id, platform, token) DO UPDATE SET
 
 func (r *PostgreSQLUserRepository) ListDeviceTokensByUser(ctx context.Context, userID uuid.UUID) ([]DeviceToken, error) {
 	rows, err := r.pool.Query(ctx, `SELECT user_id, platform, token, bundle_id, app_package, device_model, os_version, app_version, COALESCE(last_seen_at, created_at) FROM push_device_tokens WHERE user_id=$1 ORDER BY last_seen_at DESC`, userID)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer rows.Close()
 	var out []DeviceToken
 	for rows.Next() {
 		var dt DeviceToken
 		var bundleID, appPkg, devModel, osVer, appVer *string
-		if err := rows.Scan(&dt.UserID, &dt.Platform, &dt.Token, &bundleID, &appPkg, &devModel, &osVer, &appVer, &dt.LastSeenAt); err != nil { return nil, err }
+		if err := rows.Scan(&dt.UserID, &dt.Platform, &dt.Token, &bundleID, &appPkg, &devModel, &osVer, &appVer, &dt.LastSeenAt); err != nil {
+			return nil, err
+		}
 		dt.BundleID = bundleID
 		dt.AppPackage = appPkg
 		dt.DeviceModel = devModel
@@ -288,7 +292,12 @@ func (r *PostgreSQLUserRepository) DeleteDeviceToken(ctx context.Context, userID
 	return err
 }
 
-func nullIfEmpty(s string) interface{} { if s == "" { return nil } ; return s }
+func nullIfEmpty(s string) interface{} {
+	if s == "" {
+		return nil
+	}
+	return s
+}
 
 // CreateUser creates a new user in the database
 func (r *PostgreSQLUserRepository) CreateUser(ctx context.Context, id uuid.UUID, username, email, firstName, lastName, passwordHash, program string, graduationYear int32) (*sqlc.User, error) {

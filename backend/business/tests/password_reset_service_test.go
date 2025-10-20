@@ -89,6 +89,7 @@ func (m *EnhancedMockUserRepository) DeleteExpiredPasswordResetTokens(ctx contex
 	}
 	return nil
 }
+
 // Satisfy interface method introduced for push notifications (unused here)
 func (m *EnhancedMockUserRepository) GetDistinctPushUserIDs(ctx context.Context, limit, offset int32) ([]uuid.UUID, error) {
 	return []uuid.UUID{}, nil

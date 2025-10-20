@@ -152,6 +152,7 @@ func (m *EnhancedMockUserRepository) GetAnyPushSubscriptions(ctx context.Context
 func (m *EnhancedMockUserRepository) DeletePushSubscriptionByEndpoint(ctx context.Context, endpoint string) error {
 	return nil
 }
+
 // Satisfy interface: enumerate distinct push-enabled user IDs (unused in this suite)
 func (m *EnhancedMockUserRepository) GetDistinctPushUserIDs(ctx context.Context, limit, offset int32) ([]uuid.UUID, error) {
 	return []uuid.UUID{}, nil
