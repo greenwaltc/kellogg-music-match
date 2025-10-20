@@ -174,8 +174,9 @@ func main() {
 
 	// Initialize Push Notification infrastructure (service + async dispatcher)
 	// Use the narrow subset of the repository required by the service.
-	pushService := business.NewWebPushService(cfg, userRepo)
-	pushDispatcher := business.NewPushDispatcher(pushService)
+	// Use unified push service that can deliver via WebPush and (optionally) APNs/FCM
+	unifiedPush := business.NewUnifiedPushService(cfg, userRepo)
+	pushDispatcher := business.NewPushDispatcher(unifiedPush)
 	// Start workers and ensure graceful shutdown
 	pushDispatcher.Start(context.Background())
 	defer func() {
@@ -249,7 +250,15 @@ func main() {
 	mux.HandleFunc("/push/debug/vapid", NewVapidDebugHandler(userRepo, cfg))
 
 	// Async enqueue test endpoint using dispatcher (preferred)
-	mux.HandleFunc("/push/test/enqueue", NewEnqueueTestHandler(pushDispatcher, cfg))
+	mux.HandleFunc("/push/test/enqueue", NewEnqueueTestHandler(userRepo, pushDispatcher, cfg))
+	// Register native device token endpoints (APNs/FCM) only if concrete repo supports them
+	if pr, ok := userRepo.(*business.PostgreSQLUserRepository); ok {
+		mux.HandleFunc("/push/device/register", NewRegisterDeviceTokenHandler(pr))
+		mux.HandleFunc("/push/device/list", NewListDeviceTokensHandler(pr))
+		mux.HandleFunc("/push/device", NewDeleteDeviceTokenHandler(pr))
+	} else {
+		logger.L().Warn("device token repo not available; native push token endpoints disabled")
+	}
 
 	// Initialize JWT middleware
 	jwtMiddleware := NewJWTMiddleware(jwtService)

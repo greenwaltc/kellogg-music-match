@@ -133,7 +133,6 @@ config:
   # kellogg-music-match:networkPolicyStrict: "true"
   kellogg-music-match:vapidSubject: "mailto:support@kelloggmatch.com"
   kellogg-music-match:pushEnabled: "true"
-
   kellogg-music-match:dbPassword:
     secure: AAABACz2kWesUG/zU9jZt3RYsnPpgLaOXZJE2DJ9dyReh90OaON6/0IQixIIVXo/bV+7IK91xms=
   kellogg-music-match:ticketmasterConsumerKey:
@@ -160,6 +159,19 @@ config:
     secure: AAABALI9gSmiZxHd4EGmE/au0jwhF6F71yq077eDF/snFbLgsqfXjBR1ox9kLUlD1HO2lDrbawzJCILQjl2pkSNdtALOCC3G4PJV
   kellogg-music-match:vapidPublicKey:
     secure: AAABABkBg3YwiaSshcc3SrJxVn/2kzTXyoXfqM3vIM3aP8wA3YDKkiCbFNTQJDZGpZ3MyjKXShQND6ZZ+KMmSWtTh+ZeCLizkqDsDjYz99buxNIXNx+F83nNTmF015XPztkuwWuOlHtSeD4+VuTOpfnZSRI0yMw=
+  kellogg-music-match:nativePushEnabled: "true"
+  kellogg-music-match:apnsEnabled: "true"
+  kellogg-music-match:apnsEnv: TODO
+  kellogg-music-match:apnsTeamId: TODO
+  kellogg-music-match:apnsKeyId:
+    secure: AAABADMhcR8gJ/0WLifptybR4IPx7oKw8q8UDfThWOo/IzGh
+  kellogg-music-match:apnsKeyPem:
+    secure: AAABAH7902P6Hr2tDGvLy8JK80VcvFddPts4aVz18NM5PljK
+  kellogg-music-match:apnsBundleId:
+    secure: AAABAJ5kVVf/hZcnvS3O8Fah1cY1H+L+AG/Bdh3/iGAu/RxO
+  kellogg-music-match:fcmEnabled: "true"
+  kellogg-music-match:fcmProjectId: TODO
+  kellogg-music-match:fcmServiceAccount: TODO
 
 # SECRETS REMINDER: For each placeholder beginning with REPLACE_ run
 #   pulumi config set --secret kellogg-music-match:<key> <real-value>

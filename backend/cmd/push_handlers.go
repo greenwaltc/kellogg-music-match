@@ -29,6 +29,13 @@ type PushRepo interface {
 	DeletePushSubscriptionByEndpoint(ctx context.Context, endpoint string) error
 }
 
+// DeviceTokenRepo is the minimal repository contract for managing native device tokens
+type DeviceTokenRepo interface {
+	UpsertDeviceToken(ctx context.Context, userID uuid.UUID, platform, token, bundleID, appPackage, deviceModel, osVersion, appVersion string) error
+	ListDeviceTokensByUser(ctx context.Context, userID uuid.UUID) ([]business.DeviceToken, error)
+	DeleteDeviceToken(ctx context.Context, userID uuid.UUID, platform, token string) error
+}
+
 // NewSubscribeHandler returns an http.HandlerFunc to upsert a subscription for the current user
 func NewSubscribeHandler(repo PushRepo) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -173,7 +180,7 @@ func NewTestHandler(repo PushRepo, cfg *config.Config, sender PushSender) http.H
 }
 
 // NewEnqueueTestHandler enqueues a basic push notification for the authenticated user via the async dispatcher
-func NewEnqueueTestHandler(notifier business.PushNotifier, cfg *config.Config) http.HandlerFunc {
+func NewEnqueueTestHandler(_ PushRepo, notifier business.PushNotifier, cfg *config.Config) http.HandlerFunc {
 	// reuse the same simple limiter shape
 	type rlState struct {
 		count       int
@@ -258,5 +265,77 @@ func NewEnqueueTestHandler(notifier business.PushNotifier, cfg *config.Config) h
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusAccepted)
 		_ = json.NewEncoder(w).Encode(map[string]any{"status": "enqueued"})
+	}
+}
+
+// NewRegisterDeviceTokenHandler stores a native push token for APNs/FCM
+func NewRegisterDeviceTokenHandler(repo DeviceTokenRepo) http.HandlerFunc {
+	type req struct {
+		Platform    string `json:"platform"` // ios|android
+		Token       string `json:"token"`
+		BundleID    string `json:"bundleId,omitempty"`
+		AppPackage  string `json:"appPackage,omitempty"`
+		DeviceModel string `json:"deviceModel,omitempty"`
+		OSVersion   string `json:"osVersion,omitempty"`
+		AppVersion  string `json:"appVersion,omitempty"`
+	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost { w.WriteHeader(http.StatusMethodNotAllowed); return }
+		var body req
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Token == "" || (body.Platform != "ios" && body.Platform != "android") {
+			http.Error(w, "invalid payload", http.StatusBadRequest)
+			return
+		}
+		// Require authenticated user
+		var userID uuid.UUID
+		if uctx, ok := GetUserFromContext(r.Context()); !ok || uctx == nil || uctx.UserID == "" {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		} else {
+			parsed, err := uuid.Parse(uctx.UserID)
+			if err != nil {
+				http.Error(w, "invalid user id", http.StatusUnauthorized)
+				return
+			}
+			userID = parsed
+		}
+		if err := repo.UpsertDeviceToken(r.Context(), userID, body.Platform, body.Token, body.BundleID, body.AppPackage, body.DeviceModel, body.OSVersion, body.AppVersion); err != nil {
+			http.Error(w, "failed to store token", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"status":"ok"})
+	}
+}
+
+// NewListDeviceTokensHandler returns device tokens for the authenticated user
+func NewListDeviceTokensHandler(repo DeviceTokenRepo) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet { w.WriteHeader(http.StatusMethodNotAllowed); return }
+		uctx, ok := GetUserFromContext(r.Context()); if !ok || uctx == nil || uctx.UserID == "" { http.Error(w, "unauthorized", http.StatusUnauthorized); return }
+		userID, err := uuid.Parse(uctx.UserID); if err != nil { http.Error(w, "invalid user id", http.StatusUnauthorized); return }
+		toks, err := repo.ListDeviceTokensByUser(r.Context(), userID)
+		if err != nil { http.Error(w, "failed to load tokens", http.StatusInternalServerError); return }
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"tokens": toks})
+	}
+}
+
+// NewDeleteDeviceTokenHandler deletes a token for the authenticated user
+func NewDeleteDeviceTokenHandler(repo DeviceTokenRepo) http.HandlerFunc {
+	type req struct{ Platform string `json:"platform"`; Token string `json:"token"` }
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete { w.WriteHeader(http.StatusMethodNotAllowed); return }
+		var body req
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Token == "" || (body.Platform != "ios" && body.Platform != "android") {
+			http.Error(w, "invalid payload", http.StatusBadRequest); return
+		}
+		uctx, ok := GetUserFromContext(r.Context()); if !ok || uctx == nil || uctx.UserID == "" { http.Error(w, "unauthorized", http.StatusUnauthorized); return }
+		userID, err := uuid.Parse(uctx.UserID); if err != nil { http.Error(w, "invalid user id", http.StatusUnauthorized); return }
+		if err := repo.DeleteDeviceToken(r.Context(), userID, body.Platform, body.Token); err != nil {
+			http.Error(w, "failed to delete", http.StatusInternalServerError); return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"status":"deleted"})
 	}
 }

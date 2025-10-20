@@ -240,6 +240,10 @@ func (m *MockUserRepository) GetAnyPushSubscriptions(ctx context.Context, lim in
 func (m *MockUserRepository) DeletePushSubscriptionByEndpoint(ctx context.Context, endpoint string) error {
 	return nil
 }
+// Satisfy interface: enumerate distinct push-enabled user IDs (unused in these tests)
+func (m *MockUserRepository) GetDistinctPushUserIDs(ctx context.Context, limit, offset int32) ([]uuid.UUID, error) {
+	return []uuid.UUID{}, nil
+}
 
 func (m *MockUserRepository) UserExistsByUsername(ctx context.Context, username string) (bool, error) {
 	if m.userExistsByUsernameError != nil {

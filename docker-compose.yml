@@ -99,6 +99,17 @@ services:
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: "${VAPID_SUBJECT:-https://kelloggmatch.com}"
+      # Native push notification (APNS/FCM) settings
+      NATIVE_PUSH_ENABLED: ${NATIVE_PUSH_ENABLED:-false}
+      APNS_ENABLED: ${APNS_ENABLED:-false}
+      APNS_ENV: ${APNS_ENV:-development}
+      APNS_TEAM_ID: ${APNS_TEAM_ID:-}
+      APNS_KEY_ID: ${APNS_KEY_ID:-}
+      APNS_KEY_PEM: ${APNS_KEY_PEM:-}
+      APNS_BUNDLE_ID: ${APNS_BUNDLE_ID:-}
+      FCM_ENABLED: ${FCM_ENABLED:-false}
+      FCM_PROJECT_ID: ${FCM_PROJECT_ID:-}
+      FCM_SERVICE_ACCOUNT: ${FCM_SERVICE_ACCOUNT:-}
     depends_on:
       flyway:
         condition: service_completed_successfully

@@ -99,3 +99,16 @@ config:
     secure: AAABAEG3dziLnGr5Tzb2f3HUapx7F/DzcN/fgOSJqAcVZBXUrqY1FCjsrZftrUDi1fo5sMKrCXxZZBJ4wSGzWMFb+5xnHdEMBElW
   kellogg-music-match:vapidPublicKey:
     secure: AAABAGH76w6MeoajTPMtdleNOJbD1sd1CBmJM6Wc/IQdy5pGYo07sx3Pv4XOGY6ir8N/dLH+cBSSPmY55hxP88AJmD0imcUyo9uZzz6yIju3zKHi/NDYJyFDIi7VKUx8menO/8pDN/n7uS1L/Z+p/Bi3ZjQqZEA=
+  kellogg-music-match:nativePushEnabled: "true"
+  kellogg-music-match:apnsEnabled: "true"
+  kellogg-music-match:apnsEnv: TODO
+  kellogg-music-match:apnsTeamId: TODO
+  kellogg-music-match:apnsKeyId:
+    secure: AAABAPBzVqH6tFtNyJkwZ83ESxv1yl3CrDMNWe/Q5XW29aev
+  kellogg-music-match:apnsKeyPem:
+    secure: AAABAPINU/tTyF85qzCUTbK3j9jkqKloZJjpENbeh8E01hiR
+  kellogg-music-match:apnsBundleId:
+    secure: AAABAOGAkx+pjk465YdTxGrT0rZDHEhoZf6qjw70Y6llxwt3
+  kellogg-music-match:fcmEnabled: "true"
+  kellogg-music-match:fcmProjectId: TODO
+  kellogg-music-match:fcmServiceAccount: TODO

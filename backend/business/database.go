@@ -78,6 +78,19 @@ type PostgreSQLUserRepository struct {
 	spotifyArtistsUpdatedHook func(uuid.UUID)
 }
 
+// DeviceToken is a lean business-layer struct
+type DeviceToken struct {
+	UserID      uuid.UUID
+	Platform    string
+	Token       string
+	BundleID    *string
+	AppPackage  *string
+	DeviceModel *string
+	OSVersion   *string
+	AppVersion  *string
+	LastSeenAt  time.Time
+}
+
 // Pool returns underlying pgx pool (primarily for integration tests)
 func (r *PostgreSQLUserRepository) Pool() *pgxpool.Pool { return r.pool }
 
@@ -234,6 +247,48 @@ func (r *PostgreSQLUserRepository) GetDistinctPushUserIDs(ctx context.Context, l
 	}
 	return out, rows.Err()
 }
+
+// Native push device token operations (inline SQL for speed; can be moved to sqlc later)
+func (r *PostgreSQLUserRepository) UpsertDeviceToken(ctx context.Context, userID uuid.UUID, platform, token, bundleID, appPackage, deviceModel, osVersion, appVersion string) error {
+	_, err := r.pool.Exec(ctx, `
+INSERT INTO push_device_tokens (user_id, platform, token, bundle_id, app_package, device_model, os_version, app_version, last_seen_at)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8, NOW())
+ON CONFLICT (user_id, platform, token) DO UPDATE SET
+  bundle_id = EXCLUDED.bundle_id,
+  app_package = EXCLUDED.app_package,
+  device_model = EXCLUDED.device_model,
+  os_version = EXCLUDED.os_version,
+  app_version = EXCLUDED.app_version,
+  last_seen_at = NOW(),
+  updated_at = NOW()`, userID, platform, token, nullIfEmpty(bundleID), nullIfEmpty(appPackage), nullIfEmpty(deviceModel), nullIfEmpty(osVersion), nullIfEmpty(appVersion))
+	return err
+}
+
+func (r *PostgreSQLUserRepository) ListDeviceTokensByUser(ctx context.Context, userID uuid.UUID) ([]DeviceToken, error) {
+	rows, err := r.pool.Query(ctx, `SELECT user_id, platform, token, bundle_id, app_package, device_model, os_version, app_version, COALESCE(last_seen_at, created_at) FROM push_device_tokens WHERE user_id=$1 ORDER BY last_seen_at DESC`, userID)
+	if err != nil { return nil, err }
+	defer rows.Close()
+	var out []DeviceToken
+	for rows.Next() {
+		var dt DeviceToken
+		var bundleID, appPkg, devModel, osVer, appVer *string
+		if err := rows.Scan(&dt.UserID, &dt.Platform, &dt.Token, &bundleID, &appPkg, &devModel, &osVer, &appVer, &dt.LastSeenAt); err != nil { return nil, err }
+		dt.BundleID = bundleID
+		dt.AppPackage = appPkg
+		dt.DeviceModel = devModel
+		dt.OSVersion = osVer
+		dt.AppVersion = appVer
+		out = append(out, dt)
+	}
+	return out, rows.Err()
+}
+
+func (r *PostgreSQLUserRepository) DeleteDeviceToken(ctx context.Context, userID uuid.UUID, platform, token string) error {
+	_, err := r.pool.Exec(ctx, `DELETE FROM push_device_tokens WHERE user_id=$1 AND platform=$2 AND token=$3`, userID, platform, token)
+	return err
+}
+
+func nullIfEmpty(s string) interface{} { if s == "" { return nil } ; return s }
 
 // CreateUser creates a new user in the database
 func (r *PostgreSQLUserRepository) CreateUser(ctx context.Context, id uuid.UUID, username, email, firstName, lastName, passwordHash, program string, graduationYear int32) (*sqlc.User, error) {

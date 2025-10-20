@@ -20,6 +20,7 @@ type Config struct {
 	Email        EmailConfig
 	Spotify      SpotifyConfig
 	Push         PushConfig
+	NativePush   NativePushConfig
 }
 
 // ServerConfig holds server-related configuration
@@ -135,6 +136,30 @@ type PushConfig struct {
 	Subject      string // e.g. mailto:support@example.com
 }
 
+// NativePushConfig holds native push provider configuration (APNs/FCM)
+type NativePushConfig struct {
+	Enabled bool
+	APNs    APNsConfig
+	FCM     FCMConfig
+}
+
+// APNsConfig for Apple Push Notifications
+type APNsConfig struct {
+	Enabled     bool
+	Env         string // "production" or "development"
+	TeamID      string
+	KeyID       string
+	KeyPEM      string // contents of the .p8 private key (or path via KEY_PEM_PATH)
+	BundleID    string // app bundle identifier
+}
+
+// FCMConfig for Firebase Cloud Messaging
+type FCMConfig struct {
+	Enabled          bool
+	ProjectID        string
+	ServiceAccount   string // JSON credentials (or path via SERVICE_ACCOUNT_PATH)
+}
+
 // Load creates a new Config instance from environment variables
 func Load() *Config {
 	return &Config{
@@ -228,6 +253,22 @@ func Load() *Config {
 			VAPIDPublic:  getEnvWithDefault("VAPID_PUBLIC_KEY", ""),
 			VAPIDPrivate: getEnvWithDefault("VAPID_PRIVATE_KEY", ""),
 			Subject:      getEnvWithDefault("VAPID_SUBJECT", "mailto:support@kelloggmatch.com"),
+		},
+		NativePush: NativePushConfig{
+			Enabled: getEnvBoolWithDefault("NATIVE_PUSH_ENABLED", false),
+			APNs: APNsConfig{
+				Enabled:  getEnvBoolWithDefault("APNS_ENABLED", false),
+				Env:      getEnvWithDefault("APNS_ENV", "development"),
+				TeamID:   getEnvWithDefault("APNS_TEAM_ID", ""),
+				KeyID:    getEnvWithDefault("APNS_KEY_ID", ""),
+				KeyPEM:   getEnvWithDefault("APNS_KEY_PEM", ""),
+				BundleID: getEnvWithDefault("APNS_BUNDLE_ID", ""),
+			},
+			FCM: FCMConfig{
+				Enabled:        getEnvBoolWithDefault("FCM_ENABLED", false),
+				ProjectID:      getEnvWithDefault("FCM_PROJECT_ID", ""),
+				ServiceAccount: getEnvWithDefault("FCM_SERVICE_ACCOUNT", ""),
+			},
 		},
 	}
 }

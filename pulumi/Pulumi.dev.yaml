@@ -168,6 +168,19 @@ config:
     secure: AAABAN+Gu/EEjErdmINoL75Vkpcg3oosIEDMyF7242JIPOYgW3qmUYja3SPFm0yQkMi4uCgpl2aI6yL1it2n9pIHNt+Ih9CF/knA
   kellogg-music-match:vapidPublicKey:
     secure: AAABADztf14x7i2BHA2Q3ghu4FqHChbsEJJW+7jlsshYrxKUrVRLiGRN2l1csDf+q1XhC/AJRV0nGBzacK6bgmfvOmZ9DPVEklmZOGmwQ2MEQAuEe1Mu3TSOWsSQHpvBEUh7aH0pf7mgiG9k2HXPl/5HR4mZ8O4=
+  kellogg-music-match:nativePushEnabled: "true"
+  kellogg-music-match:apnsEnabled: "true"
+  kellogg-music-match:apnsEnv: TODO
+  kellogg-music-match:apnsTeamId: TODO
+  kellogg-music-match:apnsKeyId:
+    secure: AAABAPHYYy4191m2M6HtamcsbLzr10DfbCeP0lcM8USFnMBU
+  kellogg-music-match:apnsKeyPem:
+    secure: AAABAI5CBM/nbcFoIb9iKFGutX6XUHtysjt2TGM7MPcK1u/n
+  kellogg-music-match:apnsBundleId:
+    secure: AAABAFxHsSWyZi17fpYn5fSLaMvaxtrfOtvZ+rYBebKYCUMw
+  kellogg-music-match:fcmEnabled: "true"
+  kellogg-music-match:fcmProjectId: TODO
+  kellogg-music-match:fcmServiceAccount: TODO
 
 # -----------------------------------------------------------------------------
 # SECRETS HANDLING REMINDER

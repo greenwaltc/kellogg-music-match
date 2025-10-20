@@ -109,6 +109,16 @@ func main() {
 		vapidPrivateKey := pulumiCfg.RequireSecret("vapidPrivateKey")
 		vapidSubject := get("vapidSubject", "mailto:support@kelloggmatch.com")
 		pushEnabled := getBoolStr("pushEnabled", true)
+		nativePushEnabled := getBoolStr("nativePushEnabled", true)
+		apnsEnabled := getBoolStr("apnsEnabled", true)
+		apnsEnv := get("apnsEnv", "development")
+		apnsTeamId := get("apnsTeamId", "TODO")
+		apnsKeyId := pulumiCfg.RequireSecret("apnsKeyId")
+		apnsKeyPem := pulumiCfg.RequireSecret("apnsKeyPem")
+		apnsBundleId := pulumiCfg.RequireSecret("apnsBundleId")
+		fcmEnabled := getBoolStr("fcmEnabled", true)
+		fcmProjectId := get("fcmProjectId", "TODO")
+		fcmServiceAccount := get("fcmServiceAccount", "TODO")
 		legacyPort := serverPort
 		// (DATABASE_URL no longer exported; application should build from discrete env vars)
 		backendReplicas := getInt("backendReplicas", 2)
@@ -315,6 +325,9 @@ func main() {
 				"SPOTIFY_REFRESH_TOKEN_KEY":    spotifyRefreshKey.ToStringOutput(),
 				"VAPID_PUBLIC_KEY":             vapidPublicKey.ToStringOutput(),
 				"VAPID_PRIVATE_KEY":            vapidPrivateKey.ToStringOutput(),
+				"APNS_KEY_ID":                  apnsKeyId.ToStringOutput(),
+				"APNS_KEY_PEM":                 apnsKeyPem.ToStringOutput(),
+				"APNS_BUNDLE_ID":               apnsBundleId.ToStringOutput(),
 			},
 		})
 		if err != nil {
@@ -475,6 +488,13 @@ func main() {
 
 									&corev1.EnvVarArgs{Name: pulumi.String("VAPID_SUBJECT"), Value: vapidSubject},
 									&corev1.EnvVarArgs{Name: pulumi.String("PUSH_ENABLED"), Value: pushEnabled},
+									&corev1.EnvVarArgs{Name: pulumi.String("NATIVE_PUSH_ENABLED"), Value: nativePushEnabled},
+									&corev1.EnvVarArgs{Name: pulumi.String("APNS_ENABLED"), Value: apnsEnabled},
+									&corev1.EnvVarArgs{Name: pulumi.String("APNS_ENV"), Value: apnsEnv},
+									&corev1.EnvVarArgs{Name: pulumi.String("APNS_TEAM_ID"), Value: apnsTeamId},
+									&corev1.EnvVarArgs{Name: pulumi.String("FCM_ENABLED"), Value: fcmEnabled},
+									&corev1.EnvVarArgs{Name: pulumi.String("FCM_PROJECT_ID"), Value: fcmProjectId},
+									&corev1.EnvVarArgs{Name: pulumi.String("FCM_SERVICE_ACCOUNT"), Value: fcmServiceAccount},
 								},
 								Resources: &corev1.ResourceRequirementsArgs{
 									Requests: pulumi.StringMap{"cpu": backendCPUReq, "memory": backendMemReq},
