@@ -98,7 +98,9 @@ func NewTestHandler(repo PushRepo, cfg *config.Config, sender PushSender) http.H
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
-		if !cfg.Push.Enabled || cfg.Push.VAPIDPrivate == "" || cfg.Push.VAPIDPublic == "" {
+		// Allow enqueue when either Web Push (VAPID) is configured or Native Push is enabled,
+		// since the dispatcher will fan-out accordingly.
+		if (!cfg.Push.Enabled || cfg.Push.VAPIDPrivate == "" || cfg.Push.VAPIDPublic == "") && !cfg.NativePush.Enabled {
 			http.Error(w, "push not configured", http.StatusPreconditionFailed)
 			return
 		}

@@ -73,3 +73,5 @@ ui/src/config.json
 # ---- Images built locally (tags) ----
 **/*.sha256
 
+# ---- Service Account Key json ----
+*sa-key.json

@@ -1,12 +1,33 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'pages/login_page.dart';
 import 'pages/register_page.dart';
 import 'services/api_client.dart';
 import 'services/auth_service.dart';
+import 'services/push_opt_in.dart';
+import 'pages/debug_page.dart';
 
-void main() {
+// Must be a top-level function for background handling
+import 'package:firebase_messaging/firebase_messaging.dart';
+
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // Ensure Firebase is initialized for background isolates
+  try {
+    await Firebase.initializeApp();
+  } catch (_) {}
+}
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  } catch (_) {
+    // Continue without Firebase if not configured
+  }
   runApp(const MainApp());
 }
 
@@ -23,11 +44,17 @@ class MainApp extends StatelessWidget {
       ),
       routes: {
         '/login': (_) => RootScaffold(
-              body: LoginPage(onAuthenticated: () => _nav.currentState!.pushReplacementNamed('/')),
-            ),
+          body: LoginPage(
+            onAuthenticated: () => _nav.currentState!.pushReplacementNamed('/'),
+          ),
+        ),
         '/register': (_) => RootScaffold(
-              body: RegisterPage(onAuthenticated: () => _nav.currentState!.pushReplacementNamed('/')),
-            ),
+          body: RegisterPage(
+            onAuthenticated: () => _nav.currentState!.pushReplacementNamed('/'),
+          ),
+        ),
+        // Hidden debug route: manually navigate via DevTools or deep link
+        '/_debug': (_) => const DebugPage(),
       },
       navigatorKey: _nav,
       home: const AuthGate(child: HomePage()),
@@ -62,15 +89,33 @@ class _AuthGateState extends State<AuthGate> {
       _loggedIn = auth.isLoggedIn;
       _loading = false;
     });
+    if (auth.isLoggedIn) {
+      // Fire-and-forget: prompt for push if needed
+      final push = PushOptInManager(ApiClient(), prefs);
+      // Delayed to allow build to settle
+      Future.microtask(push.promptIfNeeded);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const RootScaffold(body: Center(child: CircularProgressIndicator()));
+      return const RootScaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
     }
     if (!_loggedIn) {
-      return RootScaffold(body: LoginPage(onAuthenticated: () => setState(() => _loggedIn = true)));
+      return RootScaffold(
+        body: LoginPage(
+          onAuthenticated: () async {
+            final prefs = await SharedPreferences.getInstance();
+            setState(() => _loggedIn = true);
+            // Prompt for notifications after login
+            final push = PushOptInManager(ApiClient(), prefs);
+            Future.microtask(push.promptIfNeeded);
+          },
+        ),
+      );
     }
     return RootScaffold(body: widget.child, onLogout: _handleLogout);
   }
@@ -132,12 +177,15 @@ class RootScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          children: [
-            Image.asset('assets/icons/icon-192x192.png', height: 24),
-            const SizedBox(width: 8),
-            const Text('Kellogg Music Match'),
-          ],
+        title: GestureDetector(
+          onLongPress: () => Navigator.of(context).pushNamed('/_debug'),
+          child: Row(
+            children: [
+              Image.asset('assets/icons/icon-192x192.png', height: 24),
+              const SizedBox(width: 8),
+              const Text('Kellogg Music Match'),
+            ],
+          ),
         ),
         actions: [
           if (onLogout != null)

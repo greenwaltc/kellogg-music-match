@@ -430,6 +430,263 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /push/subscribe:
+    post:
+      tags:
+        - Push
+      summary: Store or update a Web Push subscription for the authenticated user
+      description: |
+        Registers a Web Push subscription for the current user. The server will use this to deliver
+        notifications to all of a user's devices. Requires JWT authentication.
+      operationId: upsertPushSubscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PushSubscriptionRequest'
+            examples:
+              typical:
+                value:
+                  endpoint: "https://fcm.googleapis.com/fcm/send/cR18...:APA91b..."
+                  keys:
+                    p256dh: "BKNm..."
+                    auth: "0o3x..."
+      responses:
+        '200':
+          description: Subscription stored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+              examples:
+                ok:
+                  value: { status: ok }
+        '400':
+          description: Invalid subscription payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to store subscription
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /push/test:
+    post:
+      tags:
+        - Push
+      summary: Send a test Web Push notification to all of the user's stored subscriptions
+      description: |
+        Immediately attempts delivery to all stored Web Push subscriptions for the authenticated user.
+        May prune expired subscriptions automatically. Subject to basic rate limiting.
+      operationId: sendTestPush
+      responses:
+        '200':
+          description: Attempted delivery summary
+          headers:
+            X-RateLimit-Limit:
+              schema:
+                type: string
+              description: Requests allowed per window (or "debug" when debug mode enabled)
+            X-RateLimit-Window:
+              schema:
+                type: string
+              description: Rate limit window duration (e.g., 60s)
+            X-RateLimit-Remaining:
+              schema:
+                type: string
+              description: Remaining requests in the current window (or "debug")
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushTestSendResponse'
+              examples:
+                sample:
+                  value: { status: sent, sent: 1, failed: 0, deleted: 0 }
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: No subscriptions available for this user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '412':
+          description: Push not configured on server
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many requests (rate limited)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /push/debug/vapid:
+    get:
+      tags:
+        - Push
+      summary: VAPID configuration and subscription diagnostics
+      description: |
+        Returns server-side VAPID configuration diagnostics and a sample audience computed from an existing subscription.
+        Requires JWT. Returns 412 if push is disabled.
+      operationId: getVapidDebug
+      responses:
+        '200':
+          description: VAPID diagnostics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VapidDebugResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '412':
+          description: Push disabled on server
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /push/device/register:
+    post:
+      tags:
+        - Push
+      summary: Register or update a native device token (APNs/FCM)
+      description: Stores a native device push token for iOS (APNs) or Android (FCM) for the authenticated user.
+      operationId: registerDeviceToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceTokenRequest'
+      responses:
+        '200':
+          description: Token stored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+              examples:
+                ok:
+                  value: { status: ok }
+        '400':
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to store token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /push/device/list:
+    get:
+      tags:
+        - Push
+      summary: List native device tokens for the authenticated user
+      operationId: listDeviceTokens
+      responses:
+        '200':
+          description: Tokens retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tokens:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DeviceToken'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to load tokens
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /push/device:
+    delete:
+      tags:
+        - Push
+      summary: Delete a stored native device token
+      operationId: deleteDeviceToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                platform:
+                  type: string
+                  enum: [ios, android]
+                token:
+                  type: string
+              required: [platform, token]
+      responses:
+        '200':
+          description: Token deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+              examples:
+                deleted:
+                  value: { status: deleted }
+        '400':
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to delete token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /register:
     post:
       tags:
@@ -1044,6 +1301,126 @@ paths:
 
 components:
   schemas:
+    StatusResponse:
+      type: object
+      description: Generic status response
+      properties:
+        status:
+          type: string
+          example: ok
+      required: [status]
+
+    PushSubscriptionRequest:
+      type: object
+      description: Standard Web Push subscription payload
+      properties:
+        endpoint:
+          type: string
+          format: uri
+        keys:
+          type: object
+          properties:
+            p256dh:
+              type: string
+            auth:
+              type: string
+          required: [p256dh, auth]
+      required: [endpoint, keys]
+
+    PushTestSendResponse:
+      type: object
+      description: Summary of attempted test push delivery
+      properties:
+        status:
+          type: string
+          example: sent
+        sent:
+          type: integer
+          example: 1
+        failed:
+          type: integer
+          example: 0
+        deleted:
+          type: integer
+          example: 0
+      required: [status, sent, failed, deleted]
+
+    VapidDebugResponse:
+      type: object
+      description: VAPID configuration and subscription diagnostics
+      properties:
+        pairMatch:
+          type: boolean
+        publicKeyPrefix:
+          type: string
+        derivedPublicPrefix:
+          type: string
+        subject:
+          type: string
+        endpointHost:
+          type: string
+        audienceComputed:
+          type: string
+        hasSubscriptionStored:
+          type: boolean
+        userSubsCount:
+          type: integer
+        usedFallbackAny:
+          type: boolean
+
+    DeviceTokenRequest:
+      type: object
+      description: Register a native device token for push delivery
+      properties:
+        platform:
+          type: string
+          enum: [ios, android]
+        token:
+          type: string
+        bundleId:
+          type: string
+          description: iOS bundle identifier
+        appPackage:
+          type: string
+          description: Android application package name
+        deviceModel:
+          type: string
+        osVersion:
+          type: string
+        appVersion:
+          type: string
+      required: [platform, token]
+
+    DeviceToken:
+      type: object
+      description: Stored native device token
+      properties:
+        UserID:
+          type: string
+          format: uuid
+        Platform:
+          type: string
+          enum: [ios, android]
+        Token:
+          type: string
+        BundleID:
+          type: string
+          nullable: true
+        AppPackage:
+          type: string
+          nullable: true
+        DeviceModel:
+          type: string
+          nullable: true
+        OSVersion:
+          type: string
+          nullable: true
+        AppVersion:
+          type: string
+          nullable: true
+        LastSeenAt:
+          type: string
+          format: date-time
     SpotifySyncStartRequest:
       type: object
       description: Payload sent by the frontend after redirect carrying the authorization code & original state

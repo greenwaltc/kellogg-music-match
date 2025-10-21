@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/base64"
 	"os"
 	"strconv"
 	"strings"
@@ -162,7 +163,25 @@ type FCMConfig struct {
 
 // Load creates a new Config instance from environment variables
 func Load() *Config {
-	return &Config{
+	// Helpers to read secret material from path or base64 for robustness in container/env setups
+	readFileIfSet := func(envKey string) string {
+		if p := os.Getenv(envKey); p != "" {
+			if b, err := os.ReadFile(p); err == nil {
+				return string(b)
+			}
+		}
+		return ""
+	}
+	readBase64IfSet := func(envKey string) string {
+		if s := os.Getenv(envKey); s != "" {
+			if b, err := decodeBase64(s); err == nil {
+				return string(b)
+			}
+		}
+		return ""
+	}
+
+	cfg := &Config{
 		Server: ServerConfig{
 			Port: getEnvWithDefault("SERVER_PORT", "8080"),
 		},
@@ -271,6 +290,22 @@ func Load() *Config {
 			},
 		},
 	}
+
+	// Post-process secret material to allow PATH/B64 inputs
+	// APNs key
+	if pem := readFileIfSet("APNS_KEY_PEM_PATH"); pem != "" {
+		cfg.NativePush.APNs.KeyPEM = pem
+	} else if pem := readBase64IfSet("APNS_KEY_PEM_B64"); pem != "" {
+		cfg.NativePush.APNs.KeyPEM = pem
+	}
+	// FCM service account JSON
+	if sa := readFileIfSet("FCM_SERVICE_ACCOUNT_PATH"); sa != "" {
+		cfg.NativePush.FCM.ServiceAccount = sa
+	} else if sa := readBase64IfSet("FCM_SERVICE_ACCOUNT_B64"); sa != "" {
+		cfg.NativePush.FCM.ServiceAccount = sa
+	}
+
+	return cfg
 }
 
 // ConnectionString returns the PostgreSQL connection string
@@ -305,4 +340,13 @@ func getEnvBoolWithDefault(key string, defaultValue bool) bool {
 		}
 	}
 	return defaultValue
+}
+
+// decodeBase64 decodes standard or URL-safe base64 strings.
+func decodeBase64(s string) ([]byte, error) {
+	// try standard
+	if b, err := base64.StdEncoding.DecodeString(s); err == nil {
+		return b, nil
+	}
+	return base64.RawURLEncoding.DecodeString(s)
 }

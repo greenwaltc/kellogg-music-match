@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "685625601437",
+    "project_id": "kellogg-music-match-96ab1",
+    "storage_bucket": "kellogg-music-match-96ab1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:685625601437:android:e5675e2908af5522445374",
+        "android_client_info": {
+          "package_name": "com.greenwalt.kmm"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA9CFG6mbVJJOhJmKnBF6LLv6NzGuPgJQQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

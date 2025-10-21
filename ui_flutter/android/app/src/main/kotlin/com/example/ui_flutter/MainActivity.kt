@@ -1,4 +1,4 @@
-package com.example.ui_flutter
+package com.greenwalt.kmm
 
 import io.flutter.embedding.android.FlutterActivity
 
