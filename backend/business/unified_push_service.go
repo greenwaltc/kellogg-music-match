@@ -214,14 +214,38 @@ func (u *UnifiedPushService) sendFCM(ctx context.Context, userID uuid.UUID, t De
 		// test hook: use a dummy client that calls fcmDo
 		httpClient = &http.Client{Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) { return u.fcmDo(req) })}
 	} else {
-		if cfg.ProjectID == "" || cfg.ServiceAccount == "" || t.Token == "" {
+		if t.Token == "" {
 			return false, nil
 		}
-		ts, err := google.CredentialsFromJSON(ctx, []byte(cfg.ServiceAccount), "https://www.googleapis.com/auth/firebase.messaging")
-		if err != nil {
-			return false, err
+		// Prefer explicit service account JSON; otherwise fall back to Application Default Credentials (ADC)
+		var (
+			tokenSource oauth2.TokenSource
+			projectID   = cfg.ProjectID
+		)
+		if cfg.ServiceAccount != "" {
+			creds, err := google.CredentialsFromJSON(ctx, []byte(cfg.ServiceAccount), "https://www.googleapis.com/auth/firebase.messaging")
+			if err != nil {
+				return false, err
+			}
+			tokenSource = creds.TokenSource
+			if projectID == "" && creds.ProjectID != "" {
+				projectID = creds.ProjectID
+			}
+		} else {
+			// Try ADC: respects GOOGLE_APPLICATION_CREDENTIALS, gcloud user credentials, or metadata on GCP
+			creds, err := google.FindDefaultCredentials(ctx, "https://www.googleapis.com/auth/firebase.messaging")
+			if err != nil {
+				return false, err
+			}
+			tokenSource = creds.TokenSource
+			if projectID == "" && creds.ProjectID != "" {
+				projectID = creds.ProjectID
+			}
 		}
-		httpClient = oauth2.NewClient(ctx, ts.TokenSource)
+		if projectID == "" {
+			return false, fmt.Errorf("fcm: missing ProjectID (set FCM_PROJECT_ID or ensure ADC provides project_id)")
+		}
+		httpClient = oauth2.NewClient(ctx, tokenSource)
 	}
 	// Build FCM HTTP v1 message
 	msg := map[string]any{
@@ -232,7 +256,13 @@ func (u *UnifiedPushService) sendFCM(ctx context.Context, userID uuid.UUID, t De
 		},
 	}
 	body, _ := json.Marshal(msg)
-	url := fmt.Sprintf("https://fcm.googleapis.com/v1/projects/%s/messages:send", cfg.ProjectID)
+	// Use the project ID resolved above (cfg.ProjectID or ADC creds value)
+	projectID := cfg.ProjectID
+	if projectID == "" {
+		// When we built the client above, we ensured projectID is resolved in non-test path; here handle test hook path
+		projectID = u.cfg.NativePush.FCM.ProjectID
+	}
+	url := fmt.Sprintf("https://fcm.googleapis.com/v1/projects/%s/messages:send", projectID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return false, err

@@ -108,15 +108,15 @@ services:
       APNS_KEY_PEM: ${APNS_KEY_PEM:-}
       APNS_BUNDLE_ID: ${APNS_BUNDLE_ID:-}
       FCM_ENABLED: ${FCM_ENABLED:-false}
+      # FCM Project ID can be provided explicitly or resolved from ADC credentials
       FCM_PROJECT_ID: ${FCM_PROJECT_ID:-}
-      # Prefer reading the service account from a mounted secret file
-      FCM_SERVICE_ACCOUNT_PATH: /run/secrets/fcm_sa.json
-      # Legacy inline JSON (fallback when PATH not used)
-      FCM_SERVICE_ACCOUNT: ${FCM_SERVICE_ACCOUNT:-}
-    secrets:
-      - source: fcm_sa_json
-        target: fcm_sa.json
-        mode: 0440
+      # Application Default Credentials (ADC) are the default for local/dev
+      # The backend will use ADC when no service account JSON is provided.
+      # This env tells Google client libs where to find the mounted ADC file.
+      GOOGLE_APPLICATION_CREDENTIALS: /run/adc/adc.json
+    volumes:
+      # Mount ADC from host into container (macOS/Linux default path shown below)
+      - ${GOOGLE_APPLICATION_CREDENTIALS_LOCAL_PATH:-${HOME}/.config/gcloud/application_default_credentials.json}:/run/adc/adc.json:ro
     depends_on:
       flyway:
         condition: service_completed_successfully
@@ -147,10 +147,3 @@ services:
 volumes:
   postgres_data:
     driver: local
-
-secrets:
-  # Configure the path to your local Service Account JSON via env var
-  #   export FCM_SERVICE_ACCOUNT_LOCAL_PATH="$HOME/Downloads/your-firebase-sa.json"
-  # If not set, it will look in ./secrets/fcm_sa.json
-  fcm_sa_json:
-    file: ${FCM_SERVICE_ACCOUNT_LOCAL_PATH:-./secrets/fcm_sa.json}

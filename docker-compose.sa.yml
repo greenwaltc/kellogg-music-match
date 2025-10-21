@@ -1,0 +1,22 @@
+services:
+  backend:
+    environment:
+      # Explicitly enable FCM if needed
+      FCM_ENABLED: ${FCM_ENABLED:-true}
+      # Optional: set project explicitly
+      FCM_PROJECT_ID: ${FCM_PROJECT_ID:-}
+      # Use a mounted secret file for service account JSON
+      FCM_SERVICE_ACCOUNT_PATH: /run/secrets/fcm_sa.json
+      # Clear ADC env so service account takes precedence
+      GOOGLE_APPLICATION_CREDENTIALS: ""
+    secrets:
+      - source: fcm_sa_json
+        target: fcm_sa.json
+        mode: 0440
+
+secrets:
+  # Configure the path to your local Service Account JSON via env var
+  #   export FCM_SERVICE_ACCOUNT_LOCAL_PATH="$HOME/Downloads/your-firebase-sa.json"
+  # If not set, it will look in ./secrets/fcm_sa.json
+  fcm_sa_json:
+    file: ${FCM_SERVICE_ACCOUNT_LOCAL_PATH:-./secrets/fcm_sa.json}
