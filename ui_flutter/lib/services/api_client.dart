@@ -15,6 +15,40 @@ class ApiClient {
     'Accept': 'application/json',
   };
 
+  Future<Map<String, dynamic>> getJson(
+    String path, {
+    String? bearerToken,
+  }) async {
+    final uri = Uri.parse('$baseUrl$path');
+    final headers = {..._jsonHeaders};
+    if (bearerToken != null && bearerToken.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $bearerToken';
+    }
+    final resp = await _http.get(uri, headers: headers);
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      if (resp.body.isEmpty) return <String, dynamic>{};
+      return jsonDecode(resp.body) as Map<String, dynamic>;
+    }
+    // Reuse error extraction logic by throwing ApiException similar to postJson
+    String msg;
+    try {
+      final dyn = jsonDecode(resp.body);
+      if (dyn is Map<String, dynamic>) {
+        msg = (dyn['message'] as String?)?.trim() ?? 'Request failed';
+        throw ApiException(
+          resp.statusCode,
+          msg.isNotEmpty ? msg : 'Request failed',
+          details: dyn,
+        );
+      }
+    } catch (_) {}
+    msg = resp.body.trim();
+    throw ApiException(
+      resp.statusCode,
+      msg.isNotEmpty ? msg : 'Request failed',
+    );
+  }
+
   Future<Map<String, dynamic>> postJson(
     String path,
     Map<String, dynamic> body, {

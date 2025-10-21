@@ -178,7 +178,14 @@ func (w *MatchingAPIServiceWrapper) SyncSpotify(ctx context.Context, body genera
 	username := user.Username
 	job := w.spotifyService.StartSync(ctx, username, body.Code, body.State)
 	// Attempt token exchange (PKCE supported if client provided code_verifier)
-	accessToken, refreshToken, expiresIn, err := w.spotifyService.ExchangeCodeForTokens(ctx, body.Code, body.CodeVerifier)
+	var accessToken, refreshToken string
+	var expiresIn int
+	var err error
+	if strings.TrimSpace(body.RedirectUri) != "" {
+		accessToken, refreshToken, expiresIn, err = w.spotifyService.ExchangeCodeForTokensWithRedirect(ctx, body.Code, body.CodeVerifier, body.RedirectUri)
+	} else {
+		accessToken, refreshToken, expiresIn, err = w.spotifyService.ExchangeCodeForTokens(ctx, body.Code, body.CodeVerifier)
+	}
 	if err != nil {
 		job.Status = spotify.StatusFailed
 		job.Message = "Token exchange failed"
@@ -239,7 +246,14 @@ func (w *MatchingAPIServiceWrapper) RetrySpotifySync(ctx context.Context, body g
 		}
 		return generated.Response(500, generated.ErrorResponse{Message: "Retry failed", CreatedAt: time.Now().UTC()}), nil
 	}
-	accessToken, refreshToken, expiresIn, err2 := w.spotifyService.ExchangeCodeForTokens(ctx, body.Code, body.CodeVerifier)
+	var accessToken, refreshToken string
+	var expiresIn int
+	var err2 error
+	if strings.TrimSpace(body.RedirectUri) != "" {
+		accessToken, refreshToken, expiresIn, err2 = w.spotifyService.ExchangeCodeForTokensWithRedirect(ctx, body.Code, body.CodeVerifier, body.RedirectUri)
+	} else {
+		accessToken, refreshToken, expiresIn, err2 = w.spotifyService.ExchangeCodeForTokens(ctx, body.Code, body.CodeVerifier)
+	}
 	if err2 == nil && user != nil && user.UserID != "" {
 		if uid, perr := uuid.Parse(user.UserID); perr == nil {
 			_ = w.spotifyService.PersistTokens(ctx, uid, accessToken, refreshToken, expiresIn, "")

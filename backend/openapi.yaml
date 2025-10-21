@@ -90,6 +90,8 @@ paths:
                 value:
                   code: "AQD123exampleAuthCode"
                   state: "randomStateValue16"
+                  code_verifier: "bd7b2f0b5a0b4f8a8c1e3e8b3f1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7g8h9"
+                  redirect_uri: "kmm://spotify/callback"
       responses:
         '202':
           description: Sync started (stubbed success)
@@ -122,6 +124,14 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/SpotifySyncStartRequest'
+            examples:
+              sample:
+                summary: Example retry payload (same fields as start)
+                value:
+                  code: "AQD456anotherCode"
+                  state: "randomStateValue16"
+                  code_verifier: "bd7b2f0b5a0b4f8a8c1e3e8b3f1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7g8h9"
+                  redirect_uri: "kmm://spotify/callback"
       responses:
         '202':
           description: Retry accepted
@@ -1438,6 +1448,12 @@ components:
           description: PKCE code_verifier corresponding to the original code_challenge (S256)
           minLength: 43
           maxLength: 128
+        redirect_uri:
+          type: string
+          format: uri
+          description: |
+            The exact redirect URI used during the authorization request; must match your Spotify app settings.
+            When provided, the backend will use this URI for token exchange (overriding the default configured redirect).
       required:
         - code
         - state

@@ -10,6 +10,8 @@ import 'services/auth_service.dart';
 import 'services/push_opt_in.dart';
 import 'pages/debug_page.dart';
 import 'theme/app_theme.dart';
+import 'pages/spotify_connect_prompt.dart';
+import 'services/spotify_service.dart';
 
 // Must be a top-level function for background handling
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -139,11 +141,14 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   Map<String, dynamic>? _user;
+  bool? _spotifyReady;
+  bool _loadingStatus = true;
 
   @override
   void initState() {
     super.initState();
     _loadUser();
+    _loadSpotifyStatus();
   }
 
   Future<void> _loadUser() async {
@@ -152,19 +157,60 @@ class _HomePageState extends State<HomePage> {
     setState(() => _user = auth.currentUser);
   }
 
+  Future<void> _loadSpotifyStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final svc = SpotifyService(ApiClient(), prefs);
+    try {
+      final status = await svc.getStatus();
+      setState(() {
+        _spotifyReady = status['ready'] as bool? ?? false;
+        _loadingStatus = false;
+      });
+    } catch (_) {
+      setState(() {
+        _spotifyReady = false;
+        _loadingStatus = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: _user == null
-          ? const CircularProgressIndicator()
-          : Column(
-              mainAxisSize: MainAxisSize.min,
+    if (_user == null || _loadingStatus) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    // If Spotify not ready, prompt to connect
+    if (_spotifyReady == false) {
+      return ListView(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        children: [
+          Center(
+            child: Column(
               children: [
                 Text('Welcome, ${_user!['firstName']} ${_user!['lastName']}'),
                 const SizedBox(height: 8),
-                Text('Username: ${_user!['username']}'),
+                const Text(
+                  'Connect Spotify to get personalized matches and concerts.',
+                ),
               ],
             ),
+          ),
+          SpotifyConnectPrompt(onConnected: _loadSpotifyStatus),
+        ],
+      );
+    }
+    // Otherwise, show basic home content (can be replaced with real dashboard later)
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('Welcome, ${_user!['firstName']} ${_user!['lastName']}'),
+          const SizedBox(height: 8),
+          Text('Username: ${_user!['username']}'),
+          const SizedBox(height: 16),
+          const Text('Spotify connected. Great to see you!'),
+        ],
+      ),
     );
   }
 }

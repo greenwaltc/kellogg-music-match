@@ -94,6 +94,21 @@ type PasswordResetToken struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
+type PushDeviceToken struct {
+	ID          uuid.UUID          `json:"id"`
+	UserID      uuid.UUID          `json:"user_id"`
+	Platform    string             `json:"platform"`
+	Token       string             `json:"token"`
+	BundleID    pgtype.Text        `json:"bundle_id"`
+	AppPackage  pgtype.Text        `json:"app_package"`
+	DeviceModel pgtype.Text        `json:"device_model"`
+	OsVersion   pgtype.Text        `json:"os_version"`
+	AppVersion  pgtype.Text        `json:"app_version"`
+	LastSeenAt  pgtype.Timestamptz `json:"last_seen_at"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
 type PushSubscription struct {
 	ID         uuid.UUID          `json:"id"`
 	UserID     pgtype.UUID        `json:"user_id"`

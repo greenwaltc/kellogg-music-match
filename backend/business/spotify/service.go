@@ -350,6 +350,53 @@ func (s *Service) ExchangeCodeForTokens(ctx context.Context, code string, codeVe
 	return parsed.AccessToken, parsed.RefreshToken, parsed.ExpiresIn, nil
 }
 
+// ExchangeCodeForTokensWithRedirect performs the authorization code exchange using an explicit redirect URI.
+// This supports mobile clients that use a custom scheme (e.g., kmm://spotify/callback) while allowing the
+// server default redirect to remain configured for web flows.
+func (s *Service) ExchangeCodeForTokensWithRedirect(ctx context.Context, code string, codeVerifier string, redirectURI string) (string, string, int, error) {
+	if s.clientID == "" || s.clientSecret == "" || redirectURI == "" {
+		return "", "", 0, errors.New("spotify credentials/redirect not configured")
+	}
+	form := url.Values{}
+	form.Set("grant_type", "authorization_code")
+	form.Set("code", code)
+	form.Set("redirect_uri", redirectURI)
+	if codeVerifier != "" { // PKCE
+		form.Set("code_verifier", codeVerifier)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.tokenURL, strings.NewReader(form.Encode()))
+	if err != nil {
+		return "", "", 0, err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.SetBasicAuth(s.clientID, s.clientSecret)
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return "", "", 0, err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != 200 {
+		snippet := string(body)
+		if len(snippet) > 300 {
+			snippet = snippet[:300] + "..."
+		}
+		logger.L().Error("spotify.token.exchange.failed", "status", resp.StatusCode, "body", snippet)
+		return "", "", 0, fmt.Errorf("token exchange failed status=%d", resp.StatusCode)
+	}
+	var parsed struct {
+		AccessToken  string `json:"access_token"`
+		RefreshToken string `json:"refresh_token"`
+		ExpiresIn    int    `json:"expires_in"`
+		Scope        string `json:"scope"`
+		TokenType    string `json:"token_type"`
+	}
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return "", "", 0, err
+	}
+	return parsed.AccessToken, parsed.RefreshToken, parsed.ExpiresIn, nil
+}
+
 // PersistTokens encrypts and stores tokens if a store and encryption key are configured.
 func (s *Service) PersistTokens(ctx context.Context, userID uuid.UUID, accessToken, refreshToken string, expiresIn int, scope string) error {
 	if s.store == nil || s.encKey == "" {
