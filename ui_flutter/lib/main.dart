@@ -9,6 +9,7 @@ import 'services/api_client.dart';
 import 'services/auth_service.dart';
 import 'services/push_opt_in.dart';
 import 'pages/debug_page.dart';
+import 'theme/app_theme.dart';
 
 // Must be a top-level function for background handling
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -39,10 +40,9 @@ class MainApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Kellogg Music Match',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
-        useMaterial3: true,
-      ),
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: ThemeMode.system,
       routes: {
         '/login': (_) => RootScaffold(
           body: LoginPage(
