@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
 
 import 'pages/login_page.dart';
 import 'pages/register_page.dart';
@@ -53,8 +54,8 @@ class MainApp extends StatelessWidget {
             onAuthenticated: () => _nav.currentState!.pushReplacementNamed('/'),
           ),
         ),
-        // Hidden debug route: manually navigate via DevTools or deep link
-        '/_debug': (_) => const DebugPage(),
+        if (!kReleaseMode)
+          '/_debug': (_) => const DebugPage(), // only in debug/profile builds
       },
       navigatorKey: _nav,
       home: const AuthGate(child: HomePage()),
@@ -177,16 +178,24 @@ class RootScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: GestureDetector(
-          onLongPress: () => Navigator.of(context).pushNamed('/_debug'),
-          child: Row(
-            children: [
-              Image.asset('assets/icons/icon-192x192.png', height: 24),
-              const SizedBox(width: 8),
-              const Text('Kellogg Music Match'),
-            ],
-          ),
-        ),
+        title: !kReleaseMode
+            ? GestureDetector(
+                onLongPress: () => Navigator.of(context).pushNamed('/_debug'),
+                child: Row(
+                  children: [
+                    Image.asset('assets/icons/icon-192x192.png', height: 24),
+                    const SizedBox(width: 8),
+                    const Text('Kellogg Music Match'),
+                  ],
+                ),
+              )
+            : Row(
+                children: [
+                  Image.asset('assets/icons/icon-192x192.png', height: 24),
+                  const SizedBox(width: 8),
+                  const Text('Kellogg Music Match'),
+                ],
+              ),
         actions: [
           if (onLogout != null)
             IconButton(
