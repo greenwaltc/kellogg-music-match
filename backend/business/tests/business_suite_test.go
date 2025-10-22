@@ -292,3 +292,11 @@ func (m *MockUserRepository) FindSimilarUsersBySpotifyTopTracks(ctx context.Cont
 func (m *MockUserRepository) FindSimilarUsersBySpotifyTopTracksFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string) ([]business.SimilarUserResult, error) {
 	return []business.SimilarUserResult{}, nil
 }
+
+// Satisfy new repository methods for top items retrieval
+func (m *MockUserRepository) GetUserTopArtistsByRange(ctx context.Context, userID uuid.UUID, rng string, limit, offset int32) ([]business.SpotifyTopArtist, error) {
+	return []business.SpotifyTopArtist{}, nil
+}
+func (m *MockUserRepository) GetUserTopTracksByRange(ctx context.Context, userID uuid.UUID, rng string, limit, offset int32) ([]business.SpotifyTopTrack, error) {
+	return []business.SpotifyTopTrack{}, nil
+}

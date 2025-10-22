@@ -64,10 +64,12 @@ services:
       # Ensure your .env file contains:
       #   SPOTIFY_CLIENT_ID=your_spotify_app_client_id
       #   SPOTIFY_CLIENT_SECRET=your_spotify_app_client_secret
+      #   SPOTIFY_REFRESH_TOKEN_KEY=base64_of_16_24_or_32_bytes  # required to persist refresh tokens
       # Optionally override redirect; default below matches local UI callback.
       SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID:-}
       SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET:-}
       SPOTIFY_REDIRECT_URI: ${SPOTIFY_REDIRECT_URI:-http://localhost:4200/spotify/callback}
+      SPOTIFY_REFRESH_TOKEN_KEY: ${SPOTIFY_REFRESH_TOKEN_KEY:-}
       # Ticketmaster API configuration
       TICKETMASTER_CONSUMER_KEY: ${TICKETMASTER_CONSUMER_KEY:-}
       TICKETMASTER_CONSUMER_SECRET: ${TICKETMASTER_CONSUMER_SECRET:-}

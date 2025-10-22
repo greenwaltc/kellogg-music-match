@@ -219,6 +219,46 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /sync/spotify/refresh:
+    post:
+      tags:
+        - Matching
+      summary: Refresh Spotify sync using stored refresh token
+      description: |
+        Starts a new Spotify sync by refreshing the access token using the stored refresh token.
+        No user interaction is required if tokens are already stored. Returns 409 if a sync is already in progress.
+      operationId: refreshSpotifySync
+      responses:
+        '202':
+          description: Refresh accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpotifySyncAcceptedResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: No stored Spotify tokens for this user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Sync already in progress
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /concerts/{eventId}/interest:
     post:
       tags:
@@ -1309,6 +1349,142 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /users/{userId}/top-artists:
+    get:
+      tags:
+        - Matching
+      summary: Get a page of the user's current Spotify top artists
+      description: |
+        Returns the current snapshot of a user's Spotify top artists for the selected time range, ordered by rank.
+        Authentication required. Users may only access their own data (admins not yet supported).
+      operationId: getUserTopArtists
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          description: Target user ID (must match authenticated user unless admin)
+          schema:
+            type: string
+            format: uuid
+        - name: range
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [short_term, medium_term, long_term]
+            default: medium_term
+          description: Spotify time range window.
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+          description: Page size.
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: Number of items to skip.
+      responses:
+        '200':
+          description: Top artists page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopArtistsPage'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden (not your data)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /users/{userId}/top-tracks:
+    get:
+      tags:
+        - Matching
+      summary: Get a page of the user's current Spotify top tracks
+      description: |
+        Returns the current snapshot of a user's Spotify top tracks for the selected time range, ordered by rank.
+        Authentication required. Users may only access their own data (admins not yet supported).
+      operationId: getUserTopTracks
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          description: Target user ID (must match authenticated user unless admin)
+          schema:
+            type: string
+            format: uuid
+        - name: range
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [short_term, medium_term, long_term]
+            default: medium_term
+          description: Spotify time range window.
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+          description: Page size.
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: Number of items to skip.
+      responses:
+        '200':
+          description: Top tracks page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopTracksPage'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden (not your data)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
 components:
   schemas:
     StatusResponse:
@@ -2097,6 +2273,88 @@ components:
       required:
         - token
         - newPassword
+
+    SpotifyTopArtistItem:
+      type: object
+      description: A single Spotify top artist entry for a user (current snapshot)
+      properties:
+        spotifyArtistId:
+          type: string
+        name:
+          type: string
+        rank:
+          type: integer
+          minimum: 1
+        genres:
+          type: array
+          items:
+            type: string
+        popularity:
+          type: integer
+          nullable: true
+        imageUrl:
+          type: string
+          nullable: true
+      required: [spotifyArtistId, name, rank]
+
+    SpotifyTopTrackItem:
+      type: object
+      description: A single Spotify top track entry for a user (current snapshot)
+      properties:
+        spotifyTrackId:
+          type: string
+        name:
+          type: string
+        rank:
+          type: integer
+          minimum: 1
+        artistNames:
+          type: array
+          items:
+            type: string
+        popularity:
+          type: integer
+          nullable: true
+        durationMs:
+          type: integer
+          nullable: true
+        imageUrl:
+          type: string
+          nullable: true
+        albumName:
+          type: string
+          nullable: true
+      required: [spotifyTrackId, name, rank]
+
+    TopArtistsPage:
+      type: object
+      description: Page of Spotify top artists for a user
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SpotifyTopArtistItem'
+        hasMore:
+          type: boolean
+        totalCount:
+          type: integer
+          description: Total number of items available for this range
+      required: [items, hasMore]
+
+    TopTracksPage:
+      type: object
+      description: Page of Spotify top tracks for a user
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SpotifyTopTrackItem'
+        hasMore:
+          type: boolean
+        totalCount:
+          type: integer
+          description: Total number of items available for this range
+      required: [items, hasMore]
 
     MessageResponse:
       type: object

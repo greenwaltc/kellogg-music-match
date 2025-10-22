@@ -13,6 +13,7 @@ import 'theme/app_theme.dart';
 import 'pages/spotify_connect_prompt.dart';
 import 'services/spotify_service.dart';
 import 'pages/matches_page.dart';
+import 'pages/spotify_top_page.dart';
 
 // Must be a top-level function for background handling
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -268,15 +269,54 @@ class _HomePageState extends State<HomePage> {
             ],
           );
         }
-        return Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: const [
-              Icon(Icons.graphic_eq, size: 48),
-              SizedBox(height: 12),
-              Text('My Spotify stats (coming soon)'),
-            ],
-          ),
+        return SpotifyTopPage(
+          onNeedConnect: () async {
+            // Immediately initiate the Spotify authorization flow without an extra tap
+            try {
+              final prefs = await SharedPreferences.getInstance();
+              final svc = SpotifyService(ApiClient(), prefs);
+              const clientId = String.fromEnvironment(
+                'SPOTIFY_CLIENT_ID',
+                defaultValue: '',
+              );
+              const redirectDefine = String.fromEnvironment(
+                'SPOTIFY_REDIRECT_URI',
+              );
+              final redirectUri = redirectDefine.isNotEmpty
+                  ? redirectDefine
+                  : SpotifyService.callbackUri;
+              if (clientId.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Missing SPOTIFY_CLIENT_ID app config.'),
+                  ),
+                );
+                return;
+              }
+              const scopes = <String>[
+                'user-read-email',
+                'user-read-private',
+                'user-top-read',
+                'playlist-read-private',
+              ];
+              await svc.beginAuth(
+                clientId: clientId,
+                redirectUri: redirectUri,
+                scope: scopes,
+              );
+              // After starting auth, present syncing status and wait until complete
+              final ok = await Navigator.of(context).push<bool>(
+                MaterialPageRoute(builder: (_) => const SpotifySyncingPage()),
+              );
+              if (ok == true) {
+                await _loadSpotifyStatus();
+              }
+            } catch (e) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Spotify authorization failed: $e')),
+              );
+            }
+          },
         );
       case 2: // Settings
       default:

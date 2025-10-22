@@ -142,6 +142,129 @@ func (s *MatchingService) SimilarityCacheStats() *SimilarityCacheStats {
 	return &st
 }
 
+// GetUserTopArtistsPage returns a page of the user's current Spotify top artists for a given range.
+func (s *MatchingService) GetUserTopArtistsPage(ctx context.Context, userID uuid.UUID, rng string, limit, offset int32) (generated.ImplResponse, error) {
+	cfg := config.Load()
+	if rng == "" {
+		rng = cfg.Matching.DefaultRange
+	}
+	allowed := false
+	for _, ar := range cfg.Matching.AllowedRanges {
+		if rng == ar {
+			allowed = true
+			break
+		}
+	}
+	if !allowed {
+		rng = cfg.Matching.DefaultRange
+	}
+	if limit <= 0 {
+		limit = int32(cfg.Matching.DefaultLimit)
+	}
+	if max := cfg.Matching.MaxLimit; max > 0 && int(limit) > max {
+		limit = int32(max)
+	}
+	items, err := s.userRepo.GetUserTopArtistsByRange(ctx, userID, rng, limit, offset)
+	if err != nil {
+		return generated.Response(http.StatusInternalServerError, generated.ErrorResponse{Message: "failed to load top artists"}), nil
+	}
+	var totalCount int32
+	if pr, ok := s.userRepo.(*PostgreSQLUserRepository); ok {
+		if cnt, err := pr.CountUserTopArtistsByRange(ctx, userID, rng); err == nil {
+			totalCount = cnt
+		}
+	}
+	out := make([]generated.SpotifyTopArtistItem, 0, len(items))
+	for _, it := range items {
+		ai := generated.SpotifyTopArtistItem{
+			SpotifyArtistId: it.SpotifyArtistID,
+			Name:            it.Name,
+			Rank:            it.Rank,
+			Genres:          it.Genres,
+		}
+		if it.Popularity != nil {
+			v := int32(*it.Popularity)
+			// generated expects int32 already
+			ai.Popularity = &v
+		}
+		if it.ImageURL != nil {
+			ai.ImageUrl = it.ImageURL
+		}
+		out = append(out, ai)
+	}
+	hasMore := int32(len(items)) == limit
+	if totalCount == 0 {
+		// Fallback if count path not available (e.g., different repo implementation): best-effort estimate
+		totalCount = offset + int32(len(items))
+	}
+	page := generated.TopArtistsPage{Items: out, HasMore: hasMore, TotalCount: totalCount}
+	return generated.Response(http.StatusOK, page), nil
+}
+
+// GetUserTopTracksPage returns a page of the user's current Spotify top tracks for a given range.
+func (s *MatchingService) GetUserTopTracksPage(ctx context.Context, userID uuid.UUID, rng string, limit, offset int32) (generated.ImplResponse, error) {
+	cfg := config.Load()
+	if rng == "" {
+		rng = cfg.Matching.DefaultRange
+	}
+	allowed := false
+	for _, ar := range cfg.Matching.AllowedRanges {
+		if rng == ar {
+			allowed = true
+			break
+		}
+	}
+	if !allowed {
+		rng = cfg.Matching.DefaultRange
+	}
+	if limit <= 0 {
+		limit = int32(cfg.Matching.DefaultLimit)
+	}
+	if max := cfg.Matching.MaxLimit; max > 0 && int(limit) > max {
+		limit = int32(max)
+	}
+	items, err := s.userRepo.GetUserTopTracksByRange(ctx, userID, rng, limit, offset)
+	if err != nil {
+		return generated.Response(http.StatusInternalServerError, generated.ErrorResponse{Message: "failed to load top tracks"}), nil
+	}
+	var totalCount int32
+	if pr, ok := s.userRepo.(*PostgreSQLUserRepository); ok {
+		if cnt, err := pr.CountUserTopTracksByRange(ctx, userID, rng); err == nil {
+			totalCount = cnt
+		}
+	}
+	out := make([]generated.SpotifyTopTrackItem, 0, len(items))
+	for _, it := range items {
+		ti := generated.SpotifyTopTrackItem{
+			SpotifyTrackId: it.SpotifyTrackID,
+			Name:           it.Name,
+			Rank:           it.Rank,
+			ArtistNames:    it.ArtistNames,
+		}
+		if it.Popularity != nil {
+			v := int32(*it.Popularity)
+			ti.Popularity = &v
+		}
+		if it.DurationMS != nil {
+			v := int32(*it.DurationMS)
+			ti.DurationMs = &v
+		}
+		if it.ImageURL != nil {
+			ti.ImageUrl = it.ImageURL
+		}
+		if it.AlbumName != nil {
+			ti.AlbumName = it.AlbumName
+		}
+		out = append(out, ti)
+	}
+	hasMore := int32(len(items)) == limit
+	if totalCount == 0 {
+		totalCount = offset + int32(len(items))
+	}
+	page := generated.TopTracksPage{Items: out, HasMore: hasMore, TotalCount: totalCount}
+	return generated.Response(http.StatusOK, page), nil
+}
+
 // FindMusicMatches implements music matching business logic
 // FindMusicMatches determines similar users based on Spotify top artists or tracks depending on the 'basis' value.
 // BACKWARD COMPAT: existing generated wrapper currently does not pass a basis param; we infer from artistsRequest.Basis if later added or default to "artists".

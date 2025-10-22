@@ -89,6 +89,12 @@ func (s *stubRepo) StoreSpotifyTopArtists(ctx context.Context, userID uuid.UUID,
 func (s *stubRepo) StoreSpotifyTopTracks(ctx context.Context, userID uuid.UUID, fetchedAt time.Time, rng string, items []SpotifyTopTrack) error {
 	return nil
 }
+func (s *stubRepo) GetUserTopArtistsByRange(ctx context.Context, userID uuid.UUID, rng string, limit, offset int32) ([]SpotifyTopArtist, error) {
+	return []SpotifyTopArtist{}, nil
+}
+func (s *stubRepo) GetUserTopTracksByRange(ctx context.Context, userID uuid.UUID, rng string, limit, offset int32) ([]SpotifyTopTrack, error) {
+	return []SpotifyTopTrack{}, nil
+}
 func (s *stubRepo) FindSimilarUsersBySpotifyTopArtists(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]SimilarUserResult, error) {
 	return nil, nil
 }

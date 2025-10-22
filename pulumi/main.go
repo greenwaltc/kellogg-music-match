@@ -103,7 +103,7 @@ func main() {
 		jwtRefresh := get("jwtRefreshHours", "720")
 		spotifyClientID := pulumiCfg.RequireSecret("spotifyClientId")
 		spotifyClientSecret := pulumiCfg.RequireSecret("spotifyClientSecret")
-		spotifyRefreshKey := pulumiCfg.RequireSecret("spotifyRefreshTokenKey")
+		spotifyRefreshTokenKey := pulumiCfg.RequireSecret("spotifyRefreshTokenKey")
 		// VAPID keys for web push notifications (generate via `npx web-push generate-vapid-keys`)
 		vapidPublicKey := pulumiCfg.RequireSecret("vapidPublicKey")
 		vapidPrivateKey := pulumiCfg.RequireSecret("vapidPrivateKey")
@@ -322,7 +322,7 @@ func main() {
 				"PGPASSWORD":                   dbPassword.ToStringOutput(),
 				"SPOTIFY_CLIENT_ID":            spotifyClientID.ToStringOutput(),
 				"SPOTIFY_CLIENT_SECRET":        spotifyClientSecret.ToStringOutput(),
-				"SPOTIFY_REFRESH_TOKEN_KEY":    spotifyRefreshKey.ToStringOutput(),
+				"SPOTIFY_REFRESH_TOKEN_KEY":    spotifyRefreshTokenKey.ToStringOutput(),
 				"VAPID_PUBLIC_KEY":             vapidPublicKey.ToStringOutput(),
 				"VAPID_PRIVATE_KEY":            vapidPrivateKey.ToStringOutput(),
 				"APNS_KEY_ID":                  apnsKeyId.ToStringOutput(),

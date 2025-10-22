@@ -231,6 +231,39 @@ class ApiClient {
       payload['appVersion'] = appVersion;
     await postJson('/push/device/register', payload, bearerToken: bearerToken);
   }
+
+  Future<Map<String, dynamic>> deleteJson(
+    String path, {
+    String? bearerToken,
+  }) async {
+    final uri = Uri.parse('$baseUrl$path');
+    final headers = {..._jsonHeaders};
+    if (bearerToken != null && bearerToken.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $bearerToken';
+    }
+    final resp = await _http.delete(uri, headers: headers);
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      if (resp.body.isEmpty) return <String, dynamic>{};
+      return jsonDecode(resp.body) as Map<String, dynamic>;
+    }
+    String msg;
+    try {
+      final dyn = jsonDecode(resp.body);
+      if (dyn is Map<String, dynamic>) {
+        msg = (dyn['message'] as String?)?.trim() ?? 'Request failed';
+        throw ApiException(
+          resp.statusCode,
+          msg.isNotEmpty ? msg : 'Request failed',
+          details: dyn,
+        );
+      }
+    } catch (_) {}
+    msg = resp.body.trim();
+    throw ApiException(
+      resp.statusCode,
+      msg.isNotEmpty ? msg : 'Request failed',
+    );
+  }
 }
 
 class ApiException implements Exception {

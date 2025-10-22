@@ -132,6 +132,10 @@ type MockUserRepository struct {
 	getUserError              error
 	getUserArtistsResult      []string
 	getUserArtistsError       error
+	topArtists                []business.SpotifyTopArtist
+	topTracks                 []business.SpotifyTopTrack
+	topArtistsError           error
+	topTracksError            error
 }
 
 func NewMockUserRepository() *MockUserRepository {
@@ -319,6 +323,44 @@ func (m *MockUserRepository) StoreSpotifyTopArtists(ctx context.Context, userID 
 }
 func (m *MockUserRepository) StoreSpotifyTopTracks(ctx context.Context, userID uuid.UUID, fetchedAt time.Time, rng string, items []business.SpotifyTopTrack) error {
 	return nil
+}
+
+// New methods for Spotify top items retrieval
+func (m *MockUserRepository) GetUserTopArtistsByRange(ctx context.Context, userID uuid.UUID, rng string, limit, offset int32) ([]business.SpotifyTopArtist, error) {
+	if m.topArtistsError != nil {
+		return nil, m.topArtistsError
+	}
+	// Simple pagination over preset slice if provided
+	if m.topArtists == nil {
+		return []business.SpotifyTopArtist{}, nil
+	}
+	start := int(offset)
+	if start > len(m.topArtists) {
+		return []business.SpotifyTopArtist{}, nil
+	}
+	end := start + int(limit)
+	if end > len(m.topArtists) {
+		end = len(m.topArtists)
+	}
+	return append([]business.SpotifyTopArtist{}, m.topArtists[start:end]...), nil
+}
+
+func (m *MockUserRepository) GetUserTopTracksByRange(ctx context.Context, userID uuid.UUID, rng string, limit, offset int32) ([]business.SpotifyTopTrack, error) {
+	if m.topTracksError != nil {
+		return nil, m.topTracksError
+	}
+	if m.topTracks == nil {
+		return []business.SpotifyTopTrack{}, nil
+	}
+	start := int(offset)
+	if start > len(m.topTracks) {
+		return []business.SpotifyTopTrack{}, nil
+	}
+	end := start + int(limit)
+	if end > len(m.topTracks) {
+		end = len(m.topTracks)
+	}
+	return append([]business.SpotifyTopTrack{}, m.topTracks[start:end]...), nil
 }
 
 // FindSimilarUsersBySpotifyTopArtists mock returns empty slice (tests that need real data use real repo)

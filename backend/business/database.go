@@ -56,6 +56,10 @@ type UserRepository interface {
 	StoreSpotifyTopArtists(ctx context.Context, userID uuid.UUID, fetchedAt time.Time, rng string, items []SpotifyTopArtist) error
 	StoreSpotifyTopTracks(ctx context.Context, userID uuid.UUID, fetchedAt time.Time, rng string, items []SpotifyTopTrack) error
 
+	// Spotify top items retrieval (paginated, ordered by rank)
+	GetUserTopArtistsByRange(ctx context.Context, userID uuid.UUID, rng string, limit, offset int32) ([]SpotifyTopArtist, error)
+	GetUserTopTracksByRange(ctx context.Context, userID uuid.UUID, rng string, limit, offset int32) ([]SpotifyTopTrack, error)
+
 	// Spotify similarity operations
 	FindSimilarUsersBySpotifyTopArtists(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]SimilarUserResult, error)
 	FindSimilarUsersBySpotifyTopArtistsFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string) ([]SimilarUserResult, error)
@@ -643,6 +647,139 @@ ON CONFLICT (user_id, range, item_rank) DO UPDATE SET spotify_track_id=EXCLUDED.
 		}
 	}
 	return nil
+}
+
+// GetUserTopArtistsByRange returns a page of the user's current top artists for a given Spotify time range, ordered by rank.
+func (r *PostgreSQLUserRepository) GetUserTopArtistsByRange(ctx context.Context, userID uuid.UUID, rng string, limit, offset int32) ([]SpotifyTopArtist, error) {
+	if rng == "" {
+		rng = "medium_term"
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	rows, err := r.queries.GetUserTopArtistsByRange(ctx, sqlc.GetUserTopArtistsByRangeParams{
+		UserID: userID,
+		Range:  rng,
+		Lim:    limit,
+		OffSet: offset,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]SpotifyTopArtist, 0, len(rows))
+	for _, row := range rows {
+		var pop *int32
+		if row.Popularity.Valid {
+			v := row.Popularity.Int32
+			pop = &v
+		}
+		var img *string
+		if row.ImageUrl.Valid {
+			v := row.ImageUrl.String
+			img = &v
+		}
+		out = append(out, SpotifyTopArtist{
+			Rank:            row.Rank,
+			SpotifyArtistID: row.SpotifyArtistID,
+			Name:            row.Name,
+			Genres:          row.Genres,
+			Popularity:      pop,
+			ImageURL:        img,
+		})
+	}
+	return out, nil
+}
+
+// GetUserTopTracksByRange returns a page of the user's current top tracks for a given Spotify time range, ordered by rank.
+func (r *PostgreSQLUserRepository) GetUserTopTracksByRange(ctx context.Context, userID uuid.UUID, rng string, limit, offset int32) ([]SpotifyTopTrack, error) {
+	if rng == "" {
+		rng = "medium_term"
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	rows, err := r.queries.GetUserTopTracksByRange(ctx, sqlc.GetUserTopTracksByRangeParams{
+		UserID: userID,
+		Range:  rng,
+		Lim:    limit,
+		OffSet: offset,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]SpotifyTopTrack, 0, len(rows))
+	for _, row := range rows {
+		var albumName, albumID, preview, image *string
+		var popularity, duration *int32
+		if row.AlbumName.Valid {
+			v := row.AlbumName.String
+			albumName = &v
+		}
+		if row.AlbumID.Valid {
+			v := row.AlbumID.String
+			albumID = &v
+		}
+		if row.PreviewUrl.Valid {
+			v := row.PreviewUrl.String
+			preview = &v
+		}
+		if row.ImageUrl.Valid {
+			v := row.ImageUrl.String
+			image = &v
+		}
+		if row.Popularity.Valid {
+			v := row.Popularity.Int32
+			popularity = &v
+		}
+		if row.DurationMs.Valid {
+			v := row.DurationMs.Int32
+			duration = &v
+		}
+		out = append(out, SpotifyTopTrack{
+			Rank:           row.Rank,
+			SpotifyTrackID: row.SpotifyTrackID,
+			Name:           row.Name,
+			ArtistNames:    row.ArtistNames,
+			ArtistIDs:      row.ArtistIds,
+			AlbumName:      albumName,
+			AlbumID:        albumID,
+			Popularity:     popularity,
+			PreviewURL:     preview,
+			DurationMS:     duration,
+			ImageURL:       image,
+		})
+	}
+	return out, nil
+}
+
+// CountUserTopArtistsByRange returns the total number of current top artists for a user and range.
+func (r *PostgreSQLUserRepository) CountUserTopArtistsByRange(ctx context.Context, userID uuid.UUID, rng string) (int32, error) {
+	if rng == "" {
+		rng = "medium_term"
+	}
+	cnt, err := r.queries.CountUserTopArtistsByRange(ctx, sqlc.CountUserTopArtistsByRangeParams{
+		UserID: userID,
+		Range:  rng,
+	})
+	if err != nil {
+		return 0, err
+	}
+	return cnt, nil
+}
+
+// CountUserTopTracksByRange returns the total number of current top tracks for a user and range.
+func (r *PostgreSQLUserRepository) CountUserTopTracksByRange(ctx context.Context, userID uuid.UUID, rng string) (int32, error) {
+	if rng == "" {
+		rng = "medium_term"
+	}
+	cnt, err := r.queries.CountUserTopTracksByRange(ctx, sqlc.CountUserTopTracksByRangeParams{
+		UserID: userID,
+		Range:  rng,
+	})
+	if err != nil {
+		return 0, err
+	}
+	return cnt, nil
 }
 
 // FindSimilarUsersBySpotifyTopArtists delegates to the sqlc-generated query and converts the JSON overlaps

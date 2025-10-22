@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/greenwaltc/kellogg-music-match/backend/business"
 	"github.com/greenwaltc/kellogg-music-match/backend/business/crypto"
+	database "github.com/greenwaltc/kellogg-music-match/backend/db/sqlc"
 	"github.com/greenwaltc/kellogg-music-match/backend/logger"
 )
 
@@ -76,6 +77,7 @@ type TokenStore interface {
 	UpsertSpotifyTokens(ctx context.Context, userID uuid.UUID, accessToken string, refreshTokenEncrypted []byte, expiresAt time.Time, scope string, tokenType string) error
 	StoreSpotifyTopArtists(ctx context.Context, userID uuid.UUID, fetchedAt time.Time, rng string, items []business.SpotifyTopArtist) error
 	StoreSpotifyTopTracks(ctx context.Context, userID uuid.UUID, fetchedAt time.Time, rng string, items []business.SpotifyTopTrack) error
+	GetSpotifyTokensByUser(ctx context.Context, userID uuid.UUID) (*database.SpotifyToken, error)
 }
 
 // Functional options
@@ -415,6 +417,97 @@ func (s *Service) PersistTokens(ctx context.Context, userID uuid.UUID, accessTok
 	return nil
 }
 
+// RefreshAccessToken exchanges a refresh_token for a new access token (and possibly a new refresh token).
+func (s *Service) RefreshAccessToken(ctx context.Context, refreshToken string) (string, string, int, error) {
+	if s.clientID == "" || s.clientSecret == "" {
+		return "", "", 0, errors.New("spotify credentials not configured")
+	}
+	form := url.Values{}
+	form.Set("grant_type", "refresh_token")
+	form.Set("refresh_token", refreshToken)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.tokenURL, strings.NewReader(form.Encode()))
+	if err != nil {
+		return "", "", 0, err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.SetBasicAuth(s.clientID, s.clientSecret)
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return "", "", 0, err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != 200 {
+		snippet := string(body)
+		if len(snippet) > 300 {
+			snippet = snippet[:300] + "..."
+		}
+		logger.L().Error("spotify.token.refresh.failed", "status", resp.StatusCode, "body", snippet)
+		return "", "", 0, fmt.Errorf("token refresh failed status=%d", resp.StatusCode)
+	}
+	var parsed struct {
+		AccessToken  string `json:"access_token"`
+		RefreshToken string `json:"refresh_token"`
+		ExpiresIn    int    `json:"expires_in"`
+		Scope        string `json:"scope"`
+		TokenType    string `json:"token_type"`
+	}
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return "", "", 0, err
+	}
+	return parsed.AccessToken, parsed.RefreshToken, parsed.ExpiresIn, nil
+}
+
+// RefreshUsingStoredTokens starts a sync using the stored refresh token to obtain a new access token.
+func (s *Service) RefreshUsingStoredTokens(ctx context.Context, username string, userID uuid.UUID) (*SyncJob, error) {
+	// Prevent starting if in-progress
+	s.mu.Lock()
+	if existing, ok := s.jobs[username]; ok {
+		if existing.Status == StatusPending || existing.Status == StatusInProgress {
+			s.mu.Unlock()
+			return nil, ErrSyncInProgress
+		}
+	}
+	s.mu.Unlock()
+
+	if s.store == nil {
+		return nil, errors.New("token store not configured")
+	}
+	tok, err := s.store.GetSpotifyTokensByUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if tok == nil || len(tok.RefreshTokenEncrypted) == 0 {
+		return nil, errors.New("no stored tokens")
+	}
+	if s.encKey == "" {
+		return nil, errors.New("encryption key not configured")
+	}
+	// Decrypt stored refresh token
+	rtBytes, err := crypto.DecryptAESGCM(tok.RefreshTokenEncrypted, s.encKey)
+	if err != nil {
+		return nil, fmt.Errorf("decrypt refresh token: %w", err)
+	}
+	refreshToken := string(rtBytes)
+	accessToken, newRefresh, expiresIn, err := s.RefreshAccessToken(ctx, refreshToken)
+	if err != nil {
+		return nil, err
+	}
+	// Start a new job and inject tokens
+	job := s.StartSync(ctx, username, "", "")
+	// If StartSync rate-limited us, report as error
+	if job.Status == StatusFailed && strings.Contains(strings.ToLower(job.Message), "rate") {
+		return nil, ErrRateLimited
+	}
+	if newRefresh == "" {
+		newRefresh = refreshToken
+	}
+	s.SetJobTokens(username, userID, accessToken, newRefresh, expiresIn)
+	// Best effort persist
+	_ = s.PersistTokens(ctx, userID, accessToken, newRefresh, expiresIn, "")
+	return job, nil
+}
+
 // CancelSync transitions a running job to cancelled.
 func (s *Service) CancelSync(username string) bool {
 	s.mu.Lock()
@@ -453,11 +546,18 @@ func (s *Service) SetJobTokens(username string, userID uuid.UUID, accessToken, r
 }
 
 // ----- Spotify API fetch helpers -----
+type spotifyImage struct {
+	URL    string `json:"url"`
+	Width  *int   `json:"width"`
+	Height *int   `json:"height"`
+}
+
 type spotifyArtist struct {
-	ID         string   `json:"id"`
-	Name       string   `json:"name"`
-	Genres     []string `json:"genres"`
-	Popularity *int     `json:"popularity"`
+	ID         string         `json:"id"`
+	Name       string         `json:"name"`
+	Genres     []string       `json:"genres"`
+	Popularity *int           `json:"popularity"`
+	Images     []spotifyImage `json:"images"`
 }
 type spotifyTrack struct {
 	ID         string          `json:"id"`
@@ -465,6 +565,11 @@ type spotifyTrack struct {
 	DurationMS *int            `json:"duration_ms"`
 	Popularity *int            `json:"popularity"`
 	Artists    []spotifyArtist `json:"artists"`
+	Album      struct {
+		ID     string         `json:"id"`
+		Name   string         `json:"name"`
+		Images []spotifyImage `json:"images"`
+	} `json:"album"`
 }
 
 // fetchTopItems gets top artists & tracks for a single time range
@@ -494,7 +599,18 @@ func (s *Service) fetchTopItems(ctx context.Context, username string, rng string
 			p := int32(*a.Popularity)
 			pop = &p
 		}
-		artists = append(artists, business.SpotifyTopArtist{Rank: int32(i + 1), SpotifyArtistID: a.ID, Name: a.Name, Genres: a.Genres, Popularity: pop})
+		var img *string
+		if u := pickImageURL(a.Images); u != "" {
+			img = &u
+		}
+		artists = append(artists, business.SpotifyTopArtist{
+			Rank:            int32(i + 1),
+			SpotifyArtistID: a.ID,
+			Name:            a.Name,
+			Genres:          a.Genres,
+			Popularity:      pop,
+			ImageURL:        img,
+		})
 	}
 	tracks := []business.SpotifyTopTrack{}
 	for i, t := range tracksResp.Tracks {
@@ -514,7 +630,32 @@ func (s *Service) fetchTopItems(ctx context.Context, username string, rng string
 			artistNames = append(artistNames, ar.Name)
 			artistIDs = append(artistIDs, ar.ID)
 		}
-		tracks = append(tracks, business.SpotifyTopTrack{Rank: int32(i + 1), SpotifyTrackID: t.ID, Name: t.Name, ArtistNames: artistNames, ArtistIDs: artistIDs, Popularity: pop, DurationMS: dur})
+		var img *string
+		if u := pickImageURL(t.Album.Images); u != "" {
+			img = &u
+		}
+		var albumName *string
+		if strings.TrimSpace(t.Album.Name) != "" {
+			n := t.Album.Name
+			albumName = &n
+		}
+		var albumID *string
+		if strings.TrimSpace(t.Album.ID) != "" {
+			id := t.Album.ID
+			albumID = &id
+		}
+		tracks = append(tracks, business.SpotifyTopTrack{
+			Rank:           int32(i + 1),
+			SpotifyTrackID: t.ID,
+			Name:           t.Name,
+			ArtistNames:    artistNames,
+			ArtistIDs:      artistIDs,
+			Popularity:     pop,
+			DurationMS:     dur,
+			ImageURL:       img,
+			AlbumName:      albumName,
+			AlbumID:        albumID,
+		})
 	}
 	return artists, tracks, nil
 }
@@ -605,4 +746,35 @@ func (s *Service) fetchAll(ctx context.Context, token, firstURL string) (struct 
 		}
 	}
 	return result, nil
+}
+
+// pickImageURL chooses a reasonable image URL from a list of Spotify images.
+// Preference order: medium (200-400px) then largest then smallest.
+func pickImageURL(images []spotifyImage) string {
+	if len(images) == 0 {
+		return ""
+	}
+	// Prefer medium size
+	bestURL := ""
+	for _, im := range images {
+		if im.Width != nil {
+			w := *im.Width
+			if w >= 200 && w <= 400 {
+				return im.URL
+			}
+		}
+	}
+	// Fallback: largest
+	maxW := -1
+	for _, im := range images {
+		if im.Width != nil && *im.Width > maxW {
+			maxW = *im.Width
+			bestURL = im.URL
+		}
+	}
+	if bestURL != "" {
+		return bestURL
+	}
+	// Final: first
+	return images[0].URL
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	business "github.com/greenwaltc/kellogg-music-match/backend/business"
+	database "github.com/greenwaltc/kellogg-music-match/backend/db/sqlc"
 )
 
 // mockStore implements TokenStore plus snapshot methods for testing without DB.
@@ -28,6 +29,10 @@ func (m *mockStore) StoreSpotifyTopArtists(ctx context.Context, userID uuid.UUID
 func (m *mockStore) StoreSpotifyTopTracks(ctx context.Context, userID uuid.UUID, fetchedAt time.Time, rng string, items []business.SpotifyTopTrack) error {
 	m.trackSnapshots += len(items)
 	return nil
+}
+
+func (m *mockStore) GetSpotifyTokensByUser(ctx context.Context, userID uuid.UUID) (*database.SpotifyToken, error) {
+	return nil, errors.New("not implemented")
 }
 
 // Test job lifecycle with injected tokens immediately (simulate wrapper setting tokens) without real HTTP.

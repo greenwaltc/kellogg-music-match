@@ -12,6 +12,10 @@ import (
 )
 
 type Querier interface {
+	// Returns the total number of current top artists for a user and range.
+	CountUserTopArtistsByRange(ctx context.Context, arg CountUserTopArtistsByRangeParams) (int32, error)
+	// Returns the total number of current top tracks for a user and range.
+	CountUserTopTracksByRange(ctx context.Context, arg CountUserTopTracksByRangeParams) (int32, error)
 	// (If you also want the :by-user-id variant, keep your FindSimilarUsersChamferByUserID below unchanged.)
 	// Feedback queries
 	CreateFeedback(ctx context.Context, arg CreateFeedbackParams) (Feedback, error)
@@ -31,9 +35,6 @@ type Querier interface {
 	DeleteUser(ctx context.Context, id uuid.UUID) error
 	DeleteUserConcertEventInterest(ctx context.Context, arg DeleteUserConcertEventInterestParams) error
 	DeleteUserPasswordResetTokens(ctx context.Context, userID uuid.UUID) error
-	// =======================
-	// Spotify Top Items
-	// =======================
 	// Given an anchor user (user_id) and a Spotify time range, compute similarity to other users
 	// based on overlapping top artists in the latest snapshot for that range per user.
 	// Similarity uses a rank-weighted reciprocal scheme: weight = 1 / (r_anchor + r_other)
@@ -80,6 +81,13 @@ type Querier interface {
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
 	GetUserByUsernameWithPassword(ctx context.Context, username string) (User, error)
+	// =======================
+	// Spotify Top Items
+	// =======================
+	// Returns a user's current top artists for a given Spotify time range, ordered by rank.
+	GetUserTopArtistsByRange(ctx context.Context, arg GetUserTopArtistsByRangeParams) ([]GetUserTopArtistsByRangeRow, error)
+	// Returns a user's current top tracks for a given Spotify time range, ordered by rank.
+	GetUserTopTracksByRange(ctx context.Context, arg GetUserTopTracksByRangeParams) ([]GetUserTopTracksByRangeRow, error)
 	InsertSpotifyTopArtistSnapshot(ctx context.Context, arg InsertSpotifyTopArtistSnapshotParams) error
 	InsertSpotifyTopTrackSnapshot(ctx context.Context, arg InsertSpotifyTopTrackSnapshotParams) error
 	MarkPasswordResetTokenAsUsed(ctx context.Context, token string) error

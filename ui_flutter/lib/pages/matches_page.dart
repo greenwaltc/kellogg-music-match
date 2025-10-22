@@ -18,6 +18,7 @@ class _MatchesPageState extends State<MatchesPage> {
   late final ApiClient _api;
   SharedPreferences? _prefs;
   MatchingService? _svc;
+  final ScrollController _scrollController = ScrollController();
 
   String _basis = 'artists'; // 'artists' | 'tracks'
   String _range = 'medium_term'; // short_term | medium_term | long_term
@@ -30,11 +31,22 @@ class _MatchesPageState extends State<MatchesPage> {
   // Expanded state and per-card toggle (all vs overlaps only)
   final Set<int> _expanded = {};
   final Map<int, bool> _onlyOverlap = {};
+  bool _showScrollToTop = false;
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     _init();
+  }
+
+  void _onScroll() {
+    final show = _scrollController.positions.isNotEmpty
+        ? _scrollController.offset > 300
+        : false;
+    if (show != _showScrollToTop) {
+      setState(() => _showScrollToTop = show);
+    }
   }
 
   Future<void> _init() async {
@@ -63,6 +75,8 @@ class _MatchesPageState extends State<MatchesPage> {
   @override
   void dispose() {
     _searchCtrl.dispose();
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -108,7 +122,39 @@ class _MatchesPageState extends State<MatchesPage> {
           color: Theme.of(context).colorScheme.surface,
           child: SafeArea(bottom: false, child: topControls),
         ),
-        Expanded(child: list),
+        Expanded(
+          child: Stack(
+            children: [
+              list,
+              Positioned(
+                right: 16,
+                bottom: 16,
+                child: AnimatedScale(
+                  duration: const Duration(milliseconds: 150),
+                  scale: _showScrollToTop ? 1.0 : 0.0,
+                  child: AnimatedOpacity(
+                    duration: const Duration(milliseconds: 150),
+                    opacity: _showScrollToTop ? 1.0 : 0.0,
+                    child: FloatingActionButton(
+                      mini: true,
+                      onPressed: () {
+                        if (_scrollController.hasClients) {
+                          _scrollController.animateTo(
+                            0,
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeOutCubic,
+                          );
+                        }
+                      },
+                      tooltip: 'Scroll to top',
+                      child: const Icon(Icons.arrow_upward),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -226,31 +272,41 @@ class _MatchesPageState extends State<MatchesPage> {
     }
     return RefreshIndicator(
       onRefresh: () => _submit(forceRefresh: true),
-      child: ListView.builder(
-        padding: const EdgeInsets.only(top: 8, bottom: 16),
-        itemCount: _matches.length,
-        itemBuilder: (context, index) {
-          final item = _matches[index] as Map<String, dynamic>;
-          return _MatchUserTile(
-            index: index,
-            data: item,
-            basis: _basis,
-            expanded: _expanded.contains(index),
-            onlyOverlap: _onlyOverlap[index] ?? false,
-            onToggleExpanded: () {
-              setState(() {
-                if (_expanded.contains(index)) {
-                  _expanded.remove(index);
-                } else {
-                  _expanded.add(index);
-                }
-              });
-            },
-            onToggleOnlyOverlap: (val) {
-              setState(() => _onlyOverlap[index] = val);
-            },
-          );
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (n) {
+          final current = n.metrics.pixels > 200;
+          if (current != _showScrollToTop) {
+            setState(() => _showScrollToTop = current);
+          }
+          return false;
         },
+        child: ListView.builder(
+          controller: _scrollController,
+          padding: const EdgeInsets.only(top: 8, bottom: 16),
+          itemCount: _matches.length,
+          itemBuilder: (context, index) {
+            final item = _matches[index] as Map<String, dynamic>;
+            return _MatchUserTile(
+              index: index,
+              data: item,
+              basis: _basis,
+              expanded: _expanded.contains(index),
+              onlyOverlap: _onlyOverlap[index] ?? false,
+              onToggleExpanded: () {
+                setState(() {
+                  if (_expanded.contains(index)) {
+                    _expanded.remove(index);
+                  } else {
+                    _expanded.add(index);
+                  }
+                });
+              },
+              onToggleOnlyOverlap: (val) {
+                setState(() => _onlyOverlap[index] = val);
+              },
+            );
+          },
+        ),
       ),
     );
   }

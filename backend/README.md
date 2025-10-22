@@ -81,6 +81,33 @@ DB_SSLMODE=disable
 
 > **Note**: These match the Docker Compose configuration for seamless local development.
 
+### Spotify Refresh Token Persistence
+
+To support the “Refresh from Spotify” feature without re-authorizing, the backend must persist the user’s Spotify refresh token. This requires an encryption key so the token can be stored securely.
+
+- Set `SPOTIFY_REFRESH_TOKEN_KEY` in your environment (and docker-compose). The value must be base64-encoded and decode to 16, 24, or 32 bytes (AES-128/192/256).
+- Example (generate a 32-byte key on macOS/Linux):
+
+```bash
+openssl rand -base64 32
+```
+
+- Add it to your `.env` (used by docker-compose):
+
+```bash
+SPOTIFY_REFRESH_TOKEN_KEY=PasteTheBase64ValueHere
+```
+
+- Ensure these Spotify vars are also set:
+
+```bash
+SPOTIFY_CLIENT_ID=your_spotify_app_client_id
+SPOTIFY_CLIENT_SECRET=your_spotify_app_client_secret
+SPOTIFY_REDIRECT_URI=http://localhost:4200/spotify/callback
+```
+
+After setting the key, run the Spotify connect flow once (login + authorize). The backend will encrypt and store your refresh token. From then on, the “Refresh from Spotify” button can use the stored token without re-auth.
+
 ## 🚀 Quick Start
 
 ### Prerequisites

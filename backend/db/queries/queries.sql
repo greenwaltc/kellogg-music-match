@@ -7,8 +7,10 @@ INSERT INTO users (id, username, email, first_name, last_name, password_hash, pr
 VALUES (sqlc.arg(id), sqlc.arg(username), sqlc.arg(email), sqlc.arg(first_name), sqlc.arg(last_name), sqlc.arg(password_hash), sqlc.arg(program), sqlc.arg(graduation_year))
 RETURNING *;
 
+-- name: GetUserByUsername :one
 SELECT * FROM users WHERE lower(username) = lower(sqlc.arg(username)) LIMIT 1;
 
+-- name: GetUserByUsernameWithPassword :one
 SELECT * FROM users WHERE lower(username) = lower(sqlc.arg(username)) LIMIT 1;
 
 -- name: GetUserByEmail :one
@@ -17,6 +19,7 @@ SELECT * FROM users WHERE email = sqlc.arg(email) LIMIT 1;
 -- name: GetUserByID :one
 SELECT * FROM users WHERE id = sqlc.arg(id) LIMIT 1;
 
+-- name: UserExistsByUsername :one
 SELECT EXISTS(SELECT 1 FROM users WHERE lower(username) = lower(sqlc.arg(username)));
 
 -- name: UserExistsByEmail :one
@@ -242,6 +245,55 @@ SELECT * FROM spotify_tokens WHERE user_id = sqlc.arg(user_id) LIMIT 1;
 -- =======================
 -- Spotify Top Items
 -- =======================
+
+-- name: GetUserTopArtistsByRange :many
+-- Returns a user's current top artists for a given Spotify time range, ordered by rank.
+SELECT 
+  v.item_rank AS rank,
+  v.spotify_artist_id,
+  v.name,
+  v.genres,
+  v.popularity,
+  v.image_url
+FROM v_current_spotify_top_artists v
+WHERE v.user_id = sqlc.arg(user_id)
+  AND v.range = sqlc.arg(range)
+ORDER BY v.item_rank ASC
+LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off_set);
+
+-- name: CountUserTopArtistsByRange :one
+-- Returns the total number of current top artists for a user and range.
+SELECT COUNT(*)::int4
+FROM v_current_spotify_top_artists v
+WHERE v.user_id = sqlc.arg(user_id)
+  AND v.range = sqlc.arg(range);
+
+-- name: GetUserTopTracksByRange :many
+-- Returns a user's current top tracks for a given Spotify time range, ordered by rank.
+SELECT 
+  v.item_rank AS rank,
+  v.spotify_track_id,
+  v.name,
+  v.artist_names,
+  v.artist_ids,
+  v.album_name,
+  v.album_id,
+  v.popularity,
+  v.preview_url,
+  v.duration_ms,
+  v.image_url
+FROM v_current_spotify_top_tracks v
+WHERE v.user_id = sqlc.arg(user_id)
+  AND v.range = sqlc.arg(range)
+ORDER BY v.item_rank ASC
+LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off_set);
+
+-- name: CountUserTopTracksByRange :one
+-- Returns the total number of current top tracks for a user and range.
+SELECT COUNT(*)::int4
+FROM v_current_spotify_top_tracks v
+WHERE v.user_id = sqlc.arg(user_id)
+  AND v.range = sqlc.arg(range);
 
 -- name: FindTopNSimilarUsersBySpotifyArtists :many
 -- Given an anchor user (user_id) and a Spotify time range, compute similarity to other users

@@ -163,7 +163,7 @@ config:
   kellogg-music-match:vapidSubject: "mailto:support@kelloggmatch.com"
   kellogg-music-match:pushEnabled: "true"
   kellogg-music-match:spotifyRefreshTokenKey:
-    secure: AAABALxGpuoOvskkfMfd9EyxqxEuIr0jXiQgaM+hx0Rn3dY53GtoriB1lweZmZe8uhF3RoxQt69C5KbMbfygD6huDfkBwSkMd39xYw==
+    secure: AAABAFxFUWXUxLHIqGbflmZ9IbP8ZtuNrI9FeiLaxxTY22UCL/j2uoBzOvOHlCoXJCu/4d3xapmwuf3ge0k02XuYI3W0Z8vStD8iVA==
   kellogg-music-match:vapidPrivateKey:
     secure: AAABAN+Gu/EEjErdmINoL75Vkpcg3oosIEDMyF7242JIPOYgW3qmUYja3SPFm0yQkMi4uCgpl2aI6yL1it2n9pIHNt+Ih9CF/knA
   kellogg-music-match:vapidPublicKey:

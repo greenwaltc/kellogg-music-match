@@ -13,6 +13,7 @@ import (
 	"github.com/greenwaltc/kellogg-music-match/backend/business/spotify"
 	"github.com/greenwaltc/kellogg-music-match/backend/generated"
 	"github.com/greenwaltc/kellogg-music-match/backend/logger"
+	"github.com/jackc/pgx/v5"
 )
 
 // AuthAPIServiceWrapper wraps business logic to implement OpenAPI service interface
@@ -261,6 +262,73 @@ func (w *MatchingAPIServiceWrapper) RetrySpotifySync(ctx context.Context, body g
 	}
 	resp := generated.SpotifySyncAcceptedResponse{Status: "syncing", Message: job.Message}
 	return generated.Response(202, resp), nil
+}
+
+// RefreshSpotifySync triggers a sync by refreshing access token using stored refresh token (no user interaction).
+func (w *MatchingAPIServiceWrapper) RefreshSpotifySync(ctx context.Context) (generated.ImplResponse, error) {
+	uctx, ok := GetUserFromContext(ctx)
+	if !ok || uctx == nil || uctx.UserID == "" {
+		return generated.Response(401, generated.ErrorResponse{Message: "unauthorized", CreatedAt: time.Now().UTC()}), nil
+	}
+	uid, err := uuid.Parse(uctx.UserID)
+	if err != nil {
+		return generated.Response(400, generated.ErrorResponse{Message: "invalid userId", CreatedAt: time.Now().UTC()}), nil
+	}
+	job, rerr := w.spotifyService.RefreshUsingStoredTokens(ctx, uctx.Username, uid)
+	if rerr != nil {
+		if errors.Is(rerr, spotify.ErrSyncInProgress) {
+			return generated.Response(409, generated.ErrorResponse{Message: "Sync in progress", CreatedAt: time.Now().UTC()}), nil
+		}
+		// Surface not found when no stored tokens
+		if strings.Contains(strings.ToLower(rerr.Error()), "no stored tokens") || errors.Is(rerr, pgx.ErrNoRows) {
+			return generated.Response(404, generated.ErrorResponse{Message: "no stored tokens", CreatedAt: time.Now().UTC()}), nil
+		}
+		// Log details server-side for easier diagnosis
+		logger.L().Error("spotify.refresh.error", "user", uctx.Username, "err", rerr)
+		return generated.Response(500, generated.ErrorResponse{Message: "Refresh failed", CreatedAt: time.Now().UTC()}), nil
+	}
+	resp := generated.SpotifySyncAcceptedResponse{Status: "syncing", Message: job.Message}
+	return generated.Response(202, resp), nil
+}
+
+// GetUserTopArtists enforces self-only access and delegates to business service for paginated results
+func (w *MatchingAPIServiceWrapper) GetUserTopArtists(ctx context.Context, userId string, range_ string, limit int32, offset int32) (generated.ImplResponse, error) {
+	uctx, ok := GetUserFromContext(ctx)
+	if !ok || uctx == nil || uctx.UserID == "" {
+		return generated.Response(401, generated.ErrorResponse{Message: "unauthorized", CreatedAt: time.Now().UTC()}), nil
+	}
+	// Self-only for now (admins not yet implemented)
+	if strings.TrimSpace(strings.ToLower(userId)) != strings.TrimSpace(strings.ToLower(uctx.UserID)) {
+		return generated.Response(403, generated.ErrorResponse{Message: "forbidden", CreatedAt: time.Now().UTC()}), nil
+	}
+	uid, err := uuid.Parse(userId)
+	if err != nil {
+		return generated.Response(400, generated.ErrorResponse{Message: "invalid userId", CreatedAt: time.Now().UTC()}), nil
+	}
+	// Delegate
+	if ms, ok := w.matchingService.(*business.MatchingService); ok {
+		return ms.GetUserTopArtistsPage(ctx, uid, range_, limit, offset)
+	}
+	return generated.Response(500, generated.ErrorResponse{Message: "service unavailable", CreatedAt: time.Now().UTC()}), nil
+}
+
+// GetUserTopTracks enforces self-only access and delegates to business service for paginated results
+func (w *MatchingAPIServiceWrapper) GetUserTopTracks(ctx context.Context, userId string, range_ string, limit int32, offset int32) (generated.ImplResponse, error) {
+	uctx, ok := GetUserFromContext(ctx)
+	if !ok || uctx == nil || uctx.UserID == "" {
+		return generated.Response(401, generated.ErrorResponse{Message: "unauthorized", CreatedAt: time.Now().UTC()}), nil
+	}
+	if strings.TrimSpace(strings.ToLower(userId)) != strings.TrimSpace(strings.ToLower(uctx.UserID)) {
+		return generated.Response(403, generated.ErrorResponse{Message: "forbidden", CreatedAt: time.Now().UTC()}), nil
+	}
+	uid, err := uuid.Parse(userId)
+	if err != nil {
+		return generated.Response(400, generated.ErrorResponse{Message: "invalid userId", CreatedAt: time.Now().UTC()}), nil
+	}
+	if ms, ok := w.matchingService.(*business.MatchingService); ok {
+		return ms.GetUserTopTracksPage(ctx, uid, range_, limit, offset)
+	}
+	return generated.Response(500, generated.ErrorResponse{Message: "service unavailable", CreatedAt: time.Now().UTC()}), nil
 }
 
 // FeedbackAPIServiceWrapper wraps business logic to implement OpenAPI service interface

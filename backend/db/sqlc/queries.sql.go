@@ -12,6 +12,46 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countUserTopArtistsByRange = `-- name: CountUserTopArtistsByRange :one
+SELECT COUNT(*)::int4
+FROM v_current_spotify_top_artists v
+WHERE v.user_id = $1
+  AND v.range = $2
+`
+
+type CountUserTopArtistsByRangeParams struct {
+	UserID uuid.UUID `json:"user_id"`
+	Range  string    `json:"range"`
+}
+
+// Returns the total number of current top artists for a user and range.
+func (q *Queries) CountUserTopArtistsByRange(ctx context.Context, arg CountUserTopArtistsByRangeParams) (int32, error) {
+	row := q.db.QueryRow(ctx, countUserTopArtistsByRange, arg.UserID, arg.Range)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const countUserTopTracksByRange = `-- name: CountUserTopTracksByRange :one
+SELECT COUNT(*)::int4
+FROM v_current_spotify_top_tracks v
+WHERE v.user_id = $1
+  AND v.range = $2
+`
+
+type CountUserTopTracksByRangeParams struct {
+	UserID uuid.UUID `json:"user_id"`
+	Range  string    `json:"range"`
+}
+
+// Returns the total number of current top tracks for a user and range.
+func (q *Queries) CountUserTopTracksByRange(ctx context.Context, arg CountUserTopTracksByRangeParams) (int32, error) {
+	row := q.db.QueryRow(ctx, countUserTopTracksByRange, arg.UserID, arg.Range)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const createFeedback = `-- name: CreateFeedback :one
 
 INSERT INTO feedback (user_id, feedback_text)
@@ -213,7 +253,6 @@ func (q *Queries) DeleteUserPasswordResetTokens(ctx context.Context, userID uuid
 }
 
 const findTopNSimilarUsersBySpotifyArtists = `-- name: FindTopNSimilarUsersBySpotifyArtists :many
-
 WITH anchor AS (
   SELECT v.user_id AS anchor_user_id, v.item_rank AS anchor_item_rank, v.spotify_artist_id, v.name AS anchor_name
   FROM v_current_spotify_top_artists v
@@ -288,9 +327,6 @@ type FindTopNSimilarUsersBySpotifyArtistsRow struct {
 	TopArtistsJson interface{} `json:"top_artists_json"`
 }
 
-// =======================
-// Spotify Top Items
-// =======================
 // Given an anchor user (user_id) and a Spotify time range, compute similarity to other users
 // based on overlapping top artists in the latest snapshot for that range per user.
 // Similarity uses a rank-weighted reciprocal scheme: weight = 1 / (r_anchor + r_other)
@@ -1785,6 +1821,153 @@ func (q *Queries) GetUserByUsernameWithPassword(ctx context.Context, username st
 		&i.GraduationYear,
 	)
 	return i, err
+}
+
+const getUserTopArtistsByRange = `-- name: GetUserTopArtistsByRange :many
+
+SELECT 
+  v.item_rank AS rank,
+  v.spotify_artist_id,
+  v.name,
+  v.genres,
+  v.popularity,
+  v.image_url
+FROM v_current_spotify_top_artists v
+WHERE v.user_id = $1
+  AND v.range = $2
+ORDER BY v.item_rank ASC
+LIMIT $4 OFFSET $3
+`
+
+type GetUserTopArtistsByRangeParams struct {
+	UserID uuid.UUID `json:"user_id"`
+	Range  string    `json:"range"`
+	OffSet int32     `json:"off_set"`
+	Lim    int32     `json:"lim"`
+}
+
+type GetUserTopArtistsByRangeRow struct {
+	Rank            int32       `json:"rank"`
+	SpotifyArtistID string      `json:"spotify_artist_id"`
+	Name            string      `json:"name"`
+	Genres          []string    `json:"genres"`
+	Popularity      pgtype.Int4 `json:"popularity"`
+	ImageUrl        pgtype.Text `json:"image_url"`
+}
+
+// =======================
+// Spotify Top Items
+// =======================
+// Returns a user's current top artists for a given Spotify time range, ordered by rank.
+func (q *Queries) GetUserTopArtistsByRange(ctx context.Context, arg GetUserTopArtistsByRangeParams) ([]GetUserTopArtistsByRangeRow, error) {
+	rows, err := q.db.Query(ctx, getUserTopArtistsByRange,
+		arg.UserID,
+		arg.Range,
+		arg.OffSet,
+		arg.Lim,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetUserTopArtistsByRangeRow{}
+	for rows.Next() {
+		var i GetUserTopArtistsByRangeRow
+		if err := rows.Scan(
+			&i.Rank,
+			&i.SpotifyArtistID,
+			&i.Name,
+			&i.Genres,
+			&i.Popularity,
+			&i.ImageUrl,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getUserTopTracksByRange = `-- name: GetUserTopTracksByRange :many
+SELECT 
+  v.item_rank AS rank,
+  v.spotify_track_id,
+  v.name,
+  v.artist_names,
+  v.artist_ids,
+  v.album_name,
+  v.album_id,
+  v.popularity,
+  v.preview_url,
+  v.duration_ms,
+  v.image_url
+FROM v_current_spotify_top_tracks v
+WHERE v.user_id = $1
+  AND v.range = $2
+ORDER BY v.item_rank ASC
+LIMIT $4 OFFSET $3
+`
+
+type GetUserTopTracksByRangeParams struct {
+	UserID uuid.UUID `json:"user_id"`
+	Range  string    `json:"range"`
+	OffSet int32     `json:"off_set"`
+	Lim    int32     `json:"lim"`
+}
+
+type GetUserTopTracksByRangeRow struct {
+	Rank           int32       `json:"rank"`
+	SpotifyTrackID string      `json:"spotify_track_id"`
+	Name           string      `json:"name"`
+	ArtistNames    []string    `json:"artist_names"`
+	ArtistIds      []string    `json:"artist_ids"`
+	AlbumName      pgtype.Text `json:"album_name"`
+	AlbumID        pgtype.Text `json:"album_id"`
+	Popularity     pgtype.Int4 `json:"popularity"`
+	PreviewUrl     pgtype.Text `json:"preview_url"`
+	DurationMs     pgtype.Int4 `json:"duration_ms"`
+	ImageUrl       pgtype.Text `json:"image_url"`
+}
+
+// Returns a user's current top tracks for a given Spotify time range, ordered by rank.
+func (q *Queries) GetUserTopTracksByRange(ctx context.Context, arg GetUserTopTracksByRangeParams) ([]GetUserTopTracksByRangeRow, error) {
+	rows, err := q.db.Query(ctx, getUserTopTracksByRange,
+		arg.UserID,
+		arg.Range,
+		arg.OffSet,
+		arg.Lim,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetUserTopTracksByRangeRow{}
+	for rows.Next() {
+		var i GetUserTopTracksByRangeRow
+		if err := rows.Scan(
+			&i.Rank,
+			&i.SpotifyTrackID,
+			&i.Name,
+			&i.ArtistNames,
+			&i.ArtistIds,
+			&i.AlbumName,
+			&i.AlbumID,
+			&i.Popularity,
+			&i.PreviewUrl,
+			&i.DurationMs,
+			&i.ImageUrl,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const insertSpotifyTopArtistSnapshot = `-- name: InsertSpotifyTopArtistSnapshot :exec

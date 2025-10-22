@@ -94,7 +94,7 @@ config:
   kellogg-music-match:spotifyClientSecret:
     secure: AAABABnkWK2Q2yT0HxZj4hk2CEomQZKQLlLZnVpIgWEPitd1heHXMpZ1+G9KBB5IJZQr4klMOu6JOpkZG/FIIK2A
   kellogg-music-match:spotifyRefreshTokenKey:
-    secure: AAABAN33RIFegBG4r+JKkSU5pREI/Vriqoe/YvMY75fga/emogAzQlRGzUh93Hi8NoqDalmKNR9h8vCiyGlQOKUcq6eBqaig7IIFSg==
+    secure: AAABAEvdFS1jOltevCS4JpIoSXbV84Ls8Xg33jbieW/EbcQt+Ke+rdvDv3LVmFHCMXOEEMSOSn6JpLxRfCncrEI3wSLDOS6qxwI6Ng==
   kellogg-music-match:vapidPrivateKey:
     secure: AAABAEG3dziLnGr5Tzb2f3HUapx7F/DzcN/fgOSJqAcVZBXUrqY1FCjsrZftrUDi1fo5sMKrCXxZZBJ4wSGzWMFb+5xnHdEMBElW
   kellogg-music-match:vapidPublicKey:
