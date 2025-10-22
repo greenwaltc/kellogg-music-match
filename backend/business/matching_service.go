@@ -332,6 +332,41 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 				return out
 			}(),
 		}
+		// Include per-user top items depending on basis
+		if basis == "artists" && len(sim.TopArtists) > 0 {
+			arr := make([]generated.MatchUserTopArtistsInner, 0, len(sim.TopArtists))
+			for _, a := range sim.TopArtists {
+				// Guard rank
+				if a.Rank <= 0 || a.Name == "" || a.SpotifyArtistID == "" {
+					continue
+				}
+				arr = append(arr, generated.MatchUserTopArtistsInner{
+					SpotifyArtistId: a.SpotifyArtistID,
+					Name:            a.Name,
+					Rank:            a.Rank,
+				})
+			}
+			if len(arr) > 0 {
+				mu.TopArtists = arr
+			}
+		}
+		if basis == "tracks" && len(sim.TopTracks) > 0 {
+			arr := make([]generated.MatchUserTopTracksInner, 0, len(sim.TopTracks))
+			for _, t := range sim.TopTracks {
+				if t.Rank <= 0 || t.Name == "" || t.SpotifyTrackID == "" {
+					continue
+				}
+				arr = append(arr, generated.MatchUserTopTracksInner{
+					SpotifyTrackId: t.SpotifyTrackID,
+					Name:           t.Name,
+					Rank:           t.Rank,
+					ArtistNames:    t.ArtistNames,
+				})
+			}
+			if len(arr) > 0 {
+				mu.TopTracks = arr
+			}
+		}
 		matches = append(matches, mu)
 	}
 

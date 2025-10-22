@@ -12,6 +12,7 @@ import 'pages/debug_page.dart';
 import 'theme/app_theme.dart';
 import 'pages/spotify_connect_prompt.dart';
 import 'services/spotify_service.dart';
+import 'pages/matches_page.dart';
 
 // Must be a top-level function for background handling
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -146,6 +147,7 @@ class _HomePageState extends State<HomePage> {
   bool? _spotifyReady;
   bool _loadingStatus = true;
   int _currentIndex = 0;
+  bool _routedForSpotifyMissing = false;
 
   @override
   void initState() {
@@ -169,11 +171,24 @@ class _HomePageState extends State<HomePage> {
         _spotifyReady = status['ready'] as bool? ?? false;
         _loadingStatus = false;
       });
+      // If Spotify isn't connected, route to the Spotify tab once on initial load
+      if ((_spotifyReady == false) && !_routedForSpotifyMissing) {
+        setState(() {
+          _currentIndex = 1; // Spotify tab
+          _routedForSpotifyMissing = true;
+        });
+      }
     } catch (_) {
       setState(() {
         _spotifyReady = false;
         _loadingStatus = false;
       });
+      if (!_routedForSpotifyMissing) {
+        setState(() {
+          _currentIndex = 1;
+          _routedForSpotifyMissing = true;
+        });
+      }
     }
   }
 
@@ -205,16 +220,32 @@ class _HomePageState extends State<HomePage> {
     }
     switch (_currentIndex) {
       case 0: // Matches
-        return Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: const [
-              Icon(Icons.group, size: 48),
-              SizedBox(height: 12),
-              Text('Music matches (coming soon)'),
+        if (_spotifyReady == false) {
+          return ListView(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            children: [
+              Center(
+                child: Column(
+                  children: [
+                    const Icon(Icons.group, size: 48),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'To find music matches, first connect your Spotify account.',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Welcome, ${_user!['firstName']} ${_user!['lastName']}',
+                    ),
+                  ],
+                ),
+              ),
+              // Reuse the same connect prompt component for consistency
+              SpotifyConnectPrompt(onConnected: _loadSpotifyStatus),
             ],
-          ),
-        );
+          );
+        }
+        return const MatchesPage();
       case 1: // Spotify stats
         if (_spotifyReady == false) {
           return ListView(

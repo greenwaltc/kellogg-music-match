@@ -126,6 +126,21 @@ type SpotifyArtistOverlap struct {
 	OtherRank       int32  `json:"other_rank"`
 }
 
+// SimpleTopArtist is a compact representation of a user's top artist
+type SimpleTopArtist struct {
+	SpotifyArtistID string `json:"spotify_artist_id"`
+	Name            string `json:"name"`
+	Rank            int32  `json:"rank"`
+}
+
+// SimpleTopTrack is a compact representation of a user's top track
+type SimpleTopTrack struct {
+	SpotifyTrackID string   `json:"spotify_track_id"`
+	Name           string   `json:"name"`
+	Rank           int32    `json:"rank"`
+	ArtistNames    []string `json:"artist_names"`
+}
+
 // SimilarUserResult represents a user similar to the anchor based on Spotify top artists
 type SimilarUserResult struct {
 	UserID         uuid.UUID
@@ -136,6 +151,8 @@ type SimilarUserResult struct {
 	GraduationYear *int32
 	Similarity     float64
 	Overlaps       []SpotifyArtistOverlap
+	TopArtists     []SimpleTopArtist
+	TopTracks      []SimpleTopTrack
 }
 
 // NewPostgreSQLUserRepository creates a new repository backed by pgx/v5
@@ -656,6 +673,21 @@ func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopArtists(ctx conte
 				fmt.Printf("WARN: failed to unmarshal overlaps_json for user %s: %v\n", row.UserID, err)
 			}
 		}
+		// Decode optional top artists array
+		var topArtists []SimpleTopArtist
+		if row.TopArtistsJson != nil {
+			// Handle various driver return types ([]byte, string, structured values)
+			switch v := row.TopArtistsJson.(type) {
+			case []byte:
+				_ = json.Unmarshal(v, &topArtists)
+			case string:
+				_ = json.Unmarshal([]byte(v), &topArtists)
+			default:
+				if b, err := json.Marshal(v); err == nil {
+					_ = json.Unmarshal(b, &topArtists)
+				}
+			}
+		}
 		var program *string
 		if row.Program.Valid {
 			program = &row.Program.String
@@ -673,6 +705,7 @@ func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopArtists(ctx conte
 			GraduationYear: gradYear,
 			Similarity:     row.Similarity,
 			Overlaps:       overlaps,
+			TopArtists:     topArtists,
 		})
 	}
 	return results, nil
@@ -705,6 +738,19 @@ func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopArtistsFiltered(c
 				fmt.Printf("WARN: failed to unmarshal overlaps_json for user %s: %v\n", row.UserID, err)
 			}
 		}
+		var topArtists []SimpleTopArtist
+		if row.TopArtistsJson != nil {
+			switch v := row.TopArtistsJson.(type) {
+			case []byte:
+				_ = json.Unmarshal(v, &topArtists)
+			case string:
+				_ = json.Unmarshal([]byte(v), &topArtists)
+			default:
+				if b, err := json.Marshal(v); err == nil {
+					_ = json.Unmarshal(b, &topArtists)
+				}
+			}
+		}
 		var program *string
 		if row.Program.Valid {
 			program = &row.Program.String
@@ -722,6 +768,7 @@ func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopArtistsFiltered(c
 			GraduationYear: gradYear,
 			Similarity:     row.Similarity,
 			Overlaps:       overlaps,
+			TopArtists:     topArtists,
 		})
 	}
 	return results, nil
@@ -754,6 +801,19 @@ func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopTracks(ctx contex
 				fmt.Printf("WARN: failed to unmarshal track overlaps_json for user %s: %v\n", row.UserID, err)
 			}
 		}
+		var topTracks []SimpleTopTrack
+		if row.TopTracksJson != nil {
+			switch v := row.TopTracksJson.(type) {
+			case []byte:
+				_ = json.Unmarshal(v, &topTracks)
+			case string:
+				_ = json.Unmarshal([]byte(v), &topTracks)
+			default:
+				if b, err := json.Marshal(v); err == nil {
+					_ = json.Unmarshal(b, &topTracks)
+				}
+			}
+		}
 		var program *string
 		if row.Program.Valid {
 			program = &row.Program.String
@@ -771,6 +831,7 @@ func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopTracks(ctx contex
 			GraduationYear: gradYear,
 			Similarity:     row.Similarity,
 			Overlaps:       overlaps,
+			TopTracks:      topTracks,
 		})
 	}
 	return results, nil
@@ -803,6 +864,19 @@ func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopTracksFiltered(ct
 				fmt.Printf("WARN: failed to unmarshal track overlaps_json for user %s: %v\n", row.UserID, err)
 			}
 		}
+		var topTracks []SimpleTopTrack
+		if row.TopTracksJson != nil {
+			switch v := row.TopTracksJson.(type) {
+			case []byte:
+				_ = json.Unmarshal(v, &topTracks)
+			case string:
+				_ = json.Unmarshal([]byte(v), &topTracks)
+			default:
+				if b, err := json.Marshal(v); err == nil {
+					_ = json.Unmarshal(b, &topTracks)
+				}
+			}
+		}
 		var program *string
 		if row.Program.Valid {
 			program = &row.Program.String
@@ -820,6 +894,7 @@ func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopTracksFiltered(ct
 			GraduationYear: gradYear,
 			Similarity:     row.Similarity,
 			Overlaps:       overlaps,
+			TopTracks:      topTracks,
 		})
 	}
 	return results, nil

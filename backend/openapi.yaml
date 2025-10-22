@@ -1746,6 +1746,52 @@ components:
             - name: "Pink Floyd"
               anchorRank: 5
               otherRank: 3
+        topArtists:
+          type: array
+          description: Matched user's top N Spotify artists for the selected time range
+          items:
+            type: object
+            properties:
+              spotifyArtistId:
+                type: string
+                description: Spotify artist ID
+              name:
+                type: string
+              rank:
+                type: integer
+                minimum: 1
+            required: [spotifyArtistId, name, rank]
+          example:
+            - spotifyArtistId: "3WrFJ7ztbogyGnTHbHJFl2"
+              name: "The Beatles"
+              rank: 1
+            - spotifyArtistId: "4Z8W4fKeB5YxbusRsdQVPb"
+              name: "Radiohead"
+              rank: 2
+        topTracks:
+          type: array
+          description: Matched user's top N Spotify tracks for the selected time range
+          items:
+            type: object
+            properties:
+              spotifyTrackId:
+                type: string
+                description: Spotify track ID
+              name:
+                type: string
+              rank:
+                type: integer
+                minimum: 1
+              artistNames:
+                type: array
+                items:
+                  type: string
+            required: [spotifyTrackId, name, rank]
+          example:
+            - spotifyTrackId: "3AhXZa8sUQht0UEdBJgpGc"
+              name: "Let It Be - Remastered 2009"
+              rank: 1
+              artistNames: ["The Beatles"]
       required:
         - name
         - program

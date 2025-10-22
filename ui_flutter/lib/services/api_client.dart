@@ -141,6 +141,73 @@ class ApiClient {
     );
   }
 
+  // Same as postJson but returns dynamic to support endpoints that return arrays
+  Future<dynamic> postJsonAny(
+    String path,
+    Map<String, dynamic> body, {
+    String? bearerToken,
+  }) async {
+    final uri = Uri.parse('$baseUrl$path');
+    final headers = {..._jsonHeaders};
+    if (bearerToken != null && bearerToken.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $bearerToken';
+    }
+    final resp = await _http.post(
+      uri,
+      headers: headers,
+      body: jsonEncode(body),
+    );
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      if (resp.body.isEmpty) return null;
+      return jsonDecode(resp.body);
+    }
+    // Reuse error extraction behavior
+    String msg;
+    Map<String, dynamic>? details;
+    try {
+      final dynamic decoded = jsonDecode(resp.body);
+      if (decoded is Map<String, dynamic>) {
+        details = decoded;
+        final candidates = [
+          decoded['message'],
+          decoded['error_description'],
+          decoded['error'],
+          decoded['detail'],
+          decoded['title'],
+        ];
+        final found = candidates.firstWhere(
+          (e) => e is String && e.trim().isNotEmpty,
+          orElse: () => null,
+        );
+        if (found is String) {
+          msg = found.trim();
+        } else {
+          msg = 'Request failed';
+        }
+      } else if (decoded is String) {
+        msg = decoded.trim();
+      } else {
+        msg = 'Request failed';
+      }
+    } catch (_) {
+      final trimmed = resp.body.trim();
+      if (trimmed.isNotEmpty && !trimmed.startsWith('<')) {
+        msg = trimmed.length > 500 ? '${trimmed.substring(0, 500)}…' : trimmed;
+      } else {
+        msg = 'Request failed';
+      }
+    }
+    if (kDebugMode) {
+      // ignore: avoid_print
+      print('[ApiClient] POST $path failed ${resp.statusCode}: $msg');
+    }
+    throw ApiException(
+      resp.statusCode,
+      msg.isNotEmpty ? msg : 'Request failed (${resp.statusCode})',
+      details: details,
+    );
+  }
+
   // Convenience helper for device-token registration
   Future<void> registerDeviceToken({
     required String platform, // 'ios' | 'android'
