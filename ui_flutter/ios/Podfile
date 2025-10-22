@@ -42,6 +42,17 @@ post_install do |installer|
     # Ensure all pods build with the same minimum iOS version
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+      # Enable only the permissions we use in permission_handler to avoid stripping the implementation.
+      # See: https://pub.dev/packages/permission_handler#ios
+      defs = config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] || ['$(inherited)']
+      unless defs.is_a?(Array)
+        defs = [defs]
+      end
+      unless defs.include? 'PERMISSION_NOTIFICATIONS=1'
+        defs << 'PERMISSION_NOTIFICATIONS=1'
+      end
+      # Keep inherited settings and apply back
+      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = defs
     end
   end
 end

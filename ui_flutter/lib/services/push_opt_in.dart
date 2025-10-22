@@ -58,21 +58,47 @@ class PushOptInManager {
     final decided = _prefs.getString(_prefKeyDecision);
     if (decided == 'granted' || decided == 'denied') return;
 
-    // iOS requires explicit request; Android 13+ also requires runtime permission.
-    final status = await Permission.notification.status;
-    if (status.isGranted) {
-      await _prefs.setString(_prefKeyDecision, 'granted');
-      await _registerDeviceToken();
-      return;
-    }
-
-    // Ask the OS to prompt.
-    final req = await Permission.notification.request();
-    if (req.isGranted) {
-      await _prefs.setString(_prefKeyDecision, 'granted');
-      await _registerDeviceToken();
+    // iOS requires explicit request via FirebaseMessaging (best compatibility);
+    // Android 13+ also requires runtime permission which we request via permission_handler.
+    if (isIOS) {
+      final fcm = FirebaseMessaging.instance;
+      final settings = await fcm.getNotificationSettings();
+      if (settings.authorizationStatus == AuthorizationStatus.authorized ||
+          settings.authorizationStatus == AuthorizationStatus.provisional) {
+        await _prefs.setString(_prefKeyDecision, 'granted');
+        await _registerDeviceToken();
+        return;
+      }
+      final req = await fcm.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+        announcement: false,
+        criticalAlert: false,
+        provisional: false,
+        carPlay: false,
+      );
+      if (req.authorizationStatus == AuthorizationStatus.authorized ||
+          req.authorizationStatus == AuthorizationStatus.provisional) {
+        await _prefs.setString(_prefKeyDecision, 'granted');
+        await _registerDeviceToken();
+      } else {
+        await _prefs.setString(_prefKeyDecision, 'denied');
+      }
     } else {
-      await _prefs.setString(_prefKeyDecision, 'denied');
+      final status = await Permission.notification.status;
+      if (status.isGranted) {
+        await _prefs.setString(_prefKeyDecision, 'granted');
+        await _registerDeviceToken();
+        return;
+      }
+      final req = await Permission.notification.request();
+      if (req.isGranted) {
+        await _prefs.setString(_prefKeyDecision, 'granted');
+        await _registerDeviceToken();
+      } else {
+        await _prefs.setString(_prefKeyDecision, 'denied');
+      }
     }
   }
 

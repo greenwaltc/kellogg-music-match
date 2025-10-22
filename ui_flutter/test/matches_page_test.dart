@@ -78,9 +78,9 @@ void main() {
     await tester.tap(find.text('Alice'));
     await tester.pumpAndSettle();
 
-    // Should show both top artist items initially (lowercased in UI)
-    expect(find.text('radiohead'), findsOneWidget);
-    expect(find.text('muse'), findsOneWidget);
+    // Should show both top artist items initially (preserves original casing)
+    expect(find.text('Radiohead'), findsOneWidget);
+    expect(find.text('Muse'), findsOneWidget);
 
     // Toggle only overlaps
     final switches = find.byType(Switch);
@@ -89,7 +89,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Now only the overlap item remains
-    expect(find.text('radiohead'), findsOneWidget);
-    expect(find.text('muse'), findsNothing);
+    expect(find.text('Radiohead'), findsOneWidget);
+    expect(find.text('Muse'), findsNothing);
   });
 }

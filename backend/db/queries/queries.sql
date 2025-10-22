@@ -7,11 +7,9 @@ INSERT INTO users (id, username, email, first_name, last_name, password_hash, pr
 VALUES (sqlc.arg(id), sqlc.arg(username), sqlc.arg(email), sqlc.arg(first_name), sqlc.arg(last_name), sqlc.arg(password_hash), sqlc.arg(program), sqlc.arg(graduation_year))
 RETURNING *;
 
--- name: GetUserByUsername :one
-SELECT * FROM users WHERE username = sqlc.arg(username) LIMIT 1;
+SELECT * FROM users WHERE lower(username) = lower(sqlc.arg(username)) LIMIT 1;
 
--- name: GetUserByUsernameWithPassword :one
-SELECT * FROM users WHERE username = sqlc.arg(username) LIMIT 1;
+SELECT * FROM users WHERE lower(username) = lower(sqlc.arg(username)) LIMIT 1;
 
 -- name: GetUserByEmail :one
 SELECT * FROM users WHERE email = sqlc.arg(email) LIMIT 1;
@@ -19,8 +17,7 @@ SELECT * FROM users WHERE email = sqlc.arg(email) LIMIT 1;
 -- name: GetUserByID :one
 SELECT * FROM users WHERE id = sqlc.arg(id) LIMIT 1;
 
--- name: UserExistsByUsername :one
-SELECT EXISTS(SELECT 1 FROM users WHERE username = sqlc.arg(username));
+SELECT EXISTS(SELECT 1 FROM users WHERE lower(username) = lower(sqlc.arg(username)));
 
 -- name: UserExistsByEmail :one
 SELECT EXISTS(SELECT 1 FROM users WHERE email = sqlc.arg(email));

@@ -1744,7 +1744,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, username, email, first_name, last_name, password_hash, created_at, updated_at, program, graduation_year FROM users WHERE username = $1 LIMIT 1
+SELECT id, username, email, first_name, last_name, password_hash, created_at, updated_at, program, graduation_year FROM users WHERE lower(username) = lower($1) LIMIT 1
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
@@ -1766,7 +1766,7 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 }
 
 const getUserByUsernameWithPassword = `-- name: GetUserByUsernameWithPassword :one
-SELECT id, username, email, first_name, last_name, password_hash, created_at, updated_at, program, graduation_year FROM users WHERE username = $1 LIMIT 1
+SELECT id, username, email, first_name, last_name, password_hash, created_at, updated_at, program, graduation_year FROM users WHERE lower(username) = lower($1) LIMIT 1
 `
 
 func (q *Queries) GetUserByUsernameWithPassword(ctx context.Context, username string) (User, error) {
@@ -2236,7 +2236,7 @@ func (q *Queries) UserExistsByEmail(ctx context.Context, email string) (bool, er
 }
 
 const userExistsByUsername = `-- name: UserExistsByUsername :one
-SELECT EXISTS(SELECT 1 FROM users WHERE username = $1)
+SELECT EXISTS(SELECT 1 FROM users WHERE lower(username) = lower($1))
 `
 
 func (q *Queries) UserExistsByUsername(ctx context.Context, username string) (bool, error) {
