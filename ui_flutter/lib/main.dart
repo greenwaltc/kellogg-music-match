@@ -120,7 +120,8 @@ class _AuthGateState extends State<AuthGate> {
         ),
       );
     }
-    return RootScaffold(body: widget.child, onLogout: _handleLogout);
+    // For logged-in users, show the HomePage shell with bottom navigation
+    return HomePage(onLogout: _handleLogout);
   }
 
   Future<void> _handleLogout() async {
@@ -133,7 +134,8 @@ class _AuthGateState extends State<AuthGate> {
 }
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  const HomePage({super.key, this.onLogout});
+  final VoidCallback? onLogout;
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -143,6 +145,7 @@ class _HomePageState extends State<HomePage> {
   Map<String, dynamic>? _user;
   bool? _spotifyReady;
   bool _loadingStatus = true;
+  int _currentIndex = 0;
 
   @override
   void initState() {
@@ -176,49 +179,108 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final body = _buildBody();
+    final bottom = BottomNavigationBar(
+      currentIndex: _currentIndex,
+      onTap: (i) => setState(() => _currentIndex = i),
+      items: const [
+        BottomNavigationBarItem(icon: Icon(Icons.group), label: 'Matches'),
+        BottomNavigationBarItem(icon: Icon(Icons.graphic_eq), label: 'Spotify'),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.settings_outlined),
+          label: 'Settings',
+        ),
+      ],
+    );
+    return RootScaffold(
+      body: body,
+      onLogout: widget.onLogout,
+      bottomNavigationBar: bottom,
+    );
+  }
+
+  Widget _buildBody() {
     if (_user == null || _loadingStatus) {
       return const Center(child: CircularProgressIndicator());
     }
-    // If Spotify not ready, prompt to connect
-    if (_spotifyReady == false) {
-      return ListView(
-        padding: const EdgeInsets.symmetric(vertical: 24),
-        children: [
-          Center(
-            child: Column(
-              children: [
-                Text('Welcome, ${_user!['firstName']} ${_user!['lastName']}'),
-                const SizedBox(height: 8),
-                const Text(
-                  'Connect Spotify to get personalized matches and concerts.',
-                ),
-              ],
-            ),
+    switch (_currentIndex) {
+      case 0: // Matches
+        return Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Icon(Icons.group, size: 48),
+              SizedBox(height: 12),
+              Text('Music matches (coming soon)'),
+            ],
           ),
-          SpotifyConnectPrompt(onConnected: _loadSpotifyStatus),
-        ],
-      );
+        );
+      case 1: // Spotify stats
+        if (_spotifyReady == false) {
+          return ListView(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            children: [
+              Center(
+                child: Column(
+                  children: [
+                    Text(
+                      'Welcome, ${_user!['firstName']} ${_user!['lastName']}',
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Connect Spotify to get personalized matches and concerts.',
+                    ),
+                  ],
+                ),
+              ),
+              SpotifyConnectPrompt(onConnected: _loadSpotifyStatus),
+            ],
+          );
+        }
+        return Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Icon(Icons.graphic_eq, size: 48),
+              SizedBox(height: 12),
+              Text('My Spotify stats (coming soon)'),
+            ],
+          ),
+        );
+      case 2: // Settings
+      default:
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            ListTile(
+              leading: const Icon(Icons.account_circle_outlined),
+              title: Text('${_user!['firstName']} ${_user!['lastName']}'),
+              subtitle: Text('@${_user!['username']}'),
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.logout),
+              title: const Text('Logout'),
+              onTap: widget.onLogout,
+            ),
+            const SizedBox(height: 24),
+            const Center(child: Text('Settings (coming soon)')),
+          ],
+        );
     }
-    // Otherwise, show basic home content (can be replaced with real dashboard later)
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text('Welcome, ${_user!['firstName']} ${_user!['lastName']}'),
-          const SizedBox(height: 8),
-          Text('Username: ${_user!['username']}'),
-          const SizedBox(height: 16),
-          const Text('Spotify connected. Great to see you!'),
-        ],
-      ),
-    );
   }
 }
 
 class RootScaffold extends StatelessWidget {
-  const RootScaffold({super.key, required this.body, this.onLogout});
+  const RootScaffold({
+    super.key,
+    required this.body,
+    this.onLogout,
+    this.bottomNavigationBar,
+  });
   final Widget body;
   final VoidCallback? onLogout;
+  final Widget? bottomNavigationBar;
 
   @override
   Widget build(BuildContext context) {
@@ -252,6 +314,7 @@ class RootScaffold extends StatelessWidget {
         ],
       ),
       body: body,
+      bottomNavigationBar: bottomNavigationBar,
     );
   }
 }
