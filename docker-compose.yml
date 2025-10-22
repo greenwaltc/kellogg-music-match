@@ -92,8 +92,8 @@ services:
       # Feature flags
       MATCH_TRACKS_ENABLED: "true"
       # Matching configuration: cap ranks considered per user (defaults 20)
-      MATCHING_ARTIST_TOPN: 50
-      MATCHING_TRACK_TOPN: 50
+      MATCHING_ARTIST_TOPN: 100
+      MATCHING_TRACK_TOPN: 200
       # Web Push / VAPID
       PUSH_ENABLED: ${PUSH_ENABLED:-true}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}

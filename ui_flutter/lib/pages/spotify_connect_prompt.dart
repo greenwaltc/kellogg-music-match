@@ -51,10 +51,14 @@ class _SpotifyConnectPromptState extends State<SpotifyConnectPrompt> {
         scope: scopes,
       );
       if (mounted) {
-        widget.onConnected?.call();
-        Navigator.of(
-          context,
-        ).push(MaterialPageRoute(builder: (_) => const SpotifySyncingPage()));
+        // Navigate to syncing screen and await completion
+        final result = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(builder: (_) => const SpotifySyncingPage()),
+        );
+        if (result == true) {
+          // Refresh parent state so HomePage hides the connect prompt immediately
+          widget.onConnected?.call();
+        }
       }
     } catch (e) {
       setState(() {
@@ -114,6 +118,8 @@ class _SpotifySyncingPageState extends State<SpotifySyncingPage> {
   int? _progress;
   String? _message;
   String? _error;
+  bool? _ready;
+  bool _popped = false;
 
   @override
   void initState() {
@@ -132,11 +138,19 @@ class _SpotifySyncingPageState extends State<SpotifySyncingPage> {
         _status = res['status'] as String?;
         _progress = res['progress'] as int?;
         _message = res['message'] as String?;
+        _ready = res['ready'] as bool?;
         _loading =
             _status != 'complete' &&
             _status != 'failed' &&
             _status != 'cancelled';
       });
+      if (!_loading && mounted && !_popped) {
+        if (_status == 'complete' && (_ready == true)) {
+          _popped = true;
+          Navigator.of(context).pop(true);
+          return;
+        }
+      }
       if (_loading) {
         await Future.delayed(const Duration(seconds: 1));
         if (mounted) _poll(attempt + 1);
