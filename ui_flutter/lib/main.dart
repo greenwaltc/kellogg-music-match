@@ -12,6 +12,7 @@ import 'pages/debug_page.dart';
 import 'theme/app_theme.dart';
 import 'pages/spotify_connect_prompt.dart';
 import 'services/spotify_service.dart';
+import 'services/spotify_top_service.dart';
 import 'pages/matches_page.dart';
 import 'pages/spotify_top_page.dart';
 
@@ -143,18 +144,34 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Map<String, dynamic>? _user;
   bool? _spotifyReady;
   bool _loadingStatus = true;
   int _currentIndex = 0;
   bool _routedForSpotifyMissing = false;
+  bool _autoRefreshChecked = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadUser();
     _loadSpotifyStatus();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // On resume, re-fetch status and re-evaluate need to auto-refresh
+      _loadSpotifyStatus();
+    }
   }
 
   Future<void> _loadUser() async {
@@ -172,6 +189,13 @@ class _HomePageState extends State<HomePage> {
         _spotifyReady = status['ready'] as bool? ?? false;
         _loadingStatus = false;
       });
+      // Attempt an automatic refresh when server-stored last sync is older than 24h
+      final finishedAtStr = status['finishedAt'] as String?;
+      DateTime? finishedAtUtc;
+      if (finishedAtStr != null && finishedAtStr.isNotEmpty) {
+        finishedAtUtc = DateTime.tryParse(finishedAtStr)?.toUtc();
+      }
+      await _maybeAutoRefreshSpotify(lastFinishedAt: finishedAtUtc);
       // If Spotify isn't connected, route to the Spotify tab once on initial load
       if ((_spotifyReady == false) && !_routedForSpotifyMissing) {
         setState(() {
@@ -190,6 +214,57 @@ class _HomePageState extends State<HomePage> {
           _routedForSpotifyMissing = true;
         });
       }
+    }
+  }
+
+  Future<void> _maybeAutoRefreshSpotify({
+    bool fromResume = false,
+    DateTime? lastFinishedAt,
+  }) async {
+    // For initial app open, run once; on resume, skip this guard and rely on backend recency + short client cooldown
+    if (!fromResume) {
+      if (_autoRefreshChecked) return;
+      _autoRefreshChecked = true;
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      // Only attempt auto-refresh if we believe Spotify is connected
+      if (_spotifyReady != true) return;
+      final now = DateTime.now().toUtc();
+      // Backend-determined recency: skip if finishedAt < 24h
+      if (lastFinishedAt != null) {
+        final since = now.difference(lastFinishedAt);
+        if (since.inHours < 24) return;
+      }
+      // Short local cooldown to avoid spamming repeated attempts (e.g., frequent resumes)
+      const attemptKey = 'spotify_last_auto_refresh_attempt_at';
+      final attemptStr = prefs.getString(attemptKey);
+      if (attemptStr != null && attemptStr.isNotEmpty) {
+        final lastAttempt = DateTime.tryParse(attemptStr)?.toUtc();
+        if (lastAttempt != null) {
+          final sinceAttempt = now.difference(lastAttempt);
+          if (sinceAttempt.inMinutes < 15) return;
+        }
+      }
+      final topSvc = SpotifyTopService(ApiClient(), prefs);
+      try {
+        await topSvc.refreshFromSpotify();
+        // Accepted; throttle with short cooldown
+        await prefs.setString(attemptKey, now.toIso8601String());
+      } catch (e) {
+        if (e is ApiException) {
+          if (e.status == 409) {
+            // Already running; still set attempt timestamp to avoid spamming
+            await prefs.setString(attemptKey, now.toIso8601String());
+          } else if (e.status == 404) {
+            // Not connected; do not set timestamp so after connect we can auto-refresh next time
+          } else {
+            // Other errors; do nothing (try again next open)
+          }
+        }
+      }
+    } catch (_) {
+      // Ignore; non-critical
     }
   }
 
