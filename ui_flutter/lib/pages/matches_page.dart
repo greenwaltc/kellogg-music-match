@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../services/api_client.dart';
 import '../services/matching_service.dart';
@@ -422,6 +423,15 @@ class _MatchUserTile extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     )
                   : null,
+              trailing: Tooltip(
+                message: 'Open in Spotify',
+                child: Icon(
+                  Icons.open_in_new,
+                  size: 16,
+                  color: Theme.of(context).hintColor,
+                ),
+              ),
+              onTap: () => _openInSpotify(it),
             );
           },
         ),
@@ -485,5 +495,33 @@ class _MatchUserTile extends StatelessWidget {
     final nm = it['name'];
     if (nm is String) return nm.toLowerCase();
     return '';
+  }
+
+  static Future<void> _openInSpotify(Map<String, dynamic> it) async {
+    // Prefer track link when available, otherwise artist
+    final trackId = (it['spotifyTrackId'] ?? it['spotify_track_id']) as String?;
+    final artistId =
+        (it['spotifyArtistId'] ?? it['spotify_artist_id']) as String?;
+    Uri? appUri;
+    Uri? webUri;
+    if (trackId != null && trackId.isNotEmpty) {
+      appUri = Uri.parse('spotify:track:$trackId');
+      webUri = Uri.https('open.spotify.com', '/track/$trackId');
+    } else if (artistId != null && artistId.isNotEmpty) {
+      appUri = Uri.parse('spotify:artist:$artistId');
+      webUri = Uri.https('open.spotify.com', '/artist/$artistId');
+    }
+    if (appUri != null) {
+      try {
+        final ok = await launchUrl(
+          appUri,
+          mode: LaunchMode.externalApplication,
+        );
+        if (ok) return;
+      } catch (_) {}
+    }
+    if (webUri != null) {
+      await launchUrl(webUri, mode: LaunchMode.externalApplication);
+    }
   }
 }

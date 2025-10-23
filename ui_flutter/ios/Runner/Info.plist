@@ -45,6 +45,11 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Allow canOpenURL for spotify scheme -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>spotify</string>
+	</array>
 	<!-- URL scheme for Spotify OAuth callback (flutter_web_auth_2) -->
 	<key>CFBundleURLTypes</key>
 	<array>

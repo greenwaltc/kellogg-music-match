@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../services/api_client.dart';
 import '../services/spotify_top_service.dart';
@@ -274,15 +275,19 @@ class _SpotifyTopPageState extends State<SpotifyTopPage> {
           const SizedBox(height: 8),
           rangeToggle,
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  refreshButton,
-                  const SizedBox(width: 8),
-                  cancelButton,
-                ],
+              Expanded(
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    refreshButton,
+                    if (_syncing && _canCancel) cancelButton,
+                  ],
+                ),
               ),
+              const SizedBox(width: 12),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [lastSyncText, countText],
@@ -543,11 +548,29 @@ class _SpotifyRow extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [rankBox, image, const SizedBox(width: 12), title],
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: _openInSpotify,
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                rankBox,
+                image,
+                const SizedBox(width: 12),
+                title,
+                const SizedBox(width: 8),
+                Tooltip(
+                  message: 'Open in Spotify',
+                  child: Icon(
+                    Icons.open_in_new,
+                    size: 18,
+                    color: Theme.of(context).hintColor,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -568,5 +591,33 @@ class _SpotifyRow extends StatelessWidget {
         color: Theme.of(context).hintColor,
       ),
     );
+  }
+
+  Future<void> _openInSpotify() async {
+    final artistId =
+        (item['spotifyArtistId'] ?? item['spotify_artist_id']) as String?;
+    final trackId =
+        (item['spotifyTrackId'] ?? item['spotify_track_id']) as String?;
+    Uri? appUri;
+    Uri? webUri;
+    if (basis == 'tracks' && trackId != null && trackId.isNotEmpty) {
+      appUri = Uri.parse('spotify:track:$trackId');
+      webUri = Uri.https('open.spotify.com', '/track/$trackId');
+    } else if (artistId != null && artistId.isNotEmpty) {
+      appUri = Uri.parse('spotify:artist:$artistId');
+      webUri = Uri.https('open.spotify.com', '/artist/$artistId');
+    }
+    if (appUri != null) {
+      try {
+        final ok = await launchUrl(
+          appUri,
+          mode: LaunchMode.externalApplication,
+        );
+        if (ok) return;
+      } catch (_) {}
+    }
+    if (webUri != null) {
+      await launchUrl(webUri, mode: LaunchMode.externalApplication);
+    }
   }
 }
