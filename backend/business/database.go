@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/greenwaltc/kellogg-music-match/backend/config"
 	sqlc "github.com/greenwaltc/kellogg-music-match/backend/db/sqlc"
+	"github.com/greenwaltc/kellogg-music-match/backend/logger"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -196,16 +197,18 @@ func NewUserRepository() (UserRepository, error) {
 // NewUserRepositoryWithConfig creates a new UserRepository with provided database configuration
 func NewUserRepositoryWithConfig(dbConfig *config.DatabaseConfig) (UserRepository, error) {
 	// Log connection attempt (without password)
-	fmt.Printf("Attempting database connection to %s:%s@%s:%s/%s\n",
-		dbConfig.User, "***", dbConfig.Host, dbConfig.Port, dbConfig.Name)
+	logger.L().Info("db connect attempt",
+		"user", dbConfig.User,
+		"host", dbConfig.Host,
+		"port", dbConfig.Port,
+		"db", dbConfig.Name)
 
 	repo, err := NewPostgreSQLUserRepository(dbConfig)
 	if err != nil {
-		fmt.Printf("Database connection failed: %v\n", err)
+		logger.L().Error("db connect failed", "error", err)
 		return nil, fmt.Errorf("failed to create user repository: %w", err)
 	}
-
-	fmt.Println("Database connection successful!")
+	logger.L().Info("db connection successful")
 	return repo, nil
 }
 
@@ -330,8 +333,8 @@ func (r *PostgreSQLUserRepository) CreateUser(ctx context.Context, id uuid.UUID,
 		attribute.String("app.username", username),
 	)
 	defer span.End()
-	fmt.Printf("CreateUser called: ID=%s, Username=%s, Email=%s, Program=%s, GradYear=%d\n",
-		id.String(), username, email, program, graduationYear)
+	logger.FromCtx(ctx).Info("CreateUser called",
+		"id", id.String(), "username", username, "email", email, "program", program, "gradYear", graduationYear)
 
 	params := sqlc.CreateUserParams{
 		ID:           id,
@@ -353,10 +356,10 @@ func (r *PostgreSQLUserRepository) CreateUser(ctx context.Context, id uuid.UUID,
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
-		fmt.Printf("CreateUser database error: %v\n", err)
+		logger.FromCtx(ctx).Error("CreateUser database error", "error", err)
 		return nil, err
 	}
-	fmt.Printf("CreateUser successful: ID=%s, Username=%s\n", user.ID.String(), user.Username)
+	logger.FromCtx(ctx).Info("CreateUser successful", "id", user.ID.String(), "username", user.Username)
 	return &user, nil
 }
 
@@ -807,7 +810,7 @@ func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopArtists(ctx conte
 		if len(row.OverlapsJson) > 0 {
 			if err := json.Unmarshal(row.OverlapsJson, &overlaps); err != nil {
 				// If decoding fails, continue but leave overlaps empty; log for debugging.
-				fmt.Printf("WARN: failed to unmarshal overlaps_json for user %s: %v\n", row.UserID, err)
+				logger.L().Warn("failed to unmarshal overlaps_json", "userId", row.UserID.String(), "error", err)
 			}
 		}
 		// Decode optional top artists array
@@ -872,7 +875,7 @@ func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopArtistsFiltered(c
 		var overlaps []SpotifyArtistOverlap
 		if len(row.OverlapsJson) > 0 {
 			if err := json.Unmarshal(row.OverlapsJson, &overlaps); err != nil {
-				fmt.Printf("WARN: failed to unmarshal overlaps_json for user %s: %v\n", row.UserID, err)
+				logger.L().Warn("failed to unmarshal overlaps_json", "userId", row.UserID.String(), "error", err)
 			}
 		}
 		var topArtists []SimpleTopArtist
@@ -935,7 +938,7 @@ func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopTracks(ctx contex
 		var overlaps []SpotifyArtistOverlap
 		if len(row.OverlapsJson) > 0 {
 			if err := json.Unmarshal(row.OverlapsJson, &overlaps); err != nil {
-				fmt.Printf("WARN: failed to unmarshal track overlaps_json for user %s: %v\n", row.UserID, err)
+				logger.L().Warn("failed to unmarshal track overlaps_json", "userId", row.UserID.String(), "error", err)
 			}
 		}
 		var topTracks []SimpleTopTrack
@@ -998,7 +1001,7 @@ func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopTracksFiltered(ct
 		var overlaps []SpotifyArtistOverlap
 		if len(row.OverlapsJson) > 0 {
 			if err := json.Unmarshal(row.OverlapsJson, &overlaps); err != nil {
-				fmt.Printf("WARN: failed to unmarshal track overlaps_json for user %s: %v\n", row.UserID, err)
+				logger.L().Warn("failed to unmarshal track overlaps_json", "userId", row.UserID.String(), "error", err)
 			}
 		}
 		var topTracks []SimpleTopTrack

@@ -30,7 +30,7 @@ func Init(cfg config.TelemetryConfig) {
 	once.Do(func() {
 		exporter, err := buildExporter(cfg)
 		if err != nil {
-			slog.Error("telemetry exporter init failed", "error", err)
+			slog.Warn("telemetry exporter init failed", "error", err)
 			return
 		}
 		res, err := resource.New(context.Background(), resource.WithAttributes(
@@ -38,7 +38,7 @@ func Init(cfg config.TelemetryConfig) {
 			semconv.ServiceVersion(cfg.ServiceVersion),
 		))
 		if err != nil {
-			slog.Error("telemetry resource init failed", "error", err)
+			slog.Warn("telemetry resource init failed", "error", err)
 		}
 		tp = sdktrace.NewTracerProvider(
 			sdktrace.WithSampler(sdktrace.AlwaysSample()),

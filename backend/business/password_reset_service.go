@@ -5,12 +5,12 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"net/http"
 	"regexp"
 	"time"
 
 	"github.com/greenwaltc/kellogg-music-match/backend/generated"
+	"github.com/greenwaltc/kellogg-music-match/backend/logger"
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -50,7 +50,7 @@ func (s *PasswordResetService) ForgotPassword(ctx context.Context, request gener
 	user, err := s.userRepo.GetUserByEmail(ctx, email)
 	if err != nil {
 		// Log error but don't reveal to user
-		fmt.Printf("Error getting user by email: %v\n", err)
+		logger.FromCtx(ctx).Error("get user by email failed", "error", err)
 	}
 
 	// Always return success for security (don't reveal if email exists)
@@ -67,7 +67,7 @@ func (s *PasswordResetService) ForgotPassword(ctx context.Context, request gener
 		expiresAt := time.Now().Add(time.Hour)
 		_, err = s.userRepo.CreatePasswordResetToken(ctx, user.ID, token, expiresAt)
 		if err != nil {
-			fmt.Printf("Error creating password reset token: %v\n", err)
+			logger.FromCtx(ctx).Error("create password reset token failed", "error", err)
 			return generated.Response(http.StatusInternalServerError, generated.ErrorResponse{
 				Message: "failed to create reset token",
 			}), nil
@@ -77,7 +77,7 @@ func (s *PasswordResetService) ForgotPassword(ctx context.Context, request gener
 		err = s.emailService.SendPasswordResetEmail(ctx, email, user.Username, token)
 		if err != nil {
 			// Log error but don't fail the request
-			fmt.Printf("Error sending password reset email: %v\n", err)
+			logger.FromCtx(ctx).Error("send password reset email failed", "error", err)
 		}
 	}
 
@@ -112,7 +112,7 @@ func (s *PasswordResetService) ResetPassword(ctx context.Context, request genera
 				Message: "invalid or expired reset token",
 			}), nil
 		}
-		fmt.Printf("Error retrieving reset token: %v\n", err)
+		logger.FromCtx(ctx).Error("retrieve reset token failed", "error", err)
 		return generated.Response(http.StatusInternalServerError, generated.ErrorResponse{
 			Message: "failed to validate reset token",
 		}), nil
@@ -138,14 +138,14 @@ func (s *PasswordResetService) ResetPassword(ctx context.Context, request genera
 	err = s.userRepo.MarkPasswordResetTokenAsUsed(ctx, token)
 	if err != nil {
 		// Log error but don't fail since password was already updated
-		fmt.Printf("Error marking reset token as used: %v\n", err)
+		logger.FromCtx(ctx).Error("mark reset token used failed", "error", err)
 	}
 
 	// Delete all other reset tokens for this user
 	err = s.userRepo.DeleteUserPasswordResetTokens(ctx, resetToken.UserID)
 	if err != nil {
 		// Log error but don't fail
-		fmt.Printf("Error deleting user reset tokens: %v\n", err)
+		logger.FromCtx(ctx).Error("delete other reset tokens failed", "error", err)
 	}
 
 	return generated.Response(http.StatusOK, generated.MessageResponse{

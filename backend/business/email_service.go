@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/greenwaltc/kellogg-music-match/backend/config"
+	"github.com/greenwaltc/kellogg-music-match/backend/logger"
 	"github.com/sendgrid/sendgrid-go"
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
 )
@@ -36,7 +37,7 @@ type EmailMessage struct {
 func (s *EmailService) SendEmail(ctx context.Context, message EmailMessage) error {
 	if !s.config.Enabled {
 		// In development, just log the email instead of sending
-		fmt.Printf("EMAIL (disabled): To: %s, Subject: %s, Body: %s\n", message.To, message.Subject, message.Body)
+		logger.FromCtx(ctx).Info("email disabled; skipping send", "to", message.To, "subject", message.Subject)
 		return nil
 	}
 
@@ -85,7 +86,7 @@ func (s *EmailService) sendWithSendGrid(ctx context.Context, message EmailMessag
 		return fmt.Errorf("SendGrid API error: status %d, body: %s", response.StatusCode, response.Body)
 	}
 
-	fmt.Printf("Email sent successfully via SendGrid to %s (status: %d)\n", message.To, response.StatusCode)
+	logger.FromCtx(ctx).Info("email sent via sendgrid", "to", message.To, "status", response.StatusCode)
 	return nil
 }
 

@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/greenwaltc/kellogg-music-match/backend/config"
 	"github.com/greenwaltc/kellogg-music-match/backend/generated"
+	"github.com/greenwaltc/kellogg-music-match/backend/logger"
 )
 
 // toStringSlice converts various possible PostgreSQL array representations into a []string.
@@ -368,7 +369,7 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 		}
 	}
 	if err != nil {
-		fmt.Printf("ERROR: similarity query failed: %v\n", err)
+		logger.FromCtx(ctx).Error("similarity query failed", "error", err)
 		return generated.Response(http.StatusInternalServerError, generated.ErrorResponse{Message: "similarity query failed"}), nil
 	}
 
@@ -405,13 +406,9 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 			norm := sim.Similarity / maxPossible
 			if norm > 1 {
 				// Debug log to help detect any remaining edge cases causing overflow beyond 1.
-				fmt.Printf("DEBUG: normalized similarity >1 (%.4f) raw=%.6f maxPossible=%.6f overlaps=%d user=%s other=%s\n", norm, sim.Similarity, maxPossible, overlapCount, user.ID.String(), sim.UserID.String())
-				if norm > 1.0000001 { // allow tiny FP epsilon
-					norm = 1
-				} else {
-					// minor FP drift; clamp
-					norm = 1
-				}
+				logger.FromCtx(ctx).Debug("normalized similarity exceeded 1; clamping", "norm", norm, "raw", sim.Similarity, "maxPossible", maxPossible, "overlaps", overlapCount, "userId", user.ID.String(), "otherUserId", sim.UserID.String())
+				// clamp
+				norm = 1
 			}
 			score = float32(norm)
 		}

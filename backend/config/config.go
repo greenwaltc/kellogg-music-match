@@ -239,7 +239,7 @@ func Load() *Config {
 		},
 		Telemetry: TelemetryConfig{
 			Enabled:        getEnvBoolWithDefault("TRACING_ENABLED", true),
-			Exporter:       getEnvWithDefault("TRACING_EXPORTER", "stdout"),
+			Exporter:       getEnvWithDefault("TRACING_EXPORTER", "otlp"),
 			OTLPEndpoint:   getEnvWithDefault("OTEL_EXPORTER_OTLP_ENDPOINT", ""),
 			ServiceName:    getEnvWithDefault("OTEL_SERVICE_NAME", "kmm-backend"),
 			ServiceVersion: getEnvWithDefault("OTEL_SERVICE_VERSION", "1.0.0"),
