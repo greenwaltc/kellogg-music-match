@@ -27,7 +27,7 @@ func TestFindMusicMatchesRateLimit(t *testing.T) {
 		var ar generated.ArtistsRequest
 		_ = json.Unmarshal(b, &ar)
 		ctx := context.WithValue(context.Background(), UserContextKey, &UserContext{Username: username, UserID: username})
-		resp, _ := mw.FindMusicMatches(ctx, ar, username, "medium_term", "artists", false, "", "", 10, 0)
+		resp, _ := mw.FindMusicMatches(ctx, ar, username, "medium_term", "artists", false, "", 10, 0)
 		return resp, ctx
 	}
 

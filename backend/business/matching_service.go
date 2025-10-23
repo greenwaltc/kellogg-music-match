@@ -331,6 +331,13 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 			nameFilter = strings.TrimSpace(s)
 		}
 	}
+	// Optional exact username filter for fetching details of a specific other user
+	var exactOtherUsername string
+	if v := ctx.Value(MatchUsernameFilterContextKey{}); v != nil {
+		if s2, ok := v.(string); ok {
+			exactOtherUsername = strings.TrimSpace(s2)
+		}
+	}
 	// includeDetails provided explicitly via service parameter per API contract
 
 	// Determine overlaps limit (optional variadic for backward compatibility in tests not yet updated)
@@ -347,7 +354,8 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 
 	cacheKey := fmt.Sprintf("spotify:%s:%s:%s:%d:%d:%s", basis, user.ID.String(), rng, limit, ovLimit, strings.ToLower(strings.TrimSpace(nameFilter)))
 	// Cache lookup (guard against nil cache for safety if constructed elsewhere)
-	if s.cache != nil {
+	// Bypass cache when requesting details for a specific other user via exact username filter.
+	if s.cache != nil && exactOtherUsername == "" {
 		if matches, ok := s.cache.get(cacheKey); ok {
 			return generated.Response(http.StatusOK, matches), nil
 		}
@@ -358,20 +366,59 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 	var similar []SimilarUserResult
 	if basis == "tracks" {
 		if nameFilter != "" {
-			similar, err = s.userRepo.FindSimilarUsersBySpotifyTopTracksFiltered(ctx, user.ID, rng, limit, nameFilter, includeDetails)
+			// When an exact username is provided, we want to ensure we don't exclude the target by "limit".
+			// Use an expanded limit to increase the chance of including the target; we'll filter in-memory below.
+			effLimit := limit
+			if exactOtherUsername != "" {
+				if ml := cfg.Matching.MaxLimit; ml > 0 && int32(ml) > effLimit {
+					effLimit = int32(ml)
+				}
+			}
+			similar, err = s.userRepo.FindSimilarUsersBySpotifyTopTracksFiltered(ctx, user.ID, rng, effLimit, nameFilter, includeDetails)
 		} else {
-			similar, err = s.userRepo.FindSimilarUsersBySpotifyTopTracks(ctx, user.ID, rng, limit, includeDetails)
+			effLimit := limit
+			if exactOtherUsername != "" {
+				if ml := cfg.Matching.MaxLimit; ml > 0 && int32(ml) > effLimit {
+					effLimit = int32(ml)
+				}
+			}
+			similar, err = s.userRepo.FindSimilarUsersBySpotifyTopTracks(ctx, user.ID, rng, effLimit, includeDetails)
 		}
 	} else {
 		if nameFilter != "" {
-			similar, err = s.userRepo.FindSimilarUsersBySpotifyTopArtistsFiltered(ctx, user.ID, rng, limit, nameFilter, includeDetails)
+			effLimit := limit
+			if exactOtherUsername != "" {
+				if ml := cfg.Matching.MaxLimit; ml > 0 && int32(ml) > effLimit {
+					effLimit = int32(ml)
+				}
+			}
+			similar, err = s.userRepo.FindSimilarUsersBySpotifyTopArtistsFiltered(ctx, user.ID, rng, effLimit, nameFilter, includeDetails)
 		} else {
-			similar, err = s.userRepo.FindSimilarUsersBySpotifyTopArtists(ctx, user.ID, rng, limit, includeDetails)
+			effLimit := limit
+			if exactOtherUsername != "" {
+				if ml := cfg.Matching.MaxLimit; ml > 0 && int32(ml) > effLimit {
+					effLimit = int32(ml)
+				}
+			}
+			similar, err = s.userRepo.FindSimilarUsersBySpotifyTopArtists(ctx, user.ID, rng, effLimit, includeDetails)
 		}
 	}
 	if err != nil {
 		logger.FromCtx(ctx).Error("similarity query failed", "error", err)
 		return generated.Response(http.StatusInternalServerError, generated.ErrorResponse{Message: "similarity query failed"}), nil
+	}
+
+	// If an exact username was requested, filter down to only that user (case-insensitive match).
+	if exactOtherUsername != "" {
+		var filtered []SimilarUserResult
+		target := strings.ToLower(exactOtherUsername)
+		for _, sim := range similar {
+			if strings.ToLower(strings.TrimSpace(sim.Username)) == target {
+				filtered = append(filtered, sim)
+				break // unique username
+			}
+		}
+		similar = filtered
 	}
 
 	matches := make([]*generated.MatchUser, 0, len(similar))
@@ -429,6 +476,7 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 			continue
 		}
 		mu := &generated.MatchUser{
+			Username:       sim.Username,
 			Name:           fullName,
 			Program:        program,
 			GraduationYear: gradYear,
@@ -508,7 +556,7 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 		return matches[i].Score > matches[j].Score
 	})
 
-	if s.cache != nil {
+	if s.cache != nil && exactOtherUsername == "" {
 		s.cache.set(cacheKey, matches)
 	}
 	return generated.Response(http.StatusOK, matches), nil

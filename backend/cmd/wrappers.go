@@ -124,7 +124,7 @@ func NewMatchingAPIServiceWrapper(matchingService *business.MatchingService, spo
 }
 
 // FindMusicMatches delegates to business logic
-func (w *MatchingAPIServiceWrapper) FindMusicMatches(ctx context.Context, artistsRequest generated.ArtistsRequest, xUserUsername string, range_ string, basis string, includeDetails bool, userName string, userUsername string, limit int32, overlapsLimit int32) (generated.ImplResponse, error) {
+func (w *MatchingAPIServiceWrapper) FindMusicMatches(ctx context.Context, artistsRequest generated.ArtistsRequest, xUserUsername string, range_ string, basis string, includeDetails bool, userName string, limit int32, overlapsLimit int32) (generated.ImplResponse, error) {
 	// Inject basis into context for business layer (default to artists)
 	if basis == "" {
 		basis = "artists"
@@ -134,10 +134,6 @@ func (w *MatchingAPIServiceWrapper) FindMusicMatches(ctx context.Context, artist
 	// Inject optional fuzzy name filter if provided
 	if trimmed := strings.TrimSpace(userName); trimmed != "" {
 		ctx = context.WithValue(ctx, business.MatchNameFilterContextKey{}, trimmed)
-	}
-	// Inject optional exact username filter for matching a specific other user
-	if trimmedU := strings.TrimSpace(userUsername); trimmedU != "" {
-		ctx = context.WithValue(ctx, business.MatchUsernameFilterContextKey{}, trimmedU)
 	}
 	username := ""
 	if user, ok := GetUserFromContext(ctx); ok && user.Username != "" {

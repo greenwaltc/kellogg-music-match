@@ -18,6 +18,7 @@ class TestMatchingService extends MatchingService {
     int? limit,
     int? overlapsLimit,
     bool forceRefresh = false,
+    bool includeDetails = false,
   }) async {
     // Return one match with known overlaps and top items
     return [

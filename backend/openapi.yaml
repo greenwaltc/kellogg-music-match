@@ -1023,12 +1023,6 @@ paths:
             type: string
             minLength: 1
             maxLength: 100
-        - name: userUsername
-          in: query
-          description: Optional exact username filter to retrieve similarity details for a specific other user (overrides ranking).
-          required: false
-          schema:
-            type: string
         - name: limit
           in: query
           required: false
@@ -1876,6 +1870,10 @@ components:
       type: object
       description: A user with similar music taste
       properties:
+        username:
+          type: string
+          description: Matched user's unique username
+          example: "student123"
         name:
           type: string
           description: Full name of the matching user (firstName + lastName)
@@ -1983,6 +1981,7 @@ components:
               rank: 1
               artistNames: ["The Beatles"]
       required:
+        - username
         - name
         - program
         - graduationYear

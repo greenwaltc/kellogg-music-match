@@ -18,11 +18,13 @@ class MatchingService {
     String? userName,
     int? limit,
     int? overlapsLimit,
+    bool includeDetails = false,
   }) {
     final un = (userName ?? '').trim().toLowerCase();
     final lim = limit?.toString() ?? '';
     final ov = overlapsLimit?.toString() ?? '';
-    return 'basis:$basis|range:$range|q:$un|lim:$lim|ov:$ov';
+    final det = includeDetails ? '1' : '0';
+    return 'basis:$basis|range:$range|q:$un|lim:$lim|ov:$ov|d:$det';
   }
 
   Future<String?> _token() async {
@@ -37,6 +39,7 @@ class MatchingService {
     int? limit,
     int? overlapsLimit,
     bool forceRefresh = false,
+    bool includeDetails = false,
   }) async {
     final key = _key(
       basis: basis,
@@ -44,11 +47,16 @@ class MatchingService {
       userName: userName,
       limit: limit,
       overlapsLimit: overlapsLimit,
+      includeDetails: includeDetails,
     );
     if (!forceRefresh && _cache.containsKey(key)) {
       return _cache[key]!;
     }
-    final qp = <String, String>{'range': range, 'basis': basis};
+    final qp = <String, String>{
+      'range': range,
+      'basis': basis,
+      'includeDetails': includeDetails ? 'true' : 'false',
+    };
     if (userName != null && userName.trim().isNotEmpty)
       qp['userName'] = userName.trim();
     if (limit != null && limit > 0) qp['limit'] = '$limit';

@@ -28,6 +28,7 @@ class _MatchesPageState extends State<MatchesPage> {
   bool _loading = false;
   String? _error;
   List<dynamic> _matches = const [];
+  final Set<int> _loadingDetails = {};
 
   // Expanded state and per-card toggle (all vs overlaps only)
   final Set<int> _expanded = {};
@@ -109,6 +110,51 @@ class _MatchesPageState extends State<MatchesPage> {
       setState(() {
         _loading = false;
       });
+    }
+  }
+
+  Future<void> _maybeLoadDetailsForIndex(int index) async {
+    if (_svc == null) return;
+    if (index < 0 || index >= _matches.length) return;
+    final item = _matches[index] as Map<String, dynamic>;
+    // If we already have overlaps or top lists, no need to load
+    final hasOverlaps =
+        item['overlaps'] is List && (item['overlaps'] as List).isNotEmpty;
+    final hasTopArtists =
+        item['topArtists'] is List && (item['topArtists'] as List).isNotEmpty;
+    final hasTopTracks =
+        item['topTracks'] is List && (item['topTracks'] as List).isNotEmpty;
+    if (hasOverlaps || hasTopArtists || hasTopTracks) return;
+    final username = item['username'] as String?;
+    if (username == null || username.trim().isEmpty) return;
+    setState(() => _loadingDetails.add(index));
+    try {
+      final detailsList = await _svc!.fetchMatches(
+        basis: _basis,
+        range: _range,
+        userName: username, // pass username via name filter
+        includeDetails: true,
+        limit: 1,
+        overlapsLimit: null,
+        forceRefresh: true, // ensure we bypass list cache for specific user
+      );
+      if (detailsList.isNotEmpty && detailsList.first is Map<String, dynamic>) {
+        final details = (detailsList.first as Map<String, dynamic>);
+        final merged = {...item, ...details};
+        setState(() {
+          _matches = List<dynamic>.from(_matches);
+          _matches[index] = merged;
+        });
+      }
+    } catch (e) {
+      // Surface error but don't block UI
+      setState(() {
+        _error = e.toString();
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _loadingDetails.remove(index));
+      }
     }
   }
 
@@ -292,15 +338,20 @@ class _MatchesPageState extends State<MatchesPage> {
               data: item,
               basis: _basis,
               expanded: _expanded.contains(index),
+              loadingDetails: _loadingDetails.contains(index),
               onlyOverlap: _onlyOverlap[index] ?? false,
               onToggleExpanded: () {
+                final willExpand = !_expanded.contains(index);
                 setState(() {
-                  if (_expanded.contains(index)) {
-                    _expanded.remove(index);
-                  } else {
+                  if (willExpand) {
                     _expanded.add(index);
+                  } else {
+                    _expanded.remove(index);
                   }
                 });
+                if (willExpand) {
+                  _maybeLoadDetailsForIndex(index);
+                }
               },
               onToggleOnlyOverlap: (val) {
                 setState(() => _onlyOverlap[index] = val);
@@ -319,6 +370,7 @@ class _MatchUserTile extends StatelessWidget {
     required this.data,
     required this.basis,
     required this.expanded,
+    required this.loadingDetails,
     required this.onlyOverlap,
     required this.onToggleExpanded,
     required this.onToggleOnlyOverlap,
@@ -328,6 +380,7 @@ class _MatchUserTile extends StatelessWidget {
   final Map<String, dynamic> data;
   final String basis;
   final bool expanded;
+  final bool loadingDetails;
   final bool onlyOverlap;
   final VoidCallback onToggleExpanded;
   final ValueChanged<bool> onToggleOnlyOverlap;
@@ -337,9 +390,8 @@ class _MatchUserTile extends StatelessWidget {
     final name = data['name'] as String? ?? '';
     final overlapsList =
         (data['overlaps'] as List?)?.cast<dynamic>() ?? const [];
-    final overlap = overlapsList.isNotEmpty
-        ? overlapsList.length
-        : (data['overlap'] as num?)?.toInt() ?? 0;
+    // Prefer the explicit overlap property from the API, fall back to overlaps length
+    final overlap = (data['overlap'] as num?)?.toInt() ?? overlapsList.length;
 
     final tile = ListTile(
       leading: CircleAvatar(child: Text('${index + 1}')),
@@ -363,7 +415,15 @@ class _MatchUserTile extends StatelessWidget {
               ),
             ),
           const SizedBox(width: 8),
-          const Icon(Icons.expand_more),
+          // While loading per-user details, show a small spinner in the header
+          if (loadingDetails)
+            const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else
+            const Icon(Icons.expand_more),
         ],
       ),
       onTap: onToggleExpanded,
@@ -445,6 +505,12 @@ class _MatchUserTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             tile,
+            // Show a thin progress bar while details are loading (regardless of initial content)
+            if (loadingDetails)
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: LinearProgressIndicator(minHeight: 2),
+              ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: toggle,

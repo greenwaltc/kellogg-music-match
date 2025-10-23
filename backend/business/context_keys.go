@@ -9,10 +9,6 @@ type MatchBasisContextKey struct{}
 // used to restrict similar users to those whose first/last name or username matches the provided query.
 type MatchNameFilterContextKey struct{}
 
-// MatchIncludeDetailsContextKey toggles inclusion of heavy fields (overlaps/top lists) in responses.
-// When true, downstream layers may choose to include additional per-user detail payloads.
-type MatchIncludeDetailsContextKey struct{}
-
 // MatchUsernameFilterContextKey is a typed context key for passing an exact other-user username filter.
 // When set (non-empty), matching logic can narrow results to the specific user if present.
 type MatchUsernameFilterContextKey struct{}
