@@ -27,7 +27,7 @@ func TestFindMusicMatchesRateLimit(t *testing.T) {
 		var ar generated.ArtistsRequest
 		_ = json.Unmarshal(b, &ar)
 		ctx := context.WithValue(context.Background(), UserContextKey, &UserContext{Username: username, UserID: username})
-		resp, _ := mw.FindMusicMatches(ctx, ar, username, "medium_term", "artists", "", 10, 0)
+		resp, _ := mw.FindMusicMatches(ctx, ar, username, "medium_term", "artists", false, "", "", 10, 0)
 		return resp, ctx
 	}
 
@@ -49,6 +49,6 @@ func TestFindMusicMatchesRateLimit(t *testing.T) {
 
 type dummyMatchingService struct{}
 
-func (d *dummyMatchingService) FindMusicMatches(ctx context.Context, artistsRequest generated.ArtistsRequest, username string, range_ string, limit int32, overlapsLimit ...int32) (generated.ImplResponse, error) {
+func (d *dummyMatchingService) FindMusicMatches(ctx context.Context, artistsRequest generated.ArtistsRequest, username string, range_ string, includeDetails bool, limit int32, overlapsLimit ...int32) (generated.ImplResponse, error) {
 	return generated.Response(200, []interface{}{}), nil
 }

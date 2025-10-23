@@ -22,19 +22,19 @@ type mockUserRepoNameFilter struct {
 func (m *mockUserRepoNameFilter) GetUserByUsername(ctx context.Context, username string) (*sqlc.User, error) {
 	return m.user, nil
 }
-func (m *mockUserRepoNameFilter) FindSimilarUsersBySpotifyTopArtists(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]SimilarUserResult, error) {
+func (m *mockUserRepoNameFilter) FindSimilarUsersBySpotifyTopArtists(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, includeDetails bool) ([]SimilarUserResult, error) {
 	m.artistsCalled++
 	return []SimilarUserResult{}, nil
 }
-func (m *mockUserRepoNameFilter) FindSimilarUsersBySpotifyTopArtistsFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string) ([]SimilarUserResult, error) {
+func (m *mockUserRepoNameFilter) FindSimilarUsersBySpotifyTopArtistsFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string, includeDetails bool) ([]SimilarUserResult, error) {
 	m.artistsFilteredCalled++
 	return []SimilarUserResult{}, nil
 }
-func (m *mockUserRepoNameFilter) FindSimilarUsersBySpotifyTopTracks(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]SimilarUserResult, error) {
+func (m *mockUserRepoNameFilter) FindSimilarUsersBySpotifyTopTracks(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, includeDetails bool) ([]SimilarUserResult, error) {
 	m.tracksCalled++
 	return []SimilarUserResult{}, nil
 }
-func (m *mockUserRepoNameFilter) FindSimilarUsersBySpotifyTopTracksFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string) ([]SimilarUserResult, error) {
+func (m *mockUserRepoNameFilter) FindSimilarUsersBySpotifyTopTracksFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string, includeDetails bool) ([]SimilarUserResult, error) {
 	m.tracksFilteredCalled++
 	return []SimilarUserResult{}, nil
 }
@@ -43,7 +43,7 @@ func TestMatchingService_NameFilter_ArtistsPath(t *testing.T) {
 	repo := &mockUserRepoNameFilter{user: &sqlc.User{ID: uuid.New(), Username: "alice"}}
 	ms := NewMatchingService(repo, NewMatchingEngine())
 	// No filter -> unfiltered artists
-	_, err := ms.FindMusicMatches(context.Background(), generated.ArtistsRequest{}, "alice", "medium_term", 10)
+	_, err := ms.FindMusicMatches(context.Background(), generated.ArtistsRequest{}, "alice", "medium_term", true, 10)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -52,7 +52,7 @@ func TestMatchingService_NameFilter_ArtistsPath(t *testing.T) {
 	}
 	// With filter -> filtered artists
 	ctx := context.WithValue(context.Background(), MatchNameFilterContextKey{}, "First Last")
-	_, err = ms.FindMusicMatches(ctx, generated.ArtistsRequest{}, "alice", "medium_term", 10)
+	_, err = ms.FindMusicMatches(ctx, generated.ArtistsRequest{}, "alice", "medium_term", true, 10)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -67,7 +67,7 @@ func TestMatchingService_NameFilter_TracksPath(t *testing.T) {
 	ms := NewMatchingService(repo, NewMatchingEngine())
 	// Tracks disabled by config default -> expect 400 and no repo calls
 	ctx := context.WithValue(context.Background(), MatchBasisContextKey{}, "tracks")
-	imp, err := ms.FindMusicMatches(ctx, generated.ArtistsRequest{}, "alice", "medium_term", 10)
+	imp, err := ms.FindMusicMatches(ctx, generated.ArtistsRequest{}, "alice", "medium_term", true, 10)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}

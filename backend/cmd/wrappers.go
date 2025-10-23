@@ -69,7 +69,7 @@ func (w *HealthAPIServiceWrapper) GetHealth(ctx context.Context) (generated.Impl
 
 // MatchingAPIServiceWrapper wraps business logic to implement OpenAPI service interface
 type matchFinder interface {
-	FindMusicMatches(ctx context.Context, artistsRequest generated.ArtistsRequest, xUserUsername string, rng string, limit int32, overlapsLimit ...int32) (generated.ImplResponse, error)
+	FindMusicMatches(ctx context.Context, artistsRequest generated.ArtistsRequest, xUserUsername string, rng string, includeDetails bool, limit int32, overlapsLimit ...int32) (generated.ImplResponse, error)
 }
 
 type MatchingAPIServiceWrapper struct {
@@ -124,16 +124,20 @@ func NewMatchingAPIServiceWrapper(matchingService *business.MatchingService, spo
 }
 
 // FindMusicMatches delegates to business logic
-func (w *MatchingAPIServiceWrapper) FindMusicMatches(ctx context.Context, artistsRequest generated.ArtistsRequest, xUserUsername string, range_ string, basis string, userName string, limit int32, overlapsLimit int32) (generated.ImplResponse, error) {
-	// Inject basis into context for business layer until signature formally extended there (it already reads match_basis)
+func (w *MatchingAPIServiceWrapper) FindMusicMatches(ctx context.Context, artistsRequest generated.ArtistsRequest, xUserUsername string, range_ string, basis string, includeDetails bool, userName string, userUsername string, limit int32, overlapsLimit int32) (generated.ImplResponse, error) {
+	// Inject basis into context for business layer (default to artists)
 	if basis == "" {
 		basis = "artists"
 	}
-	// Provide both typed key (future use) and legacy string key "match_basis" that business layer currently inspects.
 	ctx = context.WithValue(ctx, business.MatchBasisContextKey{}, basis)
+	// includeDetails passed directly to service, no longer via context
 	// Inject optional fuzzy name filter if provided
 	if trimmed := strings.TrimSpace(userName); trimmed != "" {
 		ctx = context.WithValue(ctx, business.MatchNameFilterContextKey{}, trimmed)
+	}
+	// Inject optional exact username filter for matching a specific other user
+	if trimmedU := strings.TrimSpace(userUsername); trimmedU != "" {
+		ctx = context.WithValue(ctx, business.MatchUsernameFilterContextKey{}, trimmedU)
 	}
 	username := ""
 	if user, ok := GetUserFromContext(ctx); ok && user.Username != "" {
@@ -170,7 +174,7 @@ func (w *MatchingAPIServiceWrapper) FindMusicMatches(ctx context.Context, artist
 		headers.RetryAfter = strconv.Itoa(retryAfter)
 		return generated.Response(429, generated.ErrorResponse{Message: "too many match requests - retry shortly", CreatedAt: time.Now().UTC()}), nil
 	}
-	return w.matchingService.FindMusicMatches(context.WithValue(ctx, matchRateHeadersKey{}, headers), artistsRequest, username, range_, limit, overlapsLimit)
+	return w.matchingService.FindMusicMatches(context.WithValue(ctx, matchRateHeadersKey{}, headers), artistsRequest, username, range_, includeDetails, limit, overlapsLimit)
 }
 
 // Add SyncSpotify and GetSpotifySyncStatus to satisfy generated.MatchingAPIServicer

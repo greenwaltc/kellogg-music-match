@@ -256,11 +256,11 @@ const findTopNSimilarUsersBySpotifyArtists = `-- name: FindTopNSimilarUsersBySpo
 WITH anchor AS (
   SELECT v.user_id AS anchor_user_id, v.item_rank AS anchor_item_rank, v.spotify_artist_id, v.name AS anchor_name
   FROM v_current_spotify_top_artists v
-  WHERE v.user_id = $4 AND v.range = $1 AND v.item_rank <= $2
+  WHERE v.user_id = $5 AND v.range = $2 AND v.item_rank <= $3
 ), others AS (
   SELECT v.user_id AS other_user_id, v.item_rank AS other_item_rank, v.spotify_artist_id, v.name AS other_name
   FROM v_current_spotify_top_artists v
-  WHERE v.user_id <> $4 AND v.range = $1 AND v.item_rank <= $2
+  WHERE v.user_id <> $5 AND v.range = $2 AND v.item_rank <= $3
 ), overlap AS (
   SELECT o.other_user_id,
          a.spotify_artist_id,
@@ -273,6 +273,7 @@ WITH anchor AS (
 ), agg AS (
   SELECT other_user_id,
     SUM(weight)::float8 AS similarity,
+       COUNT(*)::int4 AS overlap_count,
        jsonb_agg(jsonb_build_object(
          'spotify_artist_id', spotify_artist_id,
          'name', name,
@@ -290,29 +291,31 @@ SELECT u.id AS user_id,
   u.program,
   u.graduation_year,
   agg.similarity,
-  agg.overlaps_json,
+  CASE WHEN $1::bool THEN agg.overlaps_json ELSE NULL END AS overlaps_json,
+  agg.overlap_count,
   /* Each similar user's top N artists for this range (JSON array) */
-  (
+  CASE WHEN $1::bool THEN (
     SELECT COALESCE(jsonb_agg(jsonb_build_object(
       'spotify_artist_id', v.spotify_artist_id,
       'name', v.name,
       'rank', v.item_rank
     ) ORDER BY v.item_rank), '[]'::jsonb)
     FROM v_current_spotify_top_artists v
-    WHERE v.user_id = u.id AND v.range = $1 AND v.item_rank <= $2
-  ) AS top_artists_json
+    WHERE v.user_id = u.id AND v.range = $2 AND v.item_rank <= $3
+  ) ELSE NULL END AS top_artists_json
 FROM agg
 JOIN users u ON u.id = agg.other_user_id
 WHERE agg.similarity > 0
 ORDER BY agg.similarity DESC, u.created_at ASC
-LIMIT $3
+LIMIT $4
 `
 
 type FindTopNSimilarUsersBySpotifyArtistsParams struct {
-	Range        string    `json:"range"`
-	TopN         int32     `json:"top_n"`
-	LimitN       int32     `json:"limit_n"`
-	AnchorUserID uuid.UUID `json:"anchor_user_id"`
+	IncludeDetails bool      `json:"include_details"`
+	Range          string    `json:"range"`
+	TopN           int32     `json:"top_n"`
+	LimitN         int32     `json:"limit_n"`
+	AnchorUserID   uuid.UUID `json:"anchor_user_id"`
 }
 
 type FindTopNSimilarUsersBySpotifyArtistsRow struct {
@@ -323,7 +326,8 @@ type FindTopNSimilarUsersBySpotifyArtistsRow struct {
 	Program        pgtype.Text `json:"program"`
 	GraduationYear pgtype.Int4 `json:"graduation_year"`
 	Similarity     float64     `json:"similarity"`
-	OverlapsJson   []byte      `json:"overlaps_json"`
+	OverlapsJson   interface{} `json:"overlaps_json"`
+	OverlapCount   int32       `json:"overlap_count"`
 	TopArtistsJson interface{} `json:"top_artists_json"`
 }
 
@@ -346,6 +350,7 @@ type FindTopNSimilarUsersBySpotifyArtistsRow struct {
 //   - JSON structure for overlaps: [{"spotify_artist_id":"...","name":"...","anchor_rank":1,"other_rank":2}]
 func (q *Queries) FindTopNSimilarUsersBySpotifyArtists(ctx context.Context, arg FindTopNSimilarUsersBySpotifyArtistsParams) ([]FindTopNSimilarUsersBySpotifyArtistsRow, error) {
 	rows, err := q.db.Query(ctx, findTopNSimilarUsersBySpotifyArtists,
+		arg.IncludeDetails,
 		arg.Range,
 		arg.TopN,
 		arg.LimitN,
@@ -367,6 +372,7 @@ func (q *Queries) FindTopNSimilarUsersBySpotifyArtists(ctx context.Context, arg 
 			&i.GraduationYear,
 			&i.Similarity,
 			&i.OverlapsJson,
+			&i.OverlapCount,
 			&i.TopArtistsJson,
 		); err != nil {
 			return nil, err
@@ -383,11 +389,11 @@ const findTopNSimilarUsersBySpotifyArtistsFiltered = `-- name: FindTopNSimilarUs
 WITH anchor AS (
   SELECT v.user_id AS anchor_user_id, v.item_rank AS anchor_item_rank, v.spotify_artist_id, v.name AS anchor_name
   FROM v_current_spotify_top_artists v
-  WHERE v.user_id = $5 AND v.range = $1 AND v.item_rank <= $2
+  WHERE v.user_id = $6 AND v.range = $2 AND v.item_rank <= $3
 ), others AS (
   SELECT v.user_id AS other_user_id, v.item_rank AS other_item_rank, v.spotify_artist_id, v.name AS other_name
   FROM v_current_spotify_top_artists v
-  WHERE v.user_id <> $5 AND v.range = $1 AND v.item_rank <= $2
+  WHERE v.user_id <> $6 AND v.range = $2 AND v.item_rank <= $3
 ), overlap AS (
   SELECT o.other_user_id,
          a.spotify_artist_id,
@@ -400,6 +406,7 @@ WITH anchor AS (
 ), agg AS (
   SELECT other_user_id,
     SUM(weight)::float8 AS similarity,
+       COUNT(*)::int4 AS overlap_count,
        jsonb_agg(jsonb_build_object(
          'spotify_artist_id', spotify_artist_id,
          'name', name,
@@ -416,36 +423,38 @@ SELECT u.id AS user_id,
   u.program,
   u.graduation_year,
   agg.similarity,
-  agg.overlaps_json,
-  (
+  CASE WHEN $1::bool THEN agg.overlaps_json ELSE NULL END AS overlaps_json,
+  agg.overlap_count,
+  CASE WHEN $1::bool THEN (
     SELECT COALESCE(jsonb_agg(jsonb_build_object(
       'spotify_artist_id', v.spotify_artist_id,
       'name', v.name,
       'rank', v.item_rank
     ) ORDER BY v.item_rank), '[]'::jsonb)
     FROM v_current_spotify_top_artists v
-    WHERE v.user_id = u.id AND v.range = $1 AND v.item_rank <= $2
-  ) AS top_artists_json
+    WHERE v.user_id = u.id AND v.range = $2 AND v.item_rank <= $3
+  ) ELSE NULL END AS top_artists_json
 FROM agg
 JOIN users u ON u.id = agg.other_user_id
 WHERE agg.similarity > 0
   AND (
-    u.first_name ILIKE '%' || $3 || '%'
-    OR u.last_name ILIKE '%' || $3 || '%'
-    OR u.username ILIKE '%' || $3 || '%'
-    OR concat_ws(' ', u.first_name, u.last_name) ILIKE '%' || $3 || '%'
-    OR concat_ws(' ', u.last_name, u.first_name) ILIKE '%' || $3 || '%'
+    u.first_name ILIKE '%' || $4 || '%'
+    OR u.last_name ILIKE '%' || $4 || '%'
+    OR u.username ILIKE '%' || $4 || '%'
+    OR concat_ws(' ', u.first_name, u.last_name) ILIKE '%' || $4 || '%'
+    OR concat_ws(' ', u.last_name, u.first_name) ILIKE '%' || $4 || '%'
   )
 ORDER BY agg.similarity DESC, u.created_at ASC
-LIMIT $4
+LIMIT $5
 `
 
 type FindTopNSimilarUsersBySpotifyArtistsFilteredParams struct {
-	Range        string      `json:"range"`
-	TopN         int32       `json:"top_n"`
-	NameFilter   pgtype.Text `json:"name_filter"`
-	LimitN       int32       `json:"limit_n"`
-	AnchorUserID uuid.UUID   `json:"anchor_user_id"`
+	IncludeDetails bool        `json:"include_details"`
+	Range          string      `json:"range"`
+	TopN           int32       `json:"top_n"`
+	NameFilter     pgtype.Text `json:"name_filter"`
+	LimitN         int32       `json:"limit_n"`
+	AnchorUserID   uuid.UUID   `json:"anchor_user_id"`
 }
 
 type FindTopNSimilarUsersBySpotifyArtistsFilteredRow struct {
@@ -456,7 +465,8 @@ type FindTopNSimilarUsersBySpotifyArtistsFilteredRow struct {
 	Program        pgtype.Text `json:"program"`
 	GraduationYear pgtype.Int4 `json:"graduation_year"`
 	Similarity     float64     `json:"similarity"`
-	OverlapsJson   []byte      `json:"overlaps_json"`
+	OverlapsJson   interface{} `json:"overlaps_json"`
+	OverlapCount   int32       `json:"overlap_count"`
 	TopArtistsJson interface{} `json:"top_artists_json"`
 }
 
@@ -466,6 +476,7 @@ type FindTopNSimilarUsersBySpotifyArtistsFilteredRow struct {
 //	name_filter TEXT   -> case-insensitive partial match against first_name, last_name, or username
 func (q *Queries) FindTopNSimilarUsersBySpotifyArtistsFiltered(ctx context.Context, arg FindTopNSimilarUsersBySpotifyArtistsFilteredParams) ([]FindTopNSimilarUsersBySpotifyArtistsFilteredRow, error) {
 	rows, err := q.db.Query(ctx, findTopNSimilarUsersBySpotifyArtistsFiltered,
+		arg.IncludeDetails,
 		arg.Range,
 		arg.TopN,
 		arg.NameFilter,
@@ -488,6 +499,7 @@ func (q *Queries) FindTopNSimilarUsersBySpotifyArtistsFiltered(ctx context.Conte
 			&i.GraduationYear,
 			&i.Similarity,
 			&i.OverlapsJson,
+			&i.OverlapCount,
 			&i.TopArtistsJson,
 		); err != nil {
 			return nil, err
@@ -504,11 +516,11 @@ const findTopNSimilarUsersBySpotifyTracks = `-- name: FindTopNSimilarUsersBySpot
 WITH anchor AS (
   SELECT v.user_id AS anchor_user_id, v.item_rank AS anchor_item_rank, v.spotify_track_id, v.name AS anchor_name
   FROM v_current_spotify_top_tracks v
-  WHERE v.user_id = $4 AND v.range = $1 AND v.item_rank <= $2
+  WHERE v.user_id = $5 AND v.range = $2 AND v.item_rank <= $3
 ), others AS (
   SELECT v.user_id AS other_user_id, v.item_rank AS other_item_rank, v.spotify_track_id, v.name AS other_name
   FROM v_current_spotify_top_tracks v
-  WHERE v.user_id <> $4 AND v.range = $1 AND v.item_rank <= $2
+  WHERE v.user_id <> $5 AND v.range = $2 AND v.item_rank <= $3
 ), overlap AS (
   SELECT o.other_user_id,
          a.spotify_track_id,
@@ -521,6 +533,7 @@ WITH anchor AS (
 ), agg AS (
   SELECT other_user_id,
     SUM(weight)::float8 AS similarity,
+       COUNT(*)::int4 AS overlap_count,
        jsonb_agg(jsonb_build_object(
          'spotify_track_id', spotify_track_id,
          'name', name,
@@ -537,9 +550,10 @@ SELECT u.id AS user_id,
      u.program,
      u.graduation_year,
      agg.similarity,
-     agg.overlaps_json,
+     CASE WHEN $1::bool THEN agg.overlaps_json ELSE NULL END AS overlaps_json,
+     agg.overlap_count,
      /* Each similar user's top N tracks for this range (JSON array) */
-     (
+     CASE WHEN $1::bool THEN (
        SELECT COALESCE(jsonb_agg(jsonb_build_object(
          'spotify_track_id', vt.spotify_track_id,
          'name', vt.name,
@@ -547,20 +561,21 @@ SELECT u.id AS user_id,
          'artist_names', vt.artist_names
        ) ORDER BY vt.item_rank), '[]'::jsonb)
        FROM v_current_spotify_top_tracks vt
-       WHERE vt.user_id = u.id AND vt.range = $1 AND vt.item_rank <= $2
-     ) AS top_tracks_json
+       WHERE vt.user_id = u.id AND vt.range = $2 AND vt.item_rank <= $3
+     ) ELSE NULL END AS top_tracks_json
 FROM agg
 JOIN users u ON u.id = agg.other_user_id
 WHERE agg.similarity > 0
 ORDER BY agg.similarity DESC, u.created_at ASC
-LIMIT $3
+LIMIT $4
 `
 
 type FindTopNSimilarUsersBySpotifyTracksParams struct {
-	Range        string    `json:"range"`
-	TopN         int32     `json:"top_n"`
-	LimitN       int32     `json:"limit_n"`
-	AnchorUserID uuid.UUID `json:"anchor_user_id"`
+	IncludeDetails bool      `json:"include_details"`
+	Range          string    `json:"range"`
+	TopN           int32     `json:"top_n"`
+	LimitN         int32     `json:"limit_n"`
+	AnchorUserID   uuid.UUID `json:"anchor_user_id"`
 }
 
 type FindTopNSimilarUsersBySpotifyTracksRow struct {
@@ -571,13 +586,15 @@ type FindTopNSimilarUsersBySpotifyTracksRow struct {
 	Program        pgtype.Text `json:"program"`
 	GraduationYear pgtype.Int4 `json:"graduation_year"`
 	Similarity     float64     `json:"similarity"`
-	OverlapsJson   []byte      `json:"overlaps_json"`
+	OverlapsJson   interface{} `json:"overlaps_json"`
+	OverlapCount   int32       `json:"overlap_count"`
 	TopTracksJson  interface{} `json:"top_tracks_json"`
 }
 
 // Similar to artist similarity but operates on track snapshots.
 func (q *Queries) FindTopNSimilarUsersBySpotifyTracks(ctx context.Context, arg FindTopNSimilarUsersBySpotifyTracksParams) ([]FindTopNSimilarUsersBySpotifyTracksRow, error) {
 	rows, err := q.db.Query(ctx, findTopNSimilarUsersBySpotifyTracks,
+		arg.IncludeDetails,
 		arg.Range,
 		arg.TopN,
 		arg.LimitN,
@@ -599,6 +616,7 @@ func (q *Queries) FindTopNSimilarUsersBySpotifyTracks(ctx context.Context, arg F
 			&i.GraduationYear,
 			&i.Similarity,
 			&i.OverlapsJson,
+			&i.OverlapCount,
 			&i.TopTracksJson,
 		); err != nil {
 			return nil, err
@@ -615,11 +633,11 @@ const findTopNSimilarUsersBySpotifyTracksFiltered = `-- name: FindTopNSimilarUse
 WITH anchor AS (
   SELECT v.user_id AS anchor_user_id, v.item_rank AS anchor_item_rank, v.spotify_track_id, v.name AS anchor_name
   FROM v_current_spotify_top_tracks v
-  WHERE v.user_id = $5 AND v.range = $1 AND v.item_rank <= $2
+  WHERE v.user_id = $6 AND v.range = $2 AND v.item_rank <= $3
 ), others AS (
   SELECT v.user_id AS other_user_id, v.item_rank AS other_item_rank, v.spotify_track_id, v.name AS other_name
   FROM v_current_spotify_top_tracks v
-  WHERE v.user_id <> $5 AND v.range = $1 AND v.item_rank <= $2
+  WHERE v.user_id <> $6 AND v.range = $2 AND v.item_rank <= $3
 ), overlap AS (
   SELECT o.other_user_id,
          a.spotify_track_id,
@@ -632,6 +650,7 @@ WITH anchor AS (
 ), agg AS (
   SELECT other_user_id,
     SUM(weight)::float8 AS similarity,
+       COUNT(*)::int4 AS overlap_count,
        jsonb_agg(jsonb_build_object(
          'spotify_track_id', spotify_track_id,
          'name', name,
@@ -648,8 +667,9 @@ SELECT u.id AS user_id,
      u.program,
      u.graduation_year,
      agg.similarity,
-     agg.overlaps_json,
-     (
+     CASE WHEN $1::bool THEN agg.overlaps_json ELSE NULL END AS overlaps_json,
+     agg.overlap_count,
+     CASE WHEN $1::bool THEN (
        SELECT COALESCE(jsonb_agg(jsonb_build_object(
          'spotify_track_id', vt.spotify_track_id,
          'name', vt.name,
@@ -657,28 +677,29 @@ SELECT u.id AS user_id,
          'artist_names', vt.artist_names
        ) ORDER BY vt.item_rank), '[]'::jsonb)
        FROM v_current_spotify_top_tracks vt
-       WHERE vt.user_id = u.id AND vt.range = $1 AND vt.item_rank <= $2
-     ) AS top_tracks_json
+       WHERE vt.user_id = u.id AND vt.range = $2 AND vt.item_rank <= $3
+     ) ELSE NULL END AS top_tracks_json
 FROM agg
 JOIN users u ON u.id = agg.other_user_id
 WHERE agg.similarity > 0
   AND (
-    u.first_name ILIKE '%' || $3 || '%'
-    OR u.last_name ILIKE '%' || $3 || '%'
-    OR u.username ILIKE '%' || $3 || '%'
-    OR concat_ws(' ', u.first_name, u.last_name) ILIKE '%' || $3 || '%'
-    OR concat_ws(' ', u.last_name, u.first_name) ILIKE '%' || $3 || '%'
+    u.first_name ILIKE '%' || $4 || '%'
+    OR u.last_name ILIKE '%' || $4 || '%'
+    OR u.username ILIKE '%' || $4 || '%'
+    OR concat_ws(' ', u.first_name, u.last_name) ILIKE '%' || $4 || '%'
+    OR concat_ws(' ', u.last_name, u.first_name) ILIKE '%' || $4 || '%'
   )
 ORDER BY agg.similarity DESC, u.created_at ASC
-LIMIT $4
+LIMIT $5
 `
 
 type FindTopNSimilarUsersBySpotifyTracksFilteredParams struct {
-	Range        string      `json:"range"`
-	TopN         int32       `json:"top_n"`
-	NameFilter   pgtype.Text `json:"name_filter"`
-	LimitN       int32       `json:"limit_n"`
-	AnchorUserID uuid.UUID   `json:"anchor_user_id"`
+	IncludeDetails bool        `json:"include_details"`
+	Range          string      `json:"range"`
+	TopN           int32       `json:"top_n"`
+	NameFilter     pgtype.Text `json:"name_filter"`
+	LimitN         int32       `json:"limit_n"`
+	AnchorUserID   uuid.UUID   `json:"anchor_user_id"`
 }
 
 type FindTopNSimilarUsersBySpotifyTracksFilteredRow struct {
@@ -689,13 +710,15 @@ type FindTopNSimilarUsersBySpotifyTracksFilteredRow struct {
 	Program        pgtype.Text `json:"program"`
 	GraduationYear pgtype.Int4 `json:"graduation_year"`
 	Similarity     float64     `json:"similarity"`
-	OverlapsJson   []byte      `json:"overlaps_json"`
+	OverlapsJson   interface{} `json:"overlaps_json"`
+	OverlapCount   int32       `json:"overlap_count"`
 	TopTracksJson  interface{} `json:"top_tracks_json"`
 }
 
 // Tracks variant with a fuzzy name filter on other users
 func (q *Queries) FindTopNSimilarUsersBySpotifyTracksFiltered(ctx context.Context, arg FindTopNSimilarUsersBySpotifyTracksFilteredParams) ([]FindTopNSimilarUsersBySpotifyTracksFilteredRow, error) {
 	rows, err := q.db.Query(ctx, findTopNSimilarUsersBySpotifyTracksFiltered,
+		arg.IncludeDetails,
 		arg.Range,
 		arg.TopN,
 		arg.NameFilter,
@@ -718,6 +741,7 @@ func (q *Queries) FindTopNSimilarUsersBySpotifyTracksFiltered(ctx context.Contex
 			&i.GraduationYear,
 			&i.Similarity,
 			&i.OverlapsJson,
+			&i.OverlapCount,
 			&i.TopTracksJson,
 		); err != nil {
 			return nil, err

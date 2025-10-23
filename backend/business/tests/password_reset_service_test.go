@@ -100,12 +100,21 @@ func (m *EnhancedMockUserRepository) UpsertSpotifyTokens(ctx context.Context, us
 func (m *EnhancedMockUserRepository) GetSpotifyTokensByUser(ctx context.Context, userID uuid.UUID) (*sqlc.SpotifyToken, error) {
 	return nil, nil
 }
-func (m *EnhancedMockUserRepository) FindSimilarUsersBySpotifyTopArtists(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]business.SimilarUserResult, error) {
+func (m *EnhancedMockUserRepository) FindSimilarUsersBySpotifyTopArtists(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, includeDetails bool) ([]business.SimilarUserResult, error) {
+	return []business.SimilarUserResult{}, nil
+}
+
+// Filtered variants to satisfy interface
+func (m *EnhancedMockUserRepository) FindSimilarUsersBySpotifyTopArtistsFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string, includeDetails bool) ([]business.SimilarUserResult, error) {
 	return []business.SimilarUserResult{}, nil
 }
 
 // Track similarity stub to satisfy interface in tests
-func (m *EnhancedMockUserRepository) FindSimilarUsersBySpotifyTopTracks(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]business.SimilarUserResult, error) {
+func (m *EnhancedMockUserRepository) FindSimilarUsersBySpotifyTopTracks(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, includeDetails bool) ([]business.SimilarUserResult, error) {
+	return []business.SimilarUserResult{}, nil
+}
+
+func (m *EnhancedMockUserRepository) FindSimilarUsersBySpotifyTopTracksFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string, includeDetails bool) ([]business.SimilarUserResult, error) {
 	return []business.SimilarUserResult{}, nil
 }
 

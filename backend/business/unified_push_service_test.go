@@ -95,16 +95,16 @@ func (s *stubRepo) GetUserTopArtistsByRange(ctx context.Context, userID uuid.UUI
 func (s *stubRepo) GetUserTopTracksByRange(ctx context.Context, userID uuid.UUID, rng string, limit, offset int32) ([]SpotifyTopTrack, error) {
 	return []SpotifyTopTrack{}, nil
 }
-func (s *stubRepo) FindSimilarUsersBySpotifyTopArtists(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]SimilarUserResult, error) {
+func (s *stubRepo) FindSimilarUsersBySpotifyTopArtists(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, includeDetails bool) ([]SimilarUserResult, error) {
 	return nil, nil
 }
-func (s *stubRepo) FindSimilarUsersBySpotifyTopArtistsFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string) ([]SimilarUserResult, error) {
+func (s *stubRepo) FindSimilarUsersBySpotifyTopArtistsFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string, includeDetails bool) ([]SimilarUserResult, error) {
 	return nil, nil
 }
-func (s *stubRepo) FindSimilarUsersBySpotifyTopTracks(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]SimilarUserResult, error) {
+func (s *stubRepo) FindSimilarUsersBySpotifyTopTracks(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, includeDetails bool) ([]SimilarUserResult, error) {
 	return nil, nil
 }
-func (s *stubRepo) FindSimilarUsersBySpotifyTopTracksFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string) ([]SimilarUserResult, error) {
+func (s *stubRepo) FindSimilarUsersBySpotifyTopTracksFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string, includeDetails bool) ([]SimilarUserResult, error) {
 	return nil, nil
 }
 func (s *stubRepo) UpsertPushSubscription(ctx context.Context, userID *uuid.UUID, endpoint, p256dh, auth, userAgent string) error {

@@ -1007,6 +1007,14 @@ paths:
           description: |-
             Similarity basis. "artists" (default) uses top artist snapshots; "tracks" uses top track snapshots. 
             Tracks is feature-flag gated server-side and will return 400 if disabled.
+        - name: includeDetails
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: |-
+            When true, include heavy detail fields per match (overlaps with ranks and the matched user's top lists). Defaults to false to optimize initial payloads.
         - name: userName
           in: query
           description: Optional fuzzy search to filter other users by first/last name or username.
@@ -1015,6 +1023,12 @@ paths:
             type: string
             minLength: 1
             maxLength: 100
+        - name: userUsername
+          in: query
+          description: Optional exact username filter to retrieve similarity details for a specific other user (overrides ranking).
+          required: false
+          schema:
+            type: string
         - name: limit
           in: query
           required: false

@@ -278,18 +278,18 @@ func (m *MockUserRepository) StoreSpotifyTopArtists(ctx context.Context, userID 
 func (m *MockUserRepository) StoreSpotifyTopTracks(ctx context.Context, userID uuid.UUID, fetchedAt time.Time, rng string, items []business.SpotifyTopTrack) error {
 	return nil
 }
-func (m *MockUserRepository) FindSimilarUsersBySpotifyTopArtists(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]business.SimilarUserResult, error) {
+func (m *MockUserRepository) FindSimilarUsersBySpotifyTopArtists(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, includeDetails bool) ([]business.SimilarUserResult, error) {
 	return []business.SimilarUserResult{}, nil
 }
-func (m *MockUserRepository) FindSimilarUsersBySpotifyTopArtistsFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string) ([]business.SimilarUserResult, error) {
+func (m *MockUserRepository) FindSimilarUsersBySpotifyTopArtistsFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string, includeDetails bool) ([]business.SimilarUserResult, error) {
 	return []business.SimilarUserResult{}, nil
 }
 
 // Added to satisfy UserRepository interface after introducing track-based similarity
-func (m *MockUserRepository) FindSimilarUsersBySpotifyTopTracks(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]business.SimilarUserResult, error) {
+func (m *MockUserRepository) FindSimilarUsersBySpotifyTopTracks(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, includeDetails bool) ([]business.SimilarUserResult, error) {
 	return []business.SimilarUserResult{}, nil
 }
-func (m *MockUserRepository) FindSimilarUsersBySpotifyTopTracksFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string) ([]business.SimilarUserResult, error) {
+func (m *MockUserRepository) FindSimilarUsersBySpotifyTopTracksFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string, includeDetails bool) ([]business.SimilarUserResult, error) {
 	return []business.SimilarUserResult{}, nil
 }
 

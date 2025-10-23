@@ -331,6 +331,7 @@ WITH anchor AS (
 ), agg AS (
   SELECT other_user_id,
     SUM(weight)::float8 AS similarity,
+       COUNT(*)::int4 AS overlap_count,
        jsonb_agg(jsonb_build_object(
          'spotify_artist_id', spotify_artist_id,
          'name', name,
@@ -348,9 +349,10 @@ SELECT u.id AS user_id,
   u.program,
   u.graduation_year,
   agg.similarity,
-  agg.overlaps_json,
+  CASE WHEN sqlc.arg(include_details)::bool THEN agg.overlaps_json ELSE NULL END AS overlaps_json,
+  agg.overlap_count,
   /* Each similar user's top N artists for this range (JSON array) */
-  (
+  CASE WHEN sqlc.arg(include_details)::bool THEN (
     SELECT COALESCE(jsonb_agg(jsonb_build_object(
       'spotify_artist_id', v.spotify_artist_id,
       'name', v.name,
@@ -358,7 +360,7 @@ SELECT u.id AS user_id,
     ) ORDER BY v.item_rank), '[]'::jsonb)
     FROM v_current_spotify_top_artists v
     WHERE v.user_id = u.id AND v.range = sqlc.arg(range) AND v.item_rank <= sqlc.arg(top_n)
-  ) AS top_artists_json
+  ) ELSE NULL END AS top_artists_json
 FROM agg
 JOIN users u ON u.id = agg.other_user_id
 WHERE agg.similarity > 0
@@ -389,6 +391,7 @@ WITH anchor AS (
 ), agg AS (
   SELECT other_user_id,
     SUM(weight)::float8 AS similarity,
+       COUNT(*)::int4 AS overlap_count,
        jsonb_agg(jsonb_build_object(
          'spotify_artist_id', spotify_artist_id,
          'name', name,
@@ -405,8 +408,9 @@ SELECT u.id AS user_id,
   u.program,
   u.graduation_year,
   agg.similarity,
-  agg.overlaps_json,
-  (
+  CASE WHEN sqlc.arg(include_details)::bool THEN agg.overlaps_json ELSE NULL END AS overlaps_json,
+  agg.overlap_count,
+  CASE WHEN sqlc.arg(include_details)::bool THEN (
     SELECT COALESCE(jsonb_agg(jsonb_build_object(
       'spotify_artist_id', v.spotify_artist_id,
       'name', v.name,
@@ -414,7 +418,7 @@ SELECT u.id AS user_id,
     ) ORDER BY v.item_rank), '[]'::jsonb)
     FROM v_current_spotify_top_artists v
     WHERE v.user_id = u.id AND v.range = sqlc.arg(range) AND v.item_rank <= sqlc.arg(top_n)
-  ) AS top_artists_json
+  ) ELSE NULL END AS top_artists_json
 FROM agg
 JOIN users u ON u.id = agg.other_user_id
 WHERE agg.similarity > 0
@@ -450,6 +454,7 @@ WITH anchor AS (
 ), agg AS (
   SELECT other_user_id,
     SUM(weight)::float8 AS similarity,
+       COUNT(*)::int4 AS overlap_count,
        jsonb_agg(jsonb_build_object(
          'spotify_track_id', spotify_track_id,
          'name', name,
@@ -466,9 +471,10 @@ SELECT u.id AS user_id,
      u.program,
      u.graduation_year,
      agg.similarity,
-     agg.overlaps_json,
+     CASE WHEN sqlc.arg(include_details)::bool THEN agg.overlaps_json ELSE NULL END AS overlaps_json,
+     agg.overlap_count,
      /* Each similar user's top N tracks for this range (JSON array) */
-     (
+     CASE WHEN sqlc.arg(include_details)::bool THEN (
        SELECT COALESCE(jsonb_agg(jsonb_build_object(
          'spotify_track_id', vt.spotify_track_id,
          'name', vt.name,
@@ -477,7 +483,7 @@ SELECT u.id AS user_id,
        ) ORDER BY vt.item_rank), '[]'::jsonb)
        FROM v_current_spotify_top_tracks vt
        WHERE vt.user_id = u.id AND vt.range = sqlc.arg(range) AND vt.item_rank <= sqlc.arg(top_n)
-     ) AS top_tracks_json
+     ) ELSE NULL END AS top_tracks_json
 FROM agg
 JOIN users u ON u.id = agg.other_user_id
 WHERE agg.similarity > 0
@@ -506,6 +512,7 @@ WITH anchor AS (
 ), agg AS (
   SELECT other_user_id,
     SUM(weight)::float8 AS similarity,
+       COUNT(*)::int4 AS overlap_count,
        jsonb_agg(jsonb_build_object(
          'spotify_track_id', spotify_track_id,
          'name', name,
@@ -522,8 +529,9 @@ SELECT u.id AS user_id,
      u.program,
      u.graduation_year,
      agg.similarity,
-     agg.overlaps_json,
-     (
+     CASE WHEN sqlc.arg(include_details)::bool THEN agg.overlaps_json ELSE NULL END AS overlaps_json,
+     agg.overlap_count,
+     CASE WHEN sqlc.arg(include_details)::bool THEN (
        SELECT COALESCE(jsonb_agg(jsonb_build_object(
          'spotify_track_id', vt.spotify_track_id,
          'name', vt.name,
@@ -532,7 +540,7 @@ SELECT u.id AS user_id,
        ) ORDER BY vt.item_rank), '[]'::jsonb)
        FROM v_current_spotify_top_tracks vt
        WHERE vt.user_id = u.id AND vt.range = sqlc.arg(range) AND vt.item_rank <= sqlc.arg(top_n)
-     ) AS top_tracks_json
+     ) ELSE NULL END AS top_tracks_json
 FROM agg
 JOIN users u ON u.id = agg.other_user_id
 WHERE agg.similarity > 0

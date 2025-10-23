@@ -21,19 +21,19 @@ type mockUserRepoTracks struct {
 func (m *mockUserRepoTracks) GetUserByUsername(ctx context.Context, username string) (*sqlc.User, error) {
 	return m.user, nil
 }
-func (m *mockUserRepoTracks) FindSimilarUsersBySpotifyTopArtists(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]SimilarUserResult, error) {
+func (m *mockUserRepoTracks) FindSimilarUsersBySpotifyTopArtists(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, includeDetails bool) ([]SimilarUserResult, error) {
 	m.artistsCalled++
 	return nil, nil
 }
-func (m *mockUserRepoTracks) FindSimilarUsersBySpotifyTopArtistsFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string) ([]SimilarUserResult, error) {
+func (m *mockUserRepoTracks) FindSimilarUsersBySpotifyTopArtistsFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string, includeDetails bool) ([]SimilarUserResult, error) {
 	m.artistsCalled++
 	return nil, nil
 }
-func (m *mockUserRepoTracks) FindSimilarUsersBySpotifyTopTracks(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]SimilarUserResult, error) {
+func (m *mockUserRepoTracks) FindSimilarUsersBySpotifyTopTracks(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, includeDetails bool) ([]SimilarUserResult, error) {
 	m.tracksCalled++
 	return nil, nil
 }
-func (m *mockUserRepoTracks) FindSimilarUsersBySpotifyTopTracksFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string) ([]SimilarUserResult, error) {
+func (m *mockUserRepoTracks) FindSimilarUsersBySpotifyTopTracksFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string, includeDetails bool) ([]SimilarUserResult, error) {
 	m.tracksCalled++
 	return nil, nil
 }
@@ -45,7 +45,7 @@ func TestMatchingService_BasisTracksEnabled(t *testing.T) {
 	repo := &mockUserRepoTracks{user: &sqlc.User{ID: uuid.New(), Username: "bob"}}
 	ms := NewMatchingService(repo, NewMatchingEngine())
 	ctx := context.WithValue(context.Background(), MatchBasisContextKey{}, "tracks")
-	imp, err := ms.FindMusicMatches(ctx, generated.ArtistsRequest{}, "bob", "medium_term", 5)
+	imp, err := ms.FindMusicMatches(ctx, generated.ArtistsRequest{}, "bob", "medium_term", true, 5)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

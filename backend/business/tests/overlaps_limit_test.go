@@ -56,7 +56,7 @@ var _ = Describe("Overlaps Limit Behavior", func() {
 		// Non-overlapping user
 		_ = makeUserWithRanks("none_ov", []struct{ ID, Name string }{{"z1", "z1"}, {"z2", "z2"}})
 
-		fullResp, err := svc.FindMusicMatches(ctx, generated.ArtistsRequest{Artists: []string{"ignored"}}, anchor, "medium_term", 10, 0)
+		fullResp, err := svc.FindMusicMatches(ctx, generated.ArtistsRequest{Artists: []string{"ignored"}}, anchor, "medium_term", true, 10, 0)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fullResp.Code).To(Equal(200))
 		fullMatches, _ := fullResp.Body.([]*generated.MatchUser)
@@ -68,7 +68,7 @@ var _ = Describe("Overlaps Limit Behavior", func() {
 			Skip("need >=3 overlaps to test truncation")
 		}
 
-		limitedResp, err2 := svc.FindMusicMatches(ctx, generated.ArtistsRequest{Artists: []string{"ignored"}}, anchor, "medium_term", 10, 2)
+		limitedResp, err2 := svc.FindMusicMatches(ctx, generated.ArtistsRequest{Artists: []string{"ignored"}}, anchor, "medium_term", true, 10, 2)
 		Expect(err2).NotTo(HaveOccurred())
 		Expect(limitedResp.Code).To(Equal(200))
 		limitedMatches, _ := limitedResp.Body.([]*generated.MatchUser)

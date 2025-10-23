@@ -269,7 +269,7 @@ func (s *MatchingService) GetUserTopTracksPage(ctx context.Context, userID uuid.
 // FindMusicMatches implements music matching business logic
 // FindMusicMatches determines similar users based on Spotify top artists or tracks depending on the 'basis' value.
 // BACKWARD COMPAT: existing generated wrapper currently does not pass a basis param; we infer from artistsRequest.Basis if later added or default to "artists".
-func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest generated.ArtistsRequest, xUserUsername string, rng string, limit int32, overlapsLimit ...int32) (generated.ImplResponse, error) {
+func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest generated.ArtistsRequest, xUserUsername string, rng string, includeDetails bool, limit int32, overlapsLimit ...int32) (generated.ImplResponse, error) {
 	if xUserUsername == "" {
 		return generated.Response(http.StatusBadRequest, generated.ErrorResponse{Message: "username header is required"}), nil
 	}
@@ -331,6 +331,7 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 			nameFilter = strings.TrimSpace(s)
 		}
 	}
+	// includeDetails provided explicitly via service parameter per API contract
 
 	// Determine overlaps limit (optional variadic for backward compatibility in tests not yet updated)
 	var ovLimit int32 = 0
@@ -357,15 +358,15 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 	var similar []SimilarUserResult
 	if basis == "tracks" {
 		if nameFilter != "" {
-			similar, err = s.userRepo.FindSimilarUsersBySpotifyTopTracksFiltered(ctx, user.ID, rng, limit, nameFilter)
+			similar, err = s.userRepo.FindSimilarUsersBySpotifyTopTracksFiltered(ctx, user.ID, rng, limit, nameFilter, includeDetails)
 		} else {
-			similar, err = s.userRepo.FindSimilarUsersBySpotifyTopTracks(ctx, user.ID, rng, limit)
+			similar, err = s.userRepo.FindSimilarUsersBySpotifyTopTracks(ctx, user.ID, rng, limit, includeDetails)
 		}
 	} else {
 		if nameFilter != "" {
-			similar, err = s.userRepo.FindSimilarUsersBySpotifyTopArtistsFiltered(ctx, user.ID, rng, limit, nameFilter)
+			similar, err = s.userRepo.FindSimilarUsersBySpotifyTopArtistsFiltered(ctx, user.ID, rng, limit, nameFilter, includeDetails)
 		} else {
-			similar, err = s.userRepo.FindSimilarUsersBySpotifyTopArtists(ctx, user.ID, rng, limit)
+			similar, err = s.userRepo.FindSimilarUsersBySpotifyTopArtists(ctx, user.ID, rng, limit, includeDetails)
 		}
 	}
 	if err != nil {
@@ -381,8 +382,11 @@ func (s *MatchingService) FindMusicMatches(ctx context.Context, artistsRequest g
 		for _, ov := range sim.Overlaps {
 			artistNames = append(artistNames, ov.Name)
 		}
-		// Overlap count = number of shared artists
+		// Overlap count: prefer decoded overlaps length when available; otherwise fall back to DB overlap_count
 		overlapCount := int32(len(sim.Overlaps))
+		if overlapCount == 0 && sim.OverlapCount > 0 {
+			overlapCount = sim.OverlapCount
+		}
 		// Score normalization (revised): estimate upper bound of similarity for this particular overlap set.
 		// Original version used sum(1/(2*anchor_rank)) which underestimated the true max and could inflate norm>1.
 		// We now compute a per-overlap theoretical max using the best (smallest) rank between the two users; because

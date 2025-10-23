@@ -364,17 +364,17 @@ func (m *MockUserRepository) GetUserTopTracksByRange(ctx context.Context, userID
 }
 
 // FindSimilarUsersBySpotifyTopArtists mock returns empty slice (tests that need real data use real repo)
-func (m *MockUserRepository) FindSimilarUsersBySpotifyTopArtists(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]business.SimilarUserResult, error) {
+func (m *MockUserRepository) FindSimilarUsersBySpotifyTopArtists(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, includeDetails bool) ([]business.SimilarUserResult, error) {
 	return []business.SimilarUserResult{}, nil
 }
-func (m *MockUserRepository) FindSimilarUsersBySpotifyTopArtistsFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string) ([]business.SimilarUserResult, error) {
+func (m *MockUserRepository) FindSimilarUsersBySpotifyTopArtistsFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string, includeDetails bool) ([]business.SimilarUserResult, error) {
 	return []business.SimilarUserResult{}, nil
 }
 
 // FindSimilarUsersBySpotifyTopTracks mock returns empty slice
-func (m *MockUserRepository) FindSimilarUsersBySpotifyTopTracks(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]business.SimilarUserResult, error) {
+func (m *MockUserRepository) FindSimilarUsersBySpotifyTopTracks(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, includeDetails bool) ([]business.SimilarUserResult, error) {
 	return []business.SimilarUserResult{}, nil
 }
-func (m *MockUserRepository) FindSimilarUsersBySpotifyTopTracksFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string) ([]business.SimilarUserResult, error) {
+func (m *MockUserRepository) FindSimilarUsersBySpotifyTopTracksFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string, includeDetails bool) ([]business.SimilarUserResult, error) {
 	return []business.SimilarUserResult{}, nil
 }

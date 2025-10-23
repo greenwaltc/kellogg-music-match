@@ -62,10 +62,10 @@ type UserRepository interface {
 	GetUserTopTracksByRange(ctx context.Context, userID uuid.UUID, rng string, limit, offset int32) ([]SpotifyTopTrack, error)
 
 	// Spotify similarity operations
-	FindSimilarUsersBySpotifyTopArtists(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]SimilarUserResult, error)
-	FindSimilarUsersBySpotifyTopArtistsFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string) ([]SimilarUserResult, error)
-	FindSimilarUsersBySpotifyTopTracks(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]SimilarUserResult, error)
-	FindSimilarUsersBySpotifyTopTracksFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string) ([]SimilarUserResult, error)
+	FindSimilarUsersBySpotifyTopArtists(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, includeDetails bool) ([]SimilarUserResult, error)
+	FindSimilarUsersBySpotifyTopArtistsFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string, includeDetails bool) ([]SimilarUserResult, error)
+	FindSimilarUsersBySpotifyTopTracks(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, includeDetails bool) ([]SimilarUserResult, error)
+	FindSimilarUsersBySpotifyTopTracksFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string, includeDetails bool) ([]SimilarUserResult, error)
 
 	// Web Push subscription operations
 	UpsertPushSubscription(ctx context.Context, userID *uuid.UUID, endpoint, p256dh, auth, userAgent string) error
@@ -155,6 +155,7 @@ type SimilarUserResult struct {
 	Program        *string
 	GraduationYear *int32
 	Similarity     float64
+	OverlapCount   int32
 	Overlaps       []SpotifyArtistOverlap
 	TopArtists     []SimpleTopArtist
 	TopTracks      []SimpleTopTrack
@@ -786,7 +787,7 @@ func (r *PostgreSQLUserRepository) CountUserTopTracksByRange(ctx context.Context
 }
 
 // FindSimilarUsersBySpotifyTopArtists delegates to the sqlc-generated query and converts the JSON overlaps
-func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopArtists(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]SimilarUserResult, error) {
+func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopArtists(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, includeDetails bool) ([]SimilarUserResult, error) {
 	if rng == "" {
 		rng = "medium_term"
 	}
@@ -796,10 +797,11 @@ func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopArtists(ctx conte
 	// Load matching config to obtain per-user top N cap for ranks
 	cfg := config.Load()
 	rows, err := r.queries.FindTopNSimilarUsersBySpotifyArtists(ctx, sqlc.FindTopNSimilarUsersBySpotifyArtistsParams{
-		LimitN:       limit,
-		AnchorUserID: anchorUserID,
-		Range:        rng,
-		TopN:         int32(cfg.Matching.ArtistTopN),
+		LimitN:         limit,
+		AnchorUserID:   anchorUserID,
+		Range:          rng,
+		TopN:           int32(cfg.Matching.ArtistTopN),
+		IncludeDetails: includeDetails,
 	})
 	if err != nil {
 		return nil, err
@@ -807,10 +809,23 @@ func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopArtists(ctx conte
 	results := make([]SimilarUserResult, 0, len(rows))
 	for _, row := range rows {
 		var overlaps []SpotifyArtistOverlap
-		if len(row.OverlapsJson) > 0 {
-			if err := json.Unmarshal(row.OverlapsJson, &overlaps); err != nil {
-				// If decoding fails, continue but leave overlaps empty; log for debugging.
-				logger.L().Warn("failed to unmarshal overlaps_json", "userId", row.UserID.String(), "error", err)
+		if row.OverlapsJson != nil {
+			// Handle various driver return types ([]byte, string, structured values)
+			switch v := row.OverlapsJson.(type) {
+			case []byte:
+				if err := json.Unmarshal(v, &overlaps); err != nil {
+					logger.L().Warn("failed to unmarshal overlaps_json", "userId", row.UserID.String(), "error", err)
+				}
+			case string:
+				if err := json.Unmarshal([]byte(v), &overlaps); err != nil {
+					logger.L().Warn("failed to unmarshal overlaps_json", "userId", row.UserID.String(), "error", err)
+				}
+			default:
+				if b, err := json.Marshal(v); err == nil {
+					if err := json.Unmarshal(b, &overlaps); err != nil {
+						logger.L().Warn("failed to decode overlaps_json", "userId", row.UserID.String(), "error", err)
+					}
+				}
 			}
 		}
 		// Decode optional top artists array
@@ -844,6 +859,7 @@ func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopArtists(ctx conte
 			Program:        program,
 			GraduationYear: gradYear,
 			Similarity:     row.Similarity,
+			OverlapCount:   row.OverlapCount,
 			Overlaps:       overlaps,
 			TopArtists:     topArtists,
 		})
@@ -852,7 +868,7 @@ func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopArtists(ctx conte
 }
 
 // FindSimilarUsersBySpotifyTopArtistsFiltered adds a fuzzy name filter over other users.
-func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopArtistsFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string) ([]SimilarUserResult, error) {
+func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopArtistsFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string, includeDetails bool) ([]SimilarUserResult, error) {
 	if rng == "" {
 		rng = "medium_term"
 	}
@@ -861,11 +877,12 @@ func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopArtistsFiltered(c
 	}
 	cfg := config.Load()
 	rows, err := r.queries.FindTopNSimilarUsersBySpotifyArtistsFiltered(ctx, sqlc.FindTopNSimilarUsersBySpotifyArtistsFilteredParams{
-		LimitN:       limit,
-		AnchorUserID: anchorUserID,
-		Range:        rng,
-		TopN:         int32(cfg.Matching.ArtistTopN),
-		NameFilter:   pgtype.Text{String: nameFilter, Valid: nameFilter != ""},
+		LimitN:         limit,
+		AnchorUserID:   anchorUserID,
+		Range:          rng,
+		TopN:           int32(cfg.Matching.ArtistTopN),
+		NameFilter:     pgtype.Text{String: nameFilter, Valid: nameFilter != ""},
+		IncludeDetails: includeDetails,
 	})
 	if err != nil {
 		return nil, err
@@ -873,9 +890,16 @@ func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopArtistsFiltered(c
 	results := make([]SimilarUserResult, 0, len(rows))
 	for _, row := range rows {
 		var overlaps []SpotifyArtistOverlap
-		if len(row.OverlapsJson) > 0 {
-			if err := json.Unmarshal(row.OverlapsJson, &overlaps); err != nil {
-				logger.L().Warn("failed to unmarshal overlaps_json", "userId", row.UserID.String(), "error", err)
+		if row.OverlapsJson != nil {
+			switch v := row.OverlapsJson.(type) {
+			case []byte:
+				_ = json.Unmarshal(v, &overlaps)
+			case string:
+				_ = json.Unmarshal([]byte(v), &overlaps)
+			default:
+				if b, err := json.Marshal(v); err == nil {
+					_ = json.Unmarshal(b, &overlaps)
+				}
 			}
 		}
 		var topArtists []SimpleTopArtist
@@ -907,6 +931,7 @@ func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopArtistsFiltered(c
 			Program:        program,
 			GraduationYear: gradYear,
 			Similarity:     row.Similarity,
+			OverlapCount:   row.OverlapCount,
 			Overlaps:       overlaps,
 			TopArtists:     topArtists,
 		})
@@ -915,7 +940,7 @@ func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopArtistsFiltered(c
 }
 
 // FindSimilarUsersBySpotifyTopTracks delegates to the sqlc-generated track similarity query (feature-flag gated at higher layer)
-func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopTracks(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]SimilarUserResult, error) {
+func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopTracks(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, includeDetails bool) ([]SimilarUserResult, error) {
 	if rng == "" {
 		rng = "medium_term"
 	}
@@ -924,10 +949,11 @@ func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopTracks(ctx contex
 	}
 	cfg := config.Load()
 	rows, err := r.queries.FindTopNSimilarUsersBySpotifyTracks(ctx, sqlc.FindTopNSimilarUsersBySpotifyTracksParams{
-		LimitN:       limit,
-		AnchorUserID: anchorUserID,
-		Range:        rng,
-		TopN:         int32(cfg.Matching.TrackTopN),
+		LimitN:         limit,
+		AnchorUserID:   anchorUserID,
+		Range:          rng,
+		TopN:           int32(cfg.Matching.TrackTopN),
+		IncludeDetails: includeDetails,
 	})
 	if err != nil {
 		return nil, err
@@ -936,9 +962,22 @@ func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopTracks(ctx contex
 	for _, row := range rows {
 		// Reuse SpotifyArtistOverlap struct for now; semantic rename later if differentiating
 		var overlaps []SpotifyArtistOverlap
-		if len(row.OverlapsJson) > 0 {
-			if err := json.Unmarshal(row.OverlapsJson, &overlaps); err != nil {
-				logger.L().Warn("failed to unmarshal track overlaps_json", "userId", row.UserID.String(), "error", err)
+		if row.OverlapsJson != nil {
+			switch v := row.OverlapsJson.(type) {
+			case []byte:
+				if err := json.Unmarshal(v, &overlaps); err != nil {
+					logger.L().Warn("failed to unmarshal track overlaps_json", "userId", row.UserID.String(), "error", err)
+				}
+			case string:
+				if err := json.Unmarshal([]byte(v), &overlaps); err != nil {
+					logger.L().Warn("failed to unmarshal track overlaps_json", "userId", row.UserID.String(), "error", err)
+				}
+			default:
+				if b, err := json.Marshal(v); err == nil {
+					if err := json.Unmarshal(b, &overlaps); err != nil {
+						logger.L().Warn("failed to decode track overlaps_json", "userId", row.UserID.String(), "error", err)
+					}
+				}
 			}
 		}
 		var topTracks []SimpleTopTrack
@@ -970,6 +1009,7 @@ func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopTracks(ctx contex
 			Program:        program,
 			GraduationYear: gradYear,
 			Similarity:     row.Similarity,
+			OverlapCount:   row.OverlapCount,
 			Overlaps:       overlaps,
 			TopTracks:      topTracks,
 		})
@@ -978,7 +1018,7 @@ func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopTracks(ctx contex
 }
 
 // FindSimilarUsersBySpotifyTopTracksFiltered adds a fuzzy name filter over other users.
-func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopTracksFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string) ([]SimilarUserResult, error) {
+func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopTracksFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string, includeDetails bool) ([]SimilarUserResult, error) {
 	if rng == "" {
 		rng = "medium_term"
 	}
@@ -987,11 +1027,12 @@ func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopTracksFiltered(ct
 	}
 	cfg := config.Load()
 	rows, err := r.queries.FindTopNSimilarUsersBySpotifyTracksFiltered(ctx, sqlc.FindTopNSimilarUsersBySpotifyTracksFilteredParams{
-		LimitN:       limit,
-		AnchorUserID: anchorUserID,
-		Range:        rng,
-		TopN:         int32(cfg.Matching.TrackTopN),
-		NameFilter:   pgtype.Text{String: nameFilter, Valid: nameFilter != ""},
+		LimitN:         limit,
+		AnchorUserID:   anchorUserID,
+		Range:          rng,
+		TopN:           int32(cfg.Matching.TrackTopN),
+		NameFilter:     pgtype.Text{String: nameFilter, Valid: nameFilter != ""},
+		IncludeDetails: includeDetails,
 	})
 	if err != nil {
 		return nil, err
@@ -999,9 +1040,16 @@ func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopTracksFiltered(ct
 	results := make([]SimilarUserResult, 0, len(rows))
 	for _, row := range rows {
 		var overlaps []SpotifyArtistOverlap
-		if len(row.OverlapsJson) > 0 {
-			if err := json.Unmarshal(row.OverlapsJson, &overlaps); err != nil {
-				logger.L().Warn("failed to unmarshal track overlaps_json", "userId", row.UserID.String(), "error", err)
+		if row.OverlapsJson != nil {
+			switch v := row.OverlapsJson.(type) {
+			case []byte:
+				_ = json.Unmarshal(v, &overlaps)
+			case string:
+				_ = json.Unmarshal([]byte(v), &overlaps)
+			default:
+				if b, err := json.Marshal(v); err == nil {
+					_ = json.Unmarshal(b, &overlaps)
+				}
 			}
 		}
 		var topTracks []SimpleTopTrack
@@ -1033,6 +1081,7 @@ func (r *PostgreSQLUserRepository) FindSimilarUsersBySpotifyTopTracksFiltered(ct
 			Program:        program,
 			GraduationYear: gradYear,
 			Similarity:     row.Similarity,
+			OverlapCount:   row.OverlapCount,
 			Overlaps:       overlaps,
 			TopTracks:      topTracks,
 		})

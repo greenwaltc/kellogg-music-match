@@ -130,12 +130,12 @@ func (m *EnhancedMockUserRepository) GetSpotifyTokensByUser(ctx context.Context,
 }
 
 // Similarity method stub
-func (m *EnhancedMockUserRepository) FindSimilarUsersBySpotifyTopArtists(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]business.SimilarUserResult, error) {
+func (m *EnhancedMockUserRepository) FindSimilarUsersBySpotifyTopArtists(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, includeDetails bool) ([]business.SimilarUserResult, error) {
 	return []business.SimilarUserResult{}, nil
 }
 
 // Track similarity stub to satisfy interface in tests
-func (m *EnhancedMockUserRepository) FindSimilarUsersBySpotifyTopTracks(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]business.SimilarUserResult, error) {
+func (m *EnhancedMockUserRepository) FindSimilarUsersBySpotifyTopTracks(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, includeDetails bool) ([]business.SimilarUserResult, error) {
 	return []business.SimilarUserResult{}, nil
 }
 

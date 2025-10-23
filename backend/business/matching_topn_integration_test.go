@@ -65,7 +65,7 @@ func TestTopNArtistsFilter(t *testing.T) {
 	}
 
 	// Query similar users for u1
-	results, err := repo.FindSimilarUsersBySpotifyTopArtists(ctx, u1, rng, 10)
+	results, err := repo.FindSimilarUsersBySpotifyTopArtists(ctx, u1, rng, 10, true)
 	if err != nil {
 		t.Fatalf("FindSimilarUsersBySpotifyTopArtists: %v", err)
 	}
@@ -144,7 +144,7 @@ func TestTopNTracksFilter(t *testing.T) {
 		t.Fatalf("store u2 tracks: %v", err)
 	}
 
-	results, err := repo.FindSimilarUsersBySpotifyTopTracks(ctx, u1, rng, 10)
+	results, err := repo.FindSimilarUsersBySpotifyTopTracks(ctx, u1, rng, 10, true)
 	if err != nil {
 		t.Fatalf("FindSimilarUsersBySpotifyTopTracks: %v", err)
 	}

@@ -26,22 +26,22 @@ func (m *mockUserRepoBasis) GetUserByUsername(ctx context.Context, username stri
 	}
 	return m.user, nil
 }
-func (m *mockUserRepoBasis) FindSimilarUsersBySpotifyTopArtists(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]SimilarUserResult, error) {
+func (m *mockUserRepoBasis) FindSimilarUsersBySpotifyTopArtists(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, includeDetails bool) ([]SimilarUserResult, error) {
 	m.artistsCalled++
 	return m.artistResults, nil
 }
-func (m *mockUserRepoBasis) FindSimilarUsersBySpotifyTopArtistsFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string) ([]SimilarUserResult, error) {
+func (m *mockUserRepoBasis) FindSimilarUsersBySpotifyTopArtistsFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string, includeDetails bool) ([]SimilarUserResult, error) {
 	m.artistsCalled++
 	return m.artistResults, nil
 }
-func (m *mockUserRepoBasis) FindSimilarUsersBySpotifyTopTracks(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32) ([]SimilarUserResult, error) {
+func (m *mockUserRepoBasis) FindSimilarUsersBySpotifyTopTracks(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, includeDetails bool) ([]SimilarUserResult, error) {
 	m.tracksCalled++
 	if m.tracksErr != nil {
 		return nil, m.tracksErr
 	}
 	return m.tracksResults, nil
 }
-func (m *mockUserRepoBasis) FindSimilarUsersBySpotifyTopTracksFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string) ([]SimilarUserResult, error) {
+func (m *mockUserRepoBasis) FindSimilarUsersBySpotifyTopTracksFiltered(ctx context.Context, anchorUserID uuid.UUID, rng string, limit int32, nameFilter string, includeDetails bool) ([]SimilarUserResult, error) {
 	m.tracksCalled++
 	if m.tracksErr != nil {
 		return nil, m.tracksErr
@@ -52,7 +52,7 @@ func (m *mockUserRepoBasis) FindSimilarUsersBySpotifyTopTracksFiltered(ctx conte
 func TestMatchingService_BasisArtistsDefault(t *testing.T) {
 	repo := &mockUserRepoBasis{user: &sqlc.User{ID: uuid.New(), Username: "alice"}}
 	ms := NewMatchingService(repo, NewMatchingEngine())
-	resp, err := ms.FindMusicMatches(context.Background(), generated.ArtistsRequest{}, "alice", "medium_term", 5)
+	resp, err := ms.FindMusicMatches(context.Background(), generated.ArtistsRequest{}, "alice", "medium_term", true, 5)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -67,7 +67,7 @@ func TestMatchingService_BasisTracksFlagDisabled(t *testing.T) {
 	ms := NewMatchingService(repo, NewMatchingEngine())
 	ctx := context.WithValue(context.Background(), MatchBasisContextKey{}, "tracks")
 	// Feature flag currently default false, expect 400 status
-	imp, err := ms.FindMusicMatches(ctx, generated.ArtistsRequest{}, "alice", "medium_term", 5)
+	imp, err := ms.FindMusicMatches(ctx, generated.ArtistsRequest{}, "alice", "medium_term", true, 5)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

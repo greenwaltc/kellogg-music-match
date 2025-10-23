@@ -82,7 +82,7 @@ var _ = Describe("Music Matching System", func() {
 			// Use the Tool+Radiohead user to find the reverse user who has the exact same set
 			response, err := matchingService.FindMusicMatches(ctx, generated.ArtistsRequest{
 				Artists: []string{"Tool", "Radiohead"},
-			}, testUsers["tool_radiohead_user"].Username, "medium_term", 10)
+			}, testUsers["tool_radiohead_user"].Username, "medium_term", true, 10)
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(response.Code).To(Equal(200))
@@ -116,7 +116,7 @@ var _ = Describe("Music Matching System", func() {
 			// User with just Tool looking at user with Tool + Radiohead
 			response, err := matchingService.FindMusicMatches(ctx, generated.ArtistsRequest{
 				Artists: []string{"Tool"},
-			}, testUsers["tool_user"].Username, "medium_term", 10)
+			}, testUsers["tool_user"].Username, "medium_term", true, 10)
 
 			Expect(err).NotTo(HaveOccurred())
 			matches, ok := response.Body.([]*generated.MatchUser)
@@ -147,7 +147,7 @@ var _ = Describe("Music Matching System", func() {
 			// Tool user looking for matches
 			response, err := matchingService.FindMusicMatches(ctx, generated.ArtistsRequest{
 				Artists: []string{"Tool"},
-			}, testUsers["tool_user"].Username, "medium_term", 10)
+			}, testUsers["tool_user"].Username, "medium_term", true, 10)
 
 			Expect(err).NotTo(HaveOccurred())
 			matches, ok := response.Body.([]*generated.MatchUser)
@@ -174,12 +174,12 @@ var _ = Describe("Music Matching System", func() {
 
 	Context("when handling edge cases", func() {
 		It("returns 200 even with empty or arbitrary artist list (ignored in Spotify mode)", func() {
-			response, err := matchingService.FindMusicMatches(ctx, generated.ArtistsRequest{Artists: []string{}}, testUsers["tool_user"].Username, "medium_term", 10, 0)
+			response, err := matchingService.FindMusicMatches(ctx, generated.ArtistsRequest{Artists: []string{}}, testUsers["tool_user"].Username, "medium_term", true, 10, 0)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(response.Code).To(Equal(200))
 		})
 		It("returns 404 for non-existent user", func() {
-			response, err := matchingService.FindMusicMatches(ctx, generated.ArtistsRequest{Artists: []string{"Tool"}}, "non_existent_user", "medium_term", 10, 0)
+			response, err := matchingService.FindMusicMatches(ctx, generated.ArtistsRequest{Artists: []string{"Tool"}}, "non_existent_user", "medium_term", true, 10, 0)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(response.Code).To(Equal(404))
 		})
