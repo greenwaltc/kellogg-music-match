@@ -1,21 +1,21 @@
 {
   "project_info": {
-    "project_number": "685625601437",
-    "project_id": "kellogg-music-match-96ab1",
-    "storage_bucket": "kellogg-music-match-96ab1.firebasestorage.app"
+    "project_number": "314972185759",
+    "project_id": "affyne-25cbc",
+    "storage_bucket": "affyne-25cbc.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:685625601437:android:e5675e2908af5522445374",
+        "mobilesdk_app_id": "1:314972185759:android:aeb5c2b071ca30e2e8eeaa",
         "android_client_info": {
-          "package_name": "com.greenwalt.kmm"
+          "package_name": "com.affyne.app"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyA9CFG6mbVJJOhJmKnBF6LLv6NzGuPgJQQ"
+          "current_key": "AIzaSyDJob-aFuX76NsM0TCZuHKCca_trksgyec"
         }
       ],
       "services": {

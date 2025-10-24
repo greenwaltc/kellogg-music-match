@@ -1,6 +1,6 @@
-# Kellogg Music Match - Production Deployment Guide
+# Affyne - Production Deployment Guide
 
-This guide covers deploying the Kellogg Music Match application to production Kubernetes clusters with enhanced security, monitoring, and scalability considerations.
+This guide covers deploying the Affyne application to production Kubernetes clusters with enhanced security, monitoring, and scalability considerations.
 
 ## 🚀 Production Deployment Checklist
 
@@ -147,7 +147,7 @@ kubectl get ingress -n kellogg-music-match-prod
 # Test health endpoints
 curl https://music-match.kellogg.northwestern.edu/health
 
-# Test user registration with Kellogg profile
+# Test user registration with Affyne profile
 curl -X POST https://music-match.kellogg.northwestern.edu/register \
   -H "Content-Type: application/json" \
   -d '{"username":"test","email":"test@kellogg.northwestern.edu","password":"Test123!","firstName":"Test","lastName":"User","program":"2Y","graduationYear":2026}'

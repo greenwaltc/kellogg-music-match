@@ -57,11 +57,15 @@ class MatchingService {
       'basis': basis,
       'includeDetails': includeDetails ? 'true' : 'false',
     };
-    if (userName != null && userName.trim().isNotEmpty)
+    if (userName != null && userName.trim().isNotEmpty) {
       qp['userName'] = userName.trim();
-    if (limit != null && limit > 0) qp['limit'] = '$limit';
-    if (overlapsLimit != null && overlapsLimit > 0)
+    }
+    if (limit != null && limit > 0) {
+      qp['limit'] = '$limit';
+    }
+    if (overlapsLimit != null && overlapsLimit > 0) {
       qp['overlapsLimit'] = '$overlapsLimit';
+    }
 
     final path = Uri(path: '/findMusicMatches', queryParameters: qp).toString();
     final resp = await _api.postJsonAny(path, {

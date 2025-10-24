@@ -14,7 +14,7 @@ describe('ConcertInterestService', () => {
   let httpMock: HttpTestingController;
 
   beforeEach(() => {
-    localStorage.setItem('kmm_token', 'header.' + btoa(JSON.stringify({ username: 'alice' })) + '.sig');
+    localStorage.setItem('affyne_token', 'header.' + btoa(JSON.stringify({ username: 'alice' })) + '.sig');
 
     TestBed.configureTestingModule({
       imports: [HttpClientTestingModule],
@@ -30,7 +30,7 @@ describe('ConcertInterestService', () => {
 
   afterEach(() => {
     httpMock.verify();
-    localStorage.removeItem('kmm_token');
+    localStorage.removeItem('affyne_token');
   });
 
   it('should POST set interest with body only (auth handled by interceptor)', () => {
@@ -51,7 +51,7 @@ describe('ConcertInterestService', () => {
   });
 
   it('should still send request even if token missing (API will 401)', () => {
-    localStorage.removeItem('kmm_token');
+    localStorage.removeItem('affyne_token');
     service.setInterest('evt3', 'INTERESTED').subscribe({
       error: () => {}
     });

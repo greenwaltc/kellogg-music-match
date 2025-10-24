@@ -183,8 +183,8 @@ vim backend/some-file.go
 make k3s-build-import
 
 # 3. Check deployment
-kubectl rollout restart deployment/backend -n kmm
-kubectl get pods -n kmm
+kubectl rollout restart deployment/backend -n affyne
+kubectl get pods -n affyne
 
 # 4. Test changes
 curl http://localhost:8080/health
@@ -199,7 +199,7 @@ make k3s-registry
 # Daily workflow
 make docker-build
 make k3s-push
-kubectl rollout restart deployment/backend -n kmm
+kubectl rollout restart deployment/backend -n affyne
 ```
 
 ## 🐛 **Troubleshooting**
@@ -232,10 +232,10 @@ sudo chown $USER:$USER ~/.kube/config
 ### **Pod ImagePullBackOff**
 ```bash
 # Check pod events
-kubectl describe pod <pod-name> -n kmm
+kubectl describe pod <pod-name> -n affyne
 
 # Common fixes:
-kubectl patch deployment <deployment> -n kmm -p '{"spec":{"template":{"spec":{"containers":[{"name":"<container>","imagePullPolicy":"Never"}]}}}}'
+kubectl patch deployment <deployment> -n affyne -p '{"spec":{"template":{"spec":{"containers":[{"name":"<container>","imagePullPolicy":"Never"}]}}}}'
 ```
 
 ## 🎯 **Best Practices**
@@ -274,7 +274,7 @@ kubectl patch deployment <deployment> -n kmm -p '{"spec":{"template":{"spec":{"c
 
 ```bash
 # Complete development cycle
-make k3s-build-import && kubectl rollout restart deployment/backend -n kmm
+make k3s-build-import && kubectl rollout restart deployment/backend -n affyne
 
 # Check everything is working
 make k3s-status

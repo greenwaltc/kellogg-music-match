@@ -53,8 +53,8 @@ export class MatchService {
     // Initialize readiness per current user only; do not carry across users
     const u = this.auth.user();
     if (u?.username) {
-      const key = `kmmSpotifyReady:${u.username}`;
-      const tsKey = `kmmSpotifyReadyTs:${u.username}`;
+      const key = `affyneSpotifyReady:${u.username}`;
+      const tsKey = `affyneSpotifyReadyTs:${u.username}`;
       const storedReady = localStorage.getItem(key);
       if (storedReady === 'true') {
         this.spotifyReady.set(true);
@@ -67,7 +67,7 @@ export class MatchService {
       // Also query backend status to ensure robustness
       this.refreshReadyFromBackend();
     }
-    const storedBasis = localStorage.getItem('kmmMatchBasis');
+    const storedBasis = localStorage.getItem('affyneMatchBasis');
     if (storedBasis === 'tracks' || storedBasis === 'artists') {
       this.basis.set(storedBasis as 'artists'|'tracks');
     }
@@ -119,8 +119,8 @@ export class MatchService {
       if (this.matches() || !currentUser) return;
 
     // Refresh readiness from per-user storage in case user changed
-    const key = `kmmSpotifyReady:${currentUser.username}`;
-    const tsKey = `kmmSpotifyReadyTs:${currentUser.username}`;
+    const key = `affyneSpotifyReady:${currentUser.username}`;
+    const tsKey = `affyneSpotifyReadyTs:${currentUser.username}`;
     const storedReady = localStorage.getItem(key) === 'true';
     if (this.spotifyReady() !== storedReady) {
       this.spotifyReady.set(storedReady);
@@ -161,7 +161,7 @@ export class MatchService {
           this.toast.show('Track-based matching is not enabled yet. Showing artist matches instead.', { type: 'info' });
           // auto-fallback to artists to stop spamming disabled endpoint
           this.basis.set('artists');
-          localStorage.setItem('kmmMatchBasis','artists');
+          localStorage.setItem('affyneMatchBasis','artists');
           this.loading.set(false);
           // retry once with artists
           queueMicrotask(()=> this.fetch('medium_term', 50, this.overlapsLimit, true));
@@ -229,7 +229,7 @@ export class MatchService {
         if (this.basis()==='tracks' && err?.error?.message === 'track-based matching disabled') {
           this.toast.show('Track-based matching is not enabled yet. Reverting to artist matches.', { type: 'info' });
           this.basis.set('artists');
-            localStorage.setItem('kmmMatchBasis','artists');
+            localStorage.setItem('affyneMatchBasis','artists');
             this.loading.set(false);
             queueMicrotask(()=> this.fetch(range, limit, overlapsLimit, forceFresh));
             return;
@@ -261,8 +261,8 @@ export class MatchService {
     this.readyTimestamp = Date.now();
     const u = this.auth.user();
     if (u?.username) {
-      localStorage.setItem(`kmmSpotifyReady:${u.username}`, 'true');
-      localStorage.setItem(`kmmSpotifyReadyTs:${u.username}`, this.readyTimestamp.toString());
+      localStorage.setItem(`affyneSpotifyReady:${u.username}`, 'true');
+      localStorage.setItem(`affyneSpotifyReadyTs:${u.username}`, this.readyTimestamp.toString());
     }
     // Clear any stale pre-spotify matches
     this.clear();
@@ -280,8 +280,8 @@ export class MatchService {
           if (!this.spotifyReady()) {
             this.spotifyReady.set(true);
             this.readyTimestamp = Date.now();
-            localStorage.setItem(`kmmSpotifyReady:${u.username}`, 'true');
-            localStorage.setItem(`kmmSpotifyReadyTs:${u.username}`, this.readyTimestamp.toString());
+            localStorage.setItem(`affyneSpotifyReady:${u.username}`, 'true');
+            localStorage.setItem(`affyneSpotifyReadyTs:${u.username}`, this.readyTimestamp.toString());
             // Now that we're ready, trigger a fetch
             queueMicrotask(() => this.fetch('medium_term', 50, this.overlapsLimit, true));
           }
@@ -304,7 +304,7 @@ export class MatchService {
   setBasis(b: 'artists'|'tracks') {
     if (this.basis() === b) return;
     this.basis.set(b);
-    localStorage.setItem('kmmMatchBasis', b);
+    localStorage.setItem('affyneMatchBasis', b);
     // Attempt fetch for current default range if not cached
     const defaultRange: 'short_term'|'medium_term'|'long_term' = 'medium_term';
     if (!this.basisHistory[b]?.[defaultRange]) {

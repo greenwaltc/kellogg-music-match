@@ -195,7 +195,7 @@ func Load() *Config {
 		},
 		CORS: CORSConfig{
 			AllowedOrigins: strings.Split(
-				getEnvWithDefault("CORS_ALLOWED_ORIGINS", "http://localhost:4200,http://kmm-ui.traefik.me"),
+				getEnvWithDefault("CORS_ALLOWED_ORIGINS", "http://localhost:4200,http://affyne-ui.traefik.me"),
 				",",
 			),
 			AllowedMethods:   getEnvWithDefault("CORS_ALLOWED_METHODS", "GET, POST, PUT, DELETE, OPTIONS"),
@@ -241,7 +241,7 @@ func Load() *Config {
 			Enabled:        getEnvBoolWithDefault("TRACING_ENABLED", true),
 			Exporter:       getEnvWithDefault("TRACING_EXPORTER", "otlp"),
 			OTLPEndpoint:   getEnvWithDefault("OTEL_EXPORTER_OTLP_ENDPOINT", ""),
-			ServiceName:    getEnvWithDefault("OTEL_SERVICE_NAME", "kmm-backend"),
+			ServiceName:    getEnvWithDefault("OTEL_SERVICE_NAME", "affyne-backend"),
 			ServiceVersion: getEnvWithDefault("OTEL_SERVICE_VERSION", "1.0.0"),
 		},
 		JWT: JWTConfig{
@@ -254,7 +254,7 @@ func Load() *Config {
 			Provider:  getEnvWithDefault("EMAIL_PROVIDER", "sendgrid"),
 			APIKey:    getEnvWithDefault("SENDGRID_API_KEY", ""),
 			FromEmail: getEnvWithDefault("EMAIL_FROM_EMAIL", "noreply@kellogg-music-match.com"),
-			FromName:  getEnvWithDefault("EMAIL_FROM_NAME", "Kellogg Music Match"),
+			FromName:  getEnvWithDefault("EMAIL_FROM_NAME", "Affyne"),
 			SMTPHost:  getEnvWithDefault("SMTP_HOST", ""),
 			SMTPPort:  getEnvWithDefault("SMTP_PORT", "587"),
 			SMTPUser:  getEnvWithDefault("SMTP_USER", ""),

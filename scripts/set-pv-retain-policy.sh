@@ -8,7 +8,7 @@ set -e
 echo "🔒 Setting PostgreSQL persistent volume reclaim policy to 'Retain'..."
 
 # Get the PV name for the postgres PVC
-PV_NAME=$(kubectl get pvc postgres-storage-postgres-0 -n kmm -o jsonpath='{.spec.volumeName}' 2>/dev/null || echo "")
+PV_NAME=$(kubectl get pvc postgres-storage-postgres-0 -n affyne -o jsonpath='{.spec.volumeName}' 2>/dev/null || echo "")
 
 if [ -z "$PV_NAME" ]; then
     echo "❌ Error: PostgreSQL PVC not found. Make sure your Pulumi deployment is running."

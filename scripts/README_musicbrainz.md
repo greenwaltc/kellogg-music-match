@@ -91,7 +91,7 @@ The included sample files (`musicbrainz_artists_1k.*`) contain 1000 artists incl
 - No API key required for basic queries
 - Data is under Creative Commons license
 
-## Integration with Kellogg Music Match
+## Integration with Affyne
 
 This artist data can be used to:
 

@@ -41,13 +41,13 @@ warn() {
 }
 
 # Check if running in Kubernetes environment
-if [ -z "$DATABASE_URL" ] && kubectl get pods -n kmm >/dev/null 2>&1; then
+if [ -z "$DATABASE_URL" ] && kubectl get pods -n affyne >/dev/null 2>&1; then
     log "Detected Kubernetes environment"
     KUBERNETES_MODE=true
-    POSTGRES_POD=$(kubectl get pods -n kmm -l app=postgres -o jsonpath='{.items[0].metadata.name}')
+    POSTGRES_POD=$(kubectl get pods -n affyne -l app=postgres -o jsonpath='{.items[0].metadata.name}')
     
     if [ -z "$POSTGRES_POD" ]; then
-        error "No PostgreSQL pod found in kmm namespace"
+        error "No PostgreSQL pod found in affyne namespace"
         exit 1
     fi
     
@@ -74,7 +74,7 @@ log "Found $TOTAL_ARTISTS artists in CSV file"
 # Function to execute SQL in Kubernetes
 exec_k8s_sql() {
     local sql="$1"
-    kubectl exec -n kmm "$POSTGRES_POD" -- psql -U postgres -d postgres -c "$sql"
+    kubectl exec -n affyne "$POSTGRES_POD" -- psql -U postgres -d postgres -c "$sql"
 }
 
 # Function to execute SQL with local DATABASE_URL
@@ -86,10 +86,10 @@ exec_local_sql() {
 # Function to copy CSV data in Kubernetes
 copy_k8s_csv() {
     log "Copying CSV file to PostgreSQL pod..."
-    kubectl cp "$PROJECT_ROOT/$CSV_FILE" "kmm/$POSTGRES_POD:/tmp/musicbrainz_artists.csv"
+    kubectl cp "$PROJECT_ROOT/$CSV_FILE" "affyne/$POSTGRES_POD:/tmp/musicbrainz_artists.csv"
     
     log "Loading data using COPY command..."
-    kubectl exec -n kmm "$POSTGRES_POD" -- psql -U postgres -d postgres -c "
+    kubectl exec -n affyne "$POSTGRES_POD" -- psql -U postgres -d postgres -c "
         CREATE TEMP TABLE temp_musicbrainz_load (
             musicbrainz_id TEXT,
             name TEXT,
@@ -141,7 +141,7 @@ copy_k8s_csv() {
     "
     
     log "Cleaning up temporary file..."
-    kubectl exec -n kmm "$POSTGRES_POD" -- rm -f /tmp/musicbrainz_artists.csv
+    kubectl exec -n affyne "$POSTGRES_POD" -- rm -f /tmp/musicbrainz_artists.csv
 }
 
 # Main execution

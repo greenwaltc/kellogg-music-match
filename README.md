@@ -1,4 +1,4 @@
-# 🎵 Kellogg Music Match
+# 🎵 Affyne
 
 A professional full-stack music taste matching application for Kellogg students. It features a Go backend, Angular frontend, PostgreSQL database, real-time concert discovery, and a **rank-weighted overlap similarity engine** with Spotify time‑range awareness. (The original scientific PWO distance PostgreSQL function is still available for historical/analytical comparison but is no longer used for live match scoring.)
 
@@ -231,7 +231,7 @@ make db-clean              # Clean database schema
 make create-migration name=add_feature  # Create new Flyway migration file
 
 # Direct database access
-docker exec -it kmm-postgres psql -U kellogg_user -d kellogg_music_match
+docker exec -it affyne-postgres psql -U kellogg_user -d kellogg_music_match
 
 # View logs
 docker-compose logs backend

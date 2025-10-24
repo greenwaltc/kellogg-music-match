@@ -7,8 +7,7 @@ import 'package:ui_flutter/services/matching_service.dart';
 import 'package:ui_flutter/pages/matches_page.dart';
 
 class TestMatchingService extends MatchingService {
-  TestMatchingService(ApiClient api, SharedPreferences prefs)
-    : super(api, prefs);
+  TestMatchingService(super.api, super.prefs);
 
   @override
   Future<List<dynamic>> fetchMatches({

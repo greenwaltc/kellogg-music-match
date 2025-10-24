@@ -294,8 +294,8 @@ func sendWebPush(subJSON []byte, cfg *config.Config) error {
 	}
 	payload, _ := json.Marshal(map[string]interface{}{
 		"notification": map[string]interface{}{
-			"title": "Kellogg Music Match",
-			"body":  "Hello from KMM!",
+			"title": "Affyne",
+			"body":  "Hello from Affyne!",
 			"icon":  "/assets/icons/icon-192x192.png",
 			"badge": "/assets/icons/badge-72x72.png",
 			"data": map[string]interface{}{

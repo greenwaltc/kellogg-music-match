@@ -3,7 +3,7 @@
 # This script copies CSV data into the pod and loads it via COPY command
 
 CSV_FILE="$1"
-NAMESPACE="kmm"
+NAMESPACE="affyne"
 POD_NAME="postgres-0"
 
 if [ -z "$CSV_FILE" ]; then

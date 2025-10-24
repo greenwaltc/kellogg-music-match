@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # PostgreSQL Database Restore Script for k3s
-# This script restores a backup of the Kellogg Music Match database
+# This script restores a backup of the Affyne database
 
 set -e
 
 # Configuration
-NAMESPACE="kmm"
+NAMESPACE="affyne"
 POD_NAME="postgres-0"
 DB_NAME="kellogg_music_match"
 DB_USER="kellogg_user"
@@ -19,7 +19,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${GREEN}🔄 Kellogg Music Match Database Restore${NC}"
+echo -e "${GREEN}🔄 Affyne Database Restore${NC}"
 echo "========================================"
 
 # Check if backup file is provided
@@ -90,7 +90,7 @@ fi
 
 # Stop any applications that might be using the database
 echo -e "${YELLOW}🛑 Scaling down backend deployment...${NC}"
-kubectl scale deployment -n ${NAMESPACE} kmm-backend --replicas=0
+kubectl scale deployment -n ${NAMESPACE} affyne-backend --replicas=0
 
 # Wait for backend pods to terminate
 echo -e "${YELLOW}⏳ Waiting for backend pods to terminate...${NC}"
@@ -120,7 +120,7 @@ if [ $? -eq 0 ]; then
     
     # Scale backend deployment back up
     echo -e "${YELLOW}🔄 Scaling backend deployment back up...${NC}"
-    kubectl scale deployment -n ${NAMESPACE} kmm-backend --replicas=2
+    kubectl scale deployment -n ${NAMESPACE} affyne-backend --replicas=2
     
     # Wait for backend pods to be ready
     echo -e "${YELLOW}⏳ Waiting for backend pods to be ready...${NC}"
@@ -133,7 +133,7 @@ else
     
     # Scale backend deployment back up even if restore failed
     echo -e "${YELLOW}🔄 Scaling backend deployment back up...${NC}"
-    kubectl scale deployment -n ${NAMESPACE} kmm-backend --replicas=2
+    kubectl scale deployment -n ${NAMESPACE} affyne-backend --replicas=2
     
     exit 1
 fi

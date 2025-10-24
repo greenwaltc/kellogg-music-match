@@ -247,7 +247,7 @@ func NewEnqueueTestHandler(_ PushRepo, notifier business.PushNotifier, cfg *conf
 
 		// Build a tiny test notification; business layer wraps into SW-compatible envelope
 		n := business.WebPushNotification{
-			Title:              "Kellogg Music Match",
+			Title:              "Affyne",
 			Body:               "Async test notification queued",
 			Icon:               "/assets/icons/icon-192x192.png",
 			Badge:              "/assets/icons/badge-72x72.png",

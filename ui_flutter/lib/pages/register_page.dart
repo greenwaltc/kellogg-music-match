@@ -66,14 +66,25 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _showConfirm = false;
 
   double _estimateEntropy(String s) {
-    if (s.isEmpty) return 0;
+    if (s.isEmpty) {
+      return 0;
+    }
     int pool = 0;
-    if (RegExp(r'[a-z]').hasMatch(s)) pool += 26;
-    if (RegExp(r'[A-Z]').hasMatch(s)) pool += 26;
-    if (RegExp(r'[0-9]').hasMatch(s)) pool += 10;
-    if (RegExp(r'[^A-Za-z0-9]').hasMatch(s))
+    if (RegExp(r'[a-z]').hasMatch(s)) {
+      pool += 26;
+    }
+    if (RegExp(r'[A-Z]').hasMatch(s)) {
+      pool += 26;
+    }
+    if (RegExp(r'[0-9]').hasMatch(s)) {
+      pool += 10;
+    }
+    if (RegExp(r'[^A-Za-z0-9]').hasMatch(s)) {
       pool += 33; // approx printable symbols
-    if (pool == 0) return 0;
+    }
+    if (pool == 0) {
+      return 0;
+    }
     // entropy ≈ length * log2(pool)
     final entropy = s.length * (math.log(pool) / math.log(2));
     return entropy;
@@ -198,11 +209,13 @@ class _RegisterPageState extends State<RegisterPage> {
                       controller: _username,
                       decoration: const InputDecoration(labelText: 'Username'),
                       validator: (v) {
-                        if (v == null || v.trim().isEmpty)
+                        if (v == null || v.trim().isEmpty) {
                           return 'Username required';
+                        }
                         final msgs = _fieldErrors['username'];
-                        if (msgs != null && msgs.isNotEmpty)
+                        if (msgs != null && msgs.isNotEmpty) {
                           return msgs.join('; ');
+                        }
                         return null;
                       },
                     ),
@@ -216,8 +229,9 @@ class _RegisterPageState extends State<RegisterPage> {
                         if (val.isEmpty) return 'Email required';
                         if (!val.contains('@')) return 'Invalid email';
                         final msgs = _fieldErrors['email'];
-                        if (msgs != null && msgs.isNotEmpty)
+                        if (msgs != null && msgs.isNotEmpty) {
                           return msgs.join('; ');
+                        }
                         return null;
                       },
                     ),
@@ -231,11 +245,13 @@ class _RegisterPageState extends State<RegisterPage> {
                               labelText: 'First name',
                             ),
                             validator: (v) {
-                              if (v == null || v.trim().isEmpty)
+                              if (v == null || v.trim().isEmpty) {
                                 return 'First name required';
+                              }
                               final msgs = _fieldErrors['firstName'];
-                              if (msgs != null && msgs.isNotEmpty)
+                              if (msgs != null && msgs.isNotEmpty) {
                                 return msgs.join('; ');
+                              }
                               return null;
                             },
                           ),
@@ -248,11 +264,13 @@ class _RegisterPageState extends State<RegisterPage> {
                               labelText: 'Last name',
                             ),
                             validator: (v) {
-                              if (v == null || v.trim().isEmpty)
+                              if (v == null || v.trim().isEmpty) {
                                 return 'Last name required';
+                              }
                               final msgs = _fieldErrors['lastName'];
-                              if (msgs != null && msgs.isNotEmpty)
+                              if (msgs != null && msgs.isNotEmpty) {
                                 return msgs.join('; ');
+                              }
                               return null;
                             },
                           ),
@@ -279,17 +297,22 @@ class _RegisterPageState extends State<RegisterPage> {
                       validator: (v) {
                         final val = v ?? '';
                         if (val.isEmpty) return 'Password required';
-                        if (val.length < 8)
+                        if (val.length < 8) {
                           return 'Must be at least 8 characters';
-                        if (!RegExp(r'[A-Z]').hasMatch(val))
+                        }
+                        if (!RegExp(r'[A-Z]').hasMatch(val)) {
                           return 'Must contain an uppercase letter';
-                        if (!RegExp(r'[a-z]').hasMatch(val))
+                        }
+                        if (!RegExp(r'[a-z]').hasMatch(val)) {
                           return 'Must contain a lowercase letter';
-                        if (!RegExp(r'[0-9]').hasMatch(val))
+                        }
+                        if (!RegExp(r'[0-9]').hasMatch(val)) {
                           return 'Must contain a digit';
+                        }
                         final msgs = _fieldErrors['password'];
-                        if (msgs != null && msgs.isNotEmpty)
+                        if (msgs != null && msgs.isNotEmpty) {
                           return msgs.join('; ');
+                        }
                         return null;
                       },
                     ),
@@ -345,11 +368,13 @@ class _RegisterPageState extends State<RegisterPage> {
                       validator: (v) {
                         final val = v ?? '';
                         if (val.isEmpty) return 'Please re-enter your password';
-                        if (val != _password.text)
+                        if (val != _password.text) {
                           return 'Passwords do not match';
+                        }
                         final msgs = _fieldErrors['confirmPassword'];
-                        if (msgs != null && msgs.isNotEmpty)
+                        if (msgs != null && msgs.isNotEmpty) {
                           return msgs.join('; ');
+                        }
                         return null;
                       },
                     ),
@@ -415,11 +440,13 @@ class _RegisterPageState extends State<RegisterPage> {
                             validator: (v) {
                               final val = int.tryParse(v?.trim() ?? '');
                               if (val == null) return 'Enter a valid year';
-                              if (val < 2024 || val > 2035)
+                              if (val < 2024 || val > 2035) {
                                 return 'Enter a reasonable year';
+                              }
                               final msgs = _fieldErrors['graduationYear'];
-                              if (msgs != null && msgs.isNotEmpty)
+                              if (msgs != null && msgs.isNotEmpty) {
                                 return msgs.join('; ');
+                              }
                               return null;
                             },
                           ),

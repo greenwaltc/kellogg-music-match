@@ -3,7 +3,7 @@ import { NavStateService } from './nav-state.service';
 
 function withFreshStorage<T>(fn: () => T): T {
   const backup = new Map<string,string|null>();
-  const keys = ['kmmVisitedMatches','kmmVisitedEvents'];
+  const keys = ['affyneVisitedMatches','affyneVisitedEvents'];
   for (const k of keys) backup.set(k, localStorage.getItem(k));
   try {
     keys.forEach(k => localStorage.removeItem(k));
@@ -23,12 +23,12 @@ describe('NavStateService', () => {
     expect(svc.visitedEvents()).toBeFalse();
     svc.markMatchesVisited();
     svc.markEventsVisited();
-    expect(localStorage.getItem('kmmVisitedMatches')).toBe('true');
-    expect(localStorage.getItem('kmmVisitedEvents')).toBe('true');
+    expect(localStorage.getItem('affyneVisitedMatches')).toBe('true');
+    expect(localStorage.getItem('affyneVisitedEvents')).toBe('true');
   }));
 
   it('initializes from localStorage', () => withFreshStorage(() => {
-    localStorage.setItem('kmmVisitedMatches','true');
+    localStorage.setItem('affyneVisitedMatches','true');
     const svc = TestBed.inject(NavStateService);
     expect(svc.visitedMatches()).toBeTrue();
   }));

@@ -47,7 +47,7 @@ export interface MessageResponse {
   message: string;
 }
 
-const STORAGE_KEY = 'kmm_user';
+const STORAGE_KEY = 'affyne_user';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -82,7 +82,7 @@ export class AuthService {
           this.user.set(res.user);
           localStorage.setItem(STORAGE_KEY, JSON.stringify(res.user));
           if (res.token) {
-            localStorage.setItem('kmm_token', res.token);
+            localStorage.setItem('affyne_token', res.token);
           }
           this.loading.set(false);
           // Reset visited flags for fresh session after login
@@ -105,7 +105,7 @@ export class AuthService {
           this.user.set(res.user);
           localStorage.setItem(STORAGE_KEY, JSON.stringify(res.user));
           if (res.token) {
-            localStorage.setItem('kmm_token', res.token);
+            localStorage.setItem('affyne_token', res.token);
           }
           this.loading.set(false);
           // Reset visited flags for fresh session after registration
@@ -132,14 +132,14 @@ export class AuthService {
     const u = this.user();
     this.user.set(null);
     localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem('kmm_token');
+    localStorage.removeItem('affyne_token');
     // Clean up any per-user Spotify readiness keys for the prior user and legacy globals
     if (u?.username) {
-      localStorage.removeItem(`kmmSpotifyReady:${u.username}`);
-      localStorage.removeItem(`kmmSpotifyReadyTs:${u.username}`);
+      localStorage.removeItem(`affyneSpotifyReady:${u.username}`);
+      localStorage.removeItem(`affyneSpotifyReadyTs:${u.username}`);
     }
-    localStorage.removeItem('kmmSpotifyReady');
-    localStorage.removeItem('kmmSpotifyReadyTs');
+    localStorage.removeItem('affyneSpotifyReady');
+    localStorage.removeItem('affyneSpotifyReadyTs');
     // Also reset visited flags
     this.nav.resetVisited();
   }

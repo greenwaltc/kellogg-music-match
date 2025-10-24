@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # PostgreSQL Database Backup Script for k3s
-# This script creates a backup of the Kellogg Music Match database
+# This script creates a backup of the Affyne database
 
 set -e
 
 # Configuration
-NAMESPACE="kmm"
+NAMESPACE="affyne"
 POD_NAME="postgres-0"
 DB_NAME="kellogg_music_match"
 DB_USER="kellogg_user"
@@ -20,7 +20,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-echo -e "${GREEN}🗄️  Kellogg Music Match Database Backup${NC}"
+echo -e "${GREEN}🗄️  Affyne Database Backup${NC}"
 echo "========================================"
 
 # Check if kubectl is available

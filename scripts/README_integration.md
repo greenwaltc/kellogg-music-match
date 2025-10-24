@@ -46,7 +46,7 @@ The migration is already applied, but for new deployments:
 cd backend && flyway migrate
 
 # Via direct SQL (development)
-kubectl exec -i postgres-0 -n kmm -- psql -U kellogg_user -d kellogg_music_match < backend/db/schema/migrations/V011__musicbrainz_artists.sql
+kubectl exec -i postgres-0 -n affyne -- psql -U kellogg_user -d kellogg_music_match < backend/db/schema/migrations/V011__musicbrainz_artists.sql
 ```
 
 ### 3. Load Artists into Database
@@ -56,7 +56,7 @@ kubectl exec -i postgres-0 -n kmm -- psql -U kellogg_user -d kellogg_music_match
 ./scripts/load_artists_k8s.sh artists_10k.csv
 
 # Using Python script (requires port-forward)
-kubectl port-forward -n kmm svc/postgres 5432:5432 &
+kubectl port-forward -n affyne svc/postgres 5432:5432 &
 python3 scripts/load_musicbrainz_artists.py artists_10k.csv
 ```
 
@@ -214,7 +214,7 @@ spec:
           name: musicbrainz-artist-data
 ```
 
-## 🎵 Benefits for Kellogg Music Match
+## 🎵 Benefits for Affyne
 
 1. **Improved Matching**: Better artist normalization and disambiguation
 2. **Enhanced UX**: Auto-complete with popular artists first

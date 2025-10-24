@@ -332,7 +332,7 @@ export class MatchesComponent implements OnInit, OnDestroy {
       const ov = parseInt(qOv, 10);
       if (!isNaN(ov) && ov > 0) this.overlapsLimit = ov;
     }
-    const stored = localStorage.getItem('kmmMatchLimit');
+    const stored = localStorage.getItem('affyneMatchLimit');
     if (stored) {
       const num = parseInt(stored, 10);
       if (this.limitOptions.includes(num)) {
@@ -343,19 +343,19 @@ export class MatchesComponent implements OnInit, OnDestroy {
         }
       }
     }
-    const storedDb = localStorage.getItem('kmmMatchLimitDebounceMs');
-    if (storedDb) { /* legacy: clear deprecated key */ localStorage.removeItem('kmmMatchLimitDebounceMs'); }
-    const storedOv = localStorage.getItem('kmmOverlapsLimit');
+    const storedDb = localStorage.getItem('affyneMatchLimitDebounceMs');
+    if (storedDb) { /* legacy: clear deprecated key */ localStorage.removeItem('affyneMatchLimitDebounceMs'); }
+    const storedOv = localStorage.getItem('affyneOverlapsLimit');
     if (storedOv) {
       const ov = parseInt(storedOv, 10);
       if (!isNaN(ov) && ov > 0) this.overlapsLimit = ov;
     }
-    const storedRange = localStorage.getItem('kmmMatchRange');
+    const storedRange = localStorage.getItem('affyneMatchRange');
     if (storedRange === 'short_term' || storedRange === 'medium_term' || storedRange === 'long_term') {
       this.range = storedRange;
     }
     const qName = urlParams.get('userName');
-    const storedName = localStorage.getItem('kmmMatchNameFilter');
+    const storedName = localStorage.getItem('affyneMatchNameFilter');
     const initName = (qName ?? storedName ?? '').trim();
     if (initName) {
       this.nameFilter = initName;
@@ -378,7 +378,7 @@ export class MatchesComponent implements OnInit, OnDestroy {
     const prev = this.range;
     this.range = r;
     this.armRateLimitReverter('range', prev);
-    localStorage.setItem('kmmMatchRange', r);
+    localStorage.setItem('affyneMatchRange', r);
     if (this.matches.loading()) {
       // defer until loading ends
       const wait = setInterval(() => {
@@ -408,7 +408,7 @@ export class MatchesComponent implements OnInit, OnDestroy {
     this.refetch(false);
   }
   onLimitChange() {
-    localStorage.setItem('kmmMatchLimit', this.limit.toString());
+    localStorage.setItem('affyneMatchLimit', this.limit.toString());
     this.updateUrlState();
     this.refetch();
   }
@@ -417,18 +417,18 @@ export class MatchesComponent implements OnInit, OnDestroy {
     this.overlapsLimit = null;
     this.nameFilter = '';
     this.matches.setNameFilter(null);
-    localStorage.setItem('kmmMatchLimit', this.limit.toString());
-    localStorage.removeItem('kmmOverlapsLimit');
-    localStorage.removeItem('kmmMatchNameFilter');
+    localStorage.setItem('affyneMatchLimit', this.limit.toString());
+    localStorage.removeItem('affyneOverlapsLimit');
+    localStorage.removeItem('affyneMatchNameFilter');
     this.updateUrlState();
     this.refetch();
   }
   onOverlapsLimitChange() {
     if (this.overlapsLimit !== null && this.overlapsLimit <= 0) this.overlapsLimit = 5;
     if (this.overlapsLimit !== null) {
-      localStorage.setItem('kmmOverlapsLimit', this.overlapsLimit.toString());
+      localStorage.setItem('affyneOverlapsLimit', this.overlapsLimit.toString());
     } else {
-      localStorage.removeItem('kmmOverlapsLimit');
+      localStorage.removeItem('affyneOverlapsLimit');
     }
     this.updateUrlState();
     this.refetch();
@@ -440,9 +440,9 @@ export class MatchesComponent implements OnInit, OnDestroy {
     this.nameDebounce = setTimeout(() => {
       this.matches.setNameFilter(trimmed);
       if (trimmed) {
-        localStorage.setItem('kmmMatchNameFilter', trimmed);
+        localStorage.setItem('affyneMatchNameFilter', trimmed);
       } else {
-        localStorage.removeItem('kmmMatchNameFilter');
+        localStorage.removeItem('affyneMatchNameFilter');
       }
       this.updateUrlState();
       this.refetch(true);

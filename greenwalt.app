@@ -102,7 +102,7 @@ server {
 
 }
 
-# Kellogg Music Match Server - kmm.greenwalt.app
+# Affyne Server - affyne.greenwalt.app
 server {
     # Nginx versions prior to 1.25
     listen 443 ssl http2;
@@ -136,7 +136,7 @@ server {
     allow 131.0.72.0/22;
 
     deny all;
-    server_name kmm.greenwalt.app;
+    server_name affyne.greenwalt.app;
     limit_rate 2m; # limits to 2MB/s or 16Mbps
 
     ## The default `client_max_body_size` is 1M, this might not be enough for some requests
@@ -163,9 +163,9 @@ server {
 
     # API routes - proxy to backend and strip /api prefix
     location /api/ {
-        # Proxy Kellogg Music Match API traffic to Kubernetes backend NodePort
+        # Proxy Affyne API traffic to Kubernetes backend NodePort
         proxy_pass https://192.168.1.163:31771/;
-        proxy_set_header Host kmm-backend.traefik.me;
+        proxy_set_header Host affyne-backend.traefik.me;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
@@ -188,9 +188,9 @@ server {
 
     # All other routes - proxy to UI
     location / {
-        # Proxy Kellogg Music Match UI traffic to Kubernetes NodePort
+        # Proxy Affyne UI traffic to Kubernetes NodePort
         proxy_pass https://192.168.1.163:31771;
-        proxy_set_header Host kmm-ui.traefik.me;
+        proxy_set_header Host affyne-ui.traefik.me;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
@@ -210,7 +210,7 @@ server {
     # WebSocket support for any real-time features
     location /ws {
         proxy_pass https://192.168.1.163:31771;
-        proxy_set_header Host kmm-ui.traefik.me;
+        proxy_set_header Host affyne-ui.traefik.me;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -264,7 +264,7 @@ server {
     deny all;
  
     # HTTP to HTTPS redirect for all domains  
-    server_name greenwalt.app jellyfin.greenwalt.app kmm.greenwalt.app;
+    server_name greenwalt.app jellyfin.greenwalt.app affyne.greenwalt.app;
     limit_rate 2m; # limits to 2MB/s or 16Mbps
     return 301 https://$host$request_uri;
 }

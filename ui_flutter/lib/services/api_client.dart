@@ -220,15 +220,21 @@ class ApiClient {
     String? bearerToken,
   }) async {
     final payload = <String, dynamic>{'platform': platform, 'token': token};
-    if (bundleId != null && bundleId.isNotEmpty) payload['bundleId'] = bundleId;
-    if (appPackage != null && appPackage.isNotEmpty)
+    if (bundleId != null && bundleId.isNotEmpty) {
+      payload['bundleId'] = bundleId;
+    }
+    if (appPackage != null && appPackage.isNotEmpty) {
       payload['appPackage'] = appPackage;
-    if (deviceModel != null && deviceModel.isNotEmpty)
+    }
+    if (deviceModel != null && deviceModel.isNotEmpty) {
       payload['deviceModel'] = deviceModel;
-    if (osVersion != null && osVersion.isNotEmpty)
+    }
+    if (osVersion != null && osVersion.isNotEmpty) {
       payload['osVersion'] = osVersion;
-    if (appVersion != null && appVersion.isNotEmpty)
+    }
+    if (appVersion != null && appVersion.isNotEmpty) {
       payload['appVersion'] = appVersion;
+    }
     await postJson('/push/device/register', payload, bearerToken: bearerToken);
   }
 

@@ -46,7 +46,7 @@ pulumi up
 ### Step 3: Verify Deployment
 ```bash
 # Check if artists were loaded
-kubectl exec -n kmm deployment/kmm-backend -- curl -s http://localhost:8080/health
+kubectl exec -n affyne deployment/affyne-backend -- curl -s http://localhost:8080/health
 ```
 
 ## 📊 What Gets Loaded

@@ -3,7 +3,7 @@ import { HttpInterceptorFn } from '@angular/common/http';
 
 export const jwtInterceptor: HttpInterceptorFn = (req, next) => {
   // Get the token from localStorage
-  const token = localStorage.getItem('kmm_token');
+  const token = localStorage.getItem('affyne_token');
   
   // Don't add token to login/register requests
   const isAuthRequest = req.url.includes('/login') || req.url.includes('/register');

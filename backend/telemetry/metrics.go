@@ -10,16 +10,16 @@ import (
 
 var (
 	RequestDuration = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{Namespace: "kmm", Name: "http_request_duration_seconds", Help: "HTTP request latency"},
+		prometheus.HistogramOpts{Namespace: "affyne", Name: "http_request_duration_seconds", Help: "HTTP request latency"},
 		[]string{"method", "path", "status"},
 	)
 	RequestCounter = prometheus.NewCounterVec(
-		prometheus.CounterOpts{Namespace: "kmm", Name: "http_requests_total", Help: "Total HTTP requests"},
+		prometheus.CounterOpts{Namespace: "affyne", Name: "http_requests_total", Help: "Total HTTP requests"},
 		[]string{"method", "path", "status"},
 	)
-	SyncEventsCounter = prometheus.NewCounter(prometheus.CounterOpts{Namespace: "kmm", Name: "sync_events_total", Help: "Total events processed in sync"})
+	SyncEventsCounter = prometheus.NewCounter(prometheus.CounterOpts{Namespace: "affyne", Name: "sync_events_total", Help: "Total events processed in sync"})
 	SyncCycleCounter  = prometheus.NewCounterVec(
-		prometheus.CounterOpts{Namespace: "kmm", Name: "sync_cycles_total", Help: "Sync cycles"},
+		prometheus.CounterOpts{Namespace: "affyne", Name: "sync_cycles_total", Help: "Sync cycles"},
 		[]string{"result"},
 	)
 )

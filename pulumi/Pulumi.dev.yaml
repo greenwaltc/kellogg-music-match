@@ -1,4 +1,4 @@
-# Stack configuration for the 'dev' stack of Kellogg Music Match
+# Stack configuration for the 'dev' stack of Affyne
 # Copy/rename for other stacks (e.g., Pulumi.prod.yaml) and adjust values.
 # IMPORTANT: Do NOT commit real secrets in plain text. For any key listed in the
 # 'SECRETS' section below, run: pulumi config set <key> <value> --secret
@@ -35,7 +35,7 @@ config:
   # ---------------------------------------------------------------------------
   # CORS
   # ---------------------------------------------------------------------------
-  kellogg-music-match:corsAllowedOrigins: "http://localhost:4200,http://kmm-ui.traefik.me,https://kmm-ui.traefik.me"
+  kellogg-music-match:corsAllowedOrigins: "http://localhost:4200,http://affyne-ui.traefik.me,https://affyne-ui.traefik.me"
   kellogg-music-match:corsAllowedMethods: "GET, POST, PUT, DELETE, OPTIONS"
   kellogg-music-match:corsAllowedHeaders: "Content-Type, Authorization, X-User-Username"
   kellogg-music-match:corsAllowCredentials: "true"
@@ -69,7 +69,7 @@ config:
   kellogg-music-match:emailEnabled: "true"
   kellogg-music-match:emailProvider: "sendgrid" # or smtp
   kellogg-music-match:emailFromEmail: "support@kelloggmatch.com"
-  kellogg-music-match:emailFromName: "Kellogg Music Match"
+  kellogg-music-match:emailFromName: "Affyne"
   kellogg-music-match:appBaseUrl: "https://kelloggmatch.com"
   # (sendgridApiKey removed – set via: pulumi config set --secret kellogg-music-match:sendgridApiKey <value>)
   # SMTP fallback (used if provider=smtp)
@@ -128,7 +128,7 @@ config:
   kellogg-music-match:tracingEnabled: "true"
   kellogg-music-match:tracingExporter: "otlp" # stdout|otlp
   kellogg-music-match:otlpEndpoint: "http://otel-collector:4318"
-  kellogg-music-match:otelServiceName: "kmm-backend"
+  kellogg-music-match:otelServiceName: "affyne-backend"
   kellogg-music-match:otelServiceVersion: "1.0.0"
   kellogg-music-match:otelResourceAttributes: "environment=dev,team=matching"
   kellogg-music-match:otelTracesSampler: "parentbased_traceidratio"

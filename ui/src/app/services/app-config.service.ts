@@ -19,7 +19,7 @@ export class AppConfigService {
         const cached = await caches.match(CONFIG_URL, { ignoreSearch: true });
         if (cached) {
           this.config = await cached.json();
-          try { (window as any).__kmmConfig = this.config; } catch {}
+          try { (window as any).__affyneConfig = this.config; } catch {}
           // Refresh later, only when online, and bypass SW
           this.whenOnline(() => this.refreshInBackground());
           return;
@@ -31,7 +31,7 @@ export class AppConfigService {
 
     // No cache on cold start: use safe defaults and hydrate later only when online
     this.config = { featureFlags: {}, vapidPublicKey: '' };
-    try { (window as any).__kmmConfig = this.config; } catch {}
+    try { (window as any).__affyneConfig = this.config; } catch {}
     this.whenOnline(() => this.hydrateFromNetwork());
   }
 
@@ -44,7 +44,7 @@ export class AppConfigService {
       const res = await fetch(BYPASS_URL, { cache: 'no-store' });
       if (!res.ok) return;
       this.config = await res.json();
-      try { (window as any).__kmmConfig = this.config; } catch {}
+      try { (window as any).__affyneConfig = this.config; } catch {}
     } catch {}
   }
 
@@ -54,7 +54,7 @@ export class AppConfigService {
       if (res.ok) {
         const fresh = await res.json();
         this.config = fresh;
-        try { (window as any).__kmmConfig = this.config; } catch {}
+        try { (window as any).__affyneConfig = this.config; } catch {}
       }
     } catch {}
   }

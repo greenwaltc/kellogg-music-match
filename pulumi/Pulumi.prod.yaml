@@ -1,4 +1,4 @@
-# Production stack baseline configuration for Kellogg Music Match
+# Production stack baseline configuration for Affyne
 # Hardened defaults. All secrets MUST be set via `pulumi config set --secret`.
 # This file contains only non-sensitive defaults plus placeholder markers.
 # Namespace: uses same program name; adjust if you deploy multiple environments.
@@ -21,7 +21,7 @@ config:
   kellogg-music-match:dbName: "kellogg_music_match"
   kellogg-music-match:dbSSLMode: "disable" # Enforce TLS in prod
   # If using a managed DB provide a full URL (omit if using discrete vars)
-  # kellogg-music-match:databaseUrl: "postgres://kmm_app:REDACTED@db-host:5432/kellogg_music_match?sslmode=require"
+  # kellogg-music-match:databaseUrl: "postgres://affyne_app:REDACTED@db-host:5432/kellogg_music_match?sslmode=require"
 
   # ---------------------------------------------------------------------------
   # Persistent Volume Claim
@@ -66,7 +66,7 @@ config:
   kellogg-music-match:emailEnabled: "true"
   kellogg-music-match:emailProvider: "sendgrid"
   kellogg-music-match:emailFromEmail: "support@kelloggmatch.com"
-  kellogg-music-match:emailFromName: "Kellogg Music Match"
+  kellogg-music-match:emailFromName: "Affyne"
   kellogg-music-match:appBaseUrl: "https://app.kelloggmatch.com"
   # (sendgridApiKey removed – set via: pulumi config set --secret kellogg-music-match:sendgridApiKey <value>)
   kellogg-music-match:smtpHost: "smtp.sendgrid.net" # If using SMTP fallback
@@ -120,7 +120,7 @@ config:
   kellogg-music-match:tracingEnabled: "true"
   kellogg-music-match:tracingExporter: "otlp"
   kellogg-music-match:otlpEndpoint: "http://otel-collector:4318" # Internal service name
-  kellogg-music-match:otelServiceName: "kmm-backend"
+  kellogg-music-match:otelServiceName: "affyne-backend"
   kellogg-music-match:otelServiceVersion: "1.0.0"
   kellogg-music-match:otelResourceAttributes: "environment=prod,team=matching"
   kellogg-music-match:otelTracesSampler: "parentbased_traceidratio"

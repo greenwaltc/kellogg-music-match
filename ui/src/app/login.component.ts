@@ -28,7 +28,7 @@ interface LoginFormShape {
   template: `
   <section class="auth-section">
     <div class="page-header">
-      <h1>Kellogg Music Match</h1>
+      <h1>Affyne</h1>
       <p class="tagline">Connect with classmates who share your music taste.</p>
     </div>
     

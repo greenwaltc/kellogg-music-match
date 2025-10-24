@@ -8,7 +8,7 @@
 PRODUCT_NAME = ui_flutter
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.greenwalt.kmm
+PRODUCT_BUNDLE_IDENTIFIER = com.affyne.app
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2025 com.example. All rights reserved.

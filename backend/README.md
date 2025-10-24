@@ -13,7 +13,7 @@ Endpoints:
 
 Note: in-memory store is for local development only; replace with DB storage for production.
 
-# Kellogg Music Match Backend
+# Affyne Backend
 
 A Go backend server featuring PostgreSQL + SQLC, OpenAPI-generated transport layer, a rank‑weighted overlap music similarity engine with Spotify time‑range support, Chicago Events (Ticketmaster) integration, in‑memory similarity caching, and comprehensive behavioral + normalization testing.
 
@@ -30,7 +30,7 @@ A Go backend server featuring PostgreSQL + SQLC, OpenAPI-generated transport lay
   - **`TESTING.md`** - Behavioral testing documentation
 - **`cmd/`** - Application entry point and service wrappers
 - **`db/`** - Enhanced database layer with consolidated schema and SQLC integration
-  - **`schema/001_initial.sql`** - Consolidated PostgreSQL schema with Kellogg-specific fields
+  - **`schema/001_initial.sql`** - Consolidated PostgreSQL schema with Affyne-specific fields
   - **`queries/queries.sql`** - SQLC query definitions with type safety optimizations
   - **`sqlc/`** - Generated type-safe Go code from consolidated schema
 - **`openapi.yaml`** - API specification

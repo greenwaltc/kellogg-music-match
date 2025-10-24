@@ -37,7 +37,7 @@ echo -e "${GREEN}✅ SendGrid API key found${NC}"
 export EMAIL_ENABLED=true
 export EMAIL_PROVIDER=sendgrid
 export EMAIL_FROM_EMAIL=${EMAIL_FROM_EMAIL:-"noreply@kellogg-music-match.com"}
-export EMAIL_FROM_NAME=${EMAIL_FROM_NAME:-"Kellogg Music Match"}
+export EMAIL_FROM_NAME=${EMAIL_FROM_NAME:-"Affyne"}
 export APP_BASE_URL=${APP_BASE_URL:-"http://localhost:4200"}
 
 echo ""

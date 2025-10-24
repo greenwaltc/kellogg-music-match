@@ -44,7 +44,7 @@ EXTERNAL_IMAGES=(
     "flyway/flyway:10-alpine"  # Pin Flyway version used by init container
 )
 
-NAMESPACE="kmm"
+NAMESPACE="affyne"
 
 # Function to import a single image
 import_image() {

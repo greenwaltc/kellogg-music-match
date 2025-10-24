@@ -1,6 +1,6 @@
-# Kellogg Music Match - Kubernetes Deployment
+# Affyne - Kubernetes Deployment
 
-This Pulumi program deploys the Kellogg Music Match application to a Kubernetes cluster with consolidated database schema, enhanced Kellogg student features, and scientific similarity calculations.
+This Pulumi program deploys the Affyne application to a Kubernetes cluster with consolidated database schema, enhanced Kellogg student features, and scientific similarity calculations.
 
 ## Prerequisites
 

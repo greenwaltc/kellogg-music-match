@@ -1,8 +1,8 @@
-# 🗄️ Database Schema Documentation - Kellogg Music Match
+# 🗄️ Database Schema Documentation - Affyne
 
 ## Overview
 
-The Kellogg Music Match application uses **PostgreSQL 16** with Flyway migrations for professional database versioning. The database features a comprehensive migration system with PWO (Position-Weighted Overlap) distance function for scientifically accurate music taste matching between Kellogg students, integrated with **47,452 MusicBrainz artist records** for enhanced matching accuracy.
+The Affyne application uses **PostgreSQL 16** with Flyway migrations for professional database versioning. The database features a comprehensive migration system with PWO (Position-Weighted Overlap) distance function for scientifically accurate music taste matching between Kellogg students, integrated with **47,452 MusicBrainz artist records** for enhanced matching accuracy.
 
 ## 🏗️ Schema Architecture
 

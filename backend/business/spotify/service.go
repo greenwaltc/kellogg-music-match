@@ -353,7 +353,7 @@ func (s *Service) ExchangeCodeForTokens(ctx context.Context, code string, codeVe
 }
 
 // ExchangeCodeForTokensWithRedirect performs the authorization code exchange using an explicit redirect URI.
-// This supports mobile clients that use a custom scheme (e.g., kmm://spotify/callback) while allowing the
+// This supports mobile clients that use a custom scheme (e.g., affyne://spotify/callback) while allowing the
 // server default redirect to remain configured for web flows.
 func (s *Service) ExchangeCodeForTokensWithRedirect(ctx context.Context, code string, codeVerifier string, redirectURI string) (string, string, int, error) {
 	if s.clientID == "" || s.clientSecret == "" || redirectURI == "" {

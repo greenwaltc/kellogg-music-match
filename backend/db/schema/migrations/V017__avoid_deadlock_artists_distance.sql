@@ -1,7 +1,7 @@
 
 -- Guard to disable neighbor invalidation during tests to avoid deadlocks
 -- Uses a custom GUC (session variable). In production this is off by default.
-DO $$ BEGIN PERFORM set_config('kmm.testing_mode', current_setting('kmm.testing_mode', true), true); EXCEPTION WHEN others THEN NULL; END $$;
+DO $$ BEGIN PERFORM set_config('affyne.testing_mode', current_setting('affyne.testing_mode', true), true); EXCEPTION WHEN others THEN NULL; END $$;
 
 CREATE OR REPLACE FUNCTION invalidate_artist_neighbors()
 RETURNS TRIGGER AS $$
@@ -9,7 +9,7 @@ DECLARE
   testing boolean;
 BEGIN
   BEGIN
-    testing := current_setting('kmm.testing_mode') = 'on';
+    testing := current_setting('affyne.testing_mode') = 'on';
   EXCEPTION WHEN others THEN
     testing := false;
   END;

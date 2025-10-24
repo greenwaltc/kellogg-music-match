@@ -149,7 +149,7 @@ type UserRepository interface {
 ## UI & UX
 ### Toggle Design
 - Segmented control (Artists | Tracks) above range controls.
-- Persist selection in `localStorage (kmmMatchBasis)`.
+- Persist selection in `localStorage (affyneMatchBasis)`.
 - Show skeleton only on first fetch for a basis+range.
 
 ### Label Changes

@@ -377,7 +377,7 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
   // Flag to know initial request in-flight for skeletons
   get showInitialSkeletons(): boolean { return this.isLoading && !this.firstLoadCompleted && this.events.length === 0; }
   private firstLoadCompleted = false;
-  private readonly SEARCH_STORAGE_KEY = 'kmm_chi_events_search';
+  private readonly SEARCH_STORAGE_KEY = 'affyne_chi_events_search';
   @ViewChild('searchBox') searchInput!: ElementRef<HTMLInputElement>;
   @ViewChildren('eventCard') eventCardElems!: QueryList<ElementRef<HTMLElement>>;
   private io?: IntersectionObserver;
@@ -399,12 +399,12 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
   
   // New filter flag
   onlyWithInterest = false;
-  private ANY_INTEREST_STORAGE_KEY = 'kmm_chi_any_interest';
+  private ANY_INTEREST_STORAGE_KEY = 'affyne_chi_any_interest';
   // New: Only my top artists filter + Top N
   onlyMyTopArtists = false;
   topNArtists = 200;
-  private ONLY_TOP_STORAGE_KEY = 'kmm_chi_only_top_artists';
-  private TOPN_STORAGE_KEY = 'kmm_chi_top_n_artists';
+  private ONLY_TOP_STORAGE_KEY = 'affyne_chi_only_top_artists';
+  private TOPN_STORAGE_KEY = 'affyne_chi_top_n_artists';
   // Observer scroll throttling
   private ioPaused = false;
   private scrollLastY = 0;
@@ -417,7 +417,7 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
   // IntersectionObserver for determining when top content is off-screen
   private scrollTopObserver?: IntersectionObserver;
   // Session scroll restoration
-  private readonly SCROLL_POS_KEY = 'kmm_chi_scrollY';
+  private readonly SCROLL_POS_KEY = 'affyne_chi_scrollY';
   private sessionRestoreScrollY: number | null = null;
   private lastPersistScrollTime = 0;
   // Scroll history stack & UI state for previous position toggle
@@ -450,7 +450,7 @@ export class ChicagoEventsComponent implements OnInit, OnDestroy, AfterViewInit 
   private longPressTimer: any;
   private longPressActivated = false;
   private readonly LONG_PRESS_THRESHOLD = 450; // ms
-  private readonly SCROLL_HISTORY_KEY = 'kmm_chi_scroll_history';
+  private readonly SCROLL_HISTORY_KEY = 'affyne_chi_scroll_history';
   private lastHistoryPushTime = 0; // performance.now() timestamp of last accepted history entry
 
   constructor(private http: HttpClient, private interest: ConcertInterestService, private auth: AuthService, private spotifyService: SpotifyService, private api: ApiBaseService) {

@@ -1,4 +1,4 @@
--- Schema for Kellogg Music Match application
+-- Schema for Affyne application
 -- PostgreSQL database schema
 -- 
 -- This directory (backend/db/schema/) is the SINGLE SOURCE OF TRUTH for database schema

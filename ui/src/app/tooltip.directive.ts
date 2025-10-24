@@ -24,11 +24,11 @@ export class TooltipDirective implements OnInit, OnDestroy {
     if (!TooltipDirective.styleInjected) {
       const style = document.createElement('style');
       style.textContent = `
-        .kmm-tooltip { position: fixed; z-index: 9999; background:#1e2530; color:#fff; padding:.45rem .6rem; font-size:.65rem; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,.25); line-height:1.25; pointer-events:none; opacity:0; transform:translateY(-4px); transition:opacity .12s ease, transform .12s ease; }
-        .kmm-tooltip.visible { opacity:1; transform:translateY(0); }
-        .kmm-tooltip[data-pos='top']::after, .kmm-tooltip[data-pos='bottom']::after { content:""; position:absolute; left:18px; border:6px solid transparent; }
-        .kmm-tooltip[data-pos='top']::after { bottom:-12px; border-top-color:#1e2530; }
-        .kmm-tooltip[data-pos='bottom']::after { top:-12px; border-bottom-color:#1e2530; }
+        .affyne-tooltip { position: fixed; z-index: 9999; background:#1e2530; color:#fff; padding:.45rem .6rem; font-size:.65rem; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,.25); line-height:1.25; pointer-events:none; opacity:0; transform:translateY(-4px); transition:opacity .12s ease, transform .12s ease; }
+        .affyne-tooltip.visible { opacity:1; transform:translateY(0); }
+        .affyne-tooltip[data-pos='top']::after, .affyne-tooltip[data-pos='bottom']::after { content:""; position:absolute; left:18px; border:6px solid transparent; }
+        .affyne-tooltip[data-pos='top']::after { bottom:-12px; border-top-color:#1e2530; }
+        .affyne-tooltip[data-pos='bottom']::after { top:-12px; border-bottom-color:#1e2530; }
       `;
       document.head.appendChild(style);
       TooltipDirective.styleInjected = true;
@@ -43,7 +43,7 @@ export class TooltipDirective implements OnInit, OnDestroy {
     if (!this.text) return;
     if (!this.tooltipEl) {
       this.tooltipEl = document.createElement('div');
-      this.tooltipEl.className = 'kmm-tooltip';
+      this.tooltipEl.className = 'affyne-tooltip';
       this.tooltipEl.style.width = this.tooltipWidth;
       this.tooltipEl.innerText = this.text;
       document.body.appendChild(this.tooltipEl);

@@ -1,6 +1,6 @@
 # Flyway Migration Setup - Complete Implementation
 
-This document describes the successful implementation of a Flyway-based database migration system for the Kellogg Music Match project, replacing the previous concatenated SQL file approach.
+This document describes the successful implementation of a Flyway-based database migration system for the Affyne project, replacing the previous concatenated SQL file approach.
 
 ## 🎯 **Objectives Achieved**
 

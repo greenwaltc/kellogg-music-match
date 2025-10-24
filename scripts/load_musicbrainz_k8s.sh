@@ -15,10 +15,10 @@ if [ ! -f "musicbrainz_artists_50k.csv" ]; then
 fi
 
 # Get the PostgreSQL pod name
-POSTGRES_POD=$(kubectl get pods -n kmm -l app=postgres -o jsonpath='{.items[0].metadata.name}')
+POSTGRES_POD=$(kubectl get pods -n affyne -l app=postgres -o jsonpath='{.items[0].metadata.name}')
 
 if [ -z "$POSTGRES_POD" ]; then
-    echo "❌ Error: No PostgreSQL pod found in kmm namespace"
+    echo "❌ Error: No PostgreSQL pod found in affyne namespace"
     echo "Make sure your Pulumi deployment has completed successfully"
     exit 1
 fi
@@ -26,7 +26,7 @@ fi
 echo "📦 Found PostgreSQL pod: $POSTGRES_POD"
 
 # Check if data already exists
-EXISTING_COUNT=$(kubectl exec -n kmm "$POSTGRES_POD" -- psql -U kellogg_user -d kellogg_music_match -t -c "SELECT COUNT(*) FROM artists WHERE is_reference = TRUE;" | tr -d ' ')
+EXISTING_COUNT=$(kubectl exec -n affyne "$POSTGRES_POD" -- psql -U kellogg_user -d kellogg_music_match -t -c "SELECT COUNT(*) FROM artists WHERE is_reference = TRUE;" | tr -d ' ')
 
 if [ "$EXISTING_COUNT" -gt 1000 ]; then
     echo "✅ MusicBrainz data already exists ($EXISTING_COUNT reference artists)"
@@ -35,10 +35,10 @@ if [ "$EXISTING_COUNT" -gt 1000 ]; then
 fi
 
 echo "📤 Copying CSV file to PostgreSQL pod..."
-kubectl cp musicbrainz_artists_50k.csv "kmm/$POSTGRES_POD:/tmp/musicbrainz_artists.csv"
+kubectl cp musicbrainz_artists_50k.csv "affyne/$POSTGRES_POD:/tmp/musicbrainz_artists.csv"
 
 echo "🔄 Loading MusicBrainz artists data..."
-kubectl exec -n kmm "$POSTGRES_POD" -- psql -U kellogg_user -d kellogg_music_match -c "
+kubectl exec -n affyne "$POSTGRES_POD" -- psql -U kellogg_user -d kellogg_music_match -c "
 CREATE TEMP TABLE temp_musicbrainz_load (
     musicbrainz_id TEXT, name TEXT, sort_name TEXT, artist_type TEXT,
     gender TEXT, country TEXT, life_span_begin TEXT, life_span_end TEXT,
@@ -78,12 +78,12 @@ DROP TABLE temp_musicbrainz_load;
 "
 
 # Verify the load
-FINAL_COUNT=$(kubectl exec -n kmm "$POSTGRES_POD" -- psql -U kellogg_user -d kellogg_music_match -t -c "SELECT COUNT(*) FROM artists WHERE is_reference = TRUE;" | tr -d ' ')
+FINAL_COUNT=$(kubectl exec -n affyne "$POSTGRES_POD" -- psql -U kellogg_user -d kellogg_music_match -t -c "SELECT COUNT(*) FROM artists WHERE is_reference = TRUE;" | tr -d ' ')
 
 echo "✅ Successfully loaded MusicBrainz data!"
 echo "📊 Total reference artists: $FINAL_COUNT"
 
 # Clean up
-kubectl exec -n kmm "$POSTGRES_POD" -- rm -f /tmp/musicbrainz_artists.csv
+kubectl exec -n affyne "$POSTGRES_POD" -- rm -f /tmp/musicbrainz_artists.csv
 
 echo "🎉 MusicBrainz data loading complete!"

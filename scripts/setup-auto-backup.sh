@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Setup automatic daily backups for Kellogg Music Match database
+# Setup automatic daily backups for Affyne database
 # This script configures a cron job to run backups daily at 2 AM
 
 BACKUP_SCRIPT="/home/cameron/projects/kellogg-music-match/scripts/backup-database.sh"
@@ -23,7 +23,7 @@ if crontab -l 2>/dev/null | grep -q "backup-database.sh"; then
 fi
 
 # Create the cron job
-(crontab -l 2>/dev/null; echo "# Kellogg Music Match Database Backup - Daily at 2 AM"; echo "0 2 * * * $BACKUP_SCRIPT >> $LOG_FILE 2>&1") | crontab -
+(crontab -l 2>/dev/null; echo "# Affyne Database Backup - Daily at 2 AM"; echo "0 2 * * * $BACKUP_SCRIPT >> $LOG_FILE 2>&1") | crontab -
 
 if [ $? -eq 0 ]; then
     echo "✅ Automatic backup configured successfully!"

@@ -23,7 +23,7 @@ config:
   kellogg-music-match:debugEnabled: "false"
   kellogg-music-match:emailEnabled: "true"
   kellogg-music-match:emailFromEmail: support@kelloggmatch.com
-  kellogg-music-match:emailFromName: Kellogg Music Match
+  kellogg-music-match:emailFromName: Affyne
   kellogg-music-match:emailProvider: sendgrid
   kellogg-music-match:flywayImage: flyway/flyway:latest
   kellogg-music-match:imagePullPolicy: IfNotPresent
@@ -40,7 +40,7 @@ config:
   kellogg-music-match:otelCollectorPrometheusPort: "8888"
   kellogg-music-match:otelCollectorReplicas: "2"
   kellogg-music-match:otelResourceAttributes: environment=prod,team=matching
-  kellogg-music-match:otelServiceName: kmm-backend
+  kellogg-music-match:otelServiceName: affyne-backend
   kellogg-music-match:otelServiceVersion: 1.0.0
   kellogg-music-match:otelTracesSampler: parentbased_traceidratio
   kellogg-music-match:otelTracesSamplerArg: "0.05"

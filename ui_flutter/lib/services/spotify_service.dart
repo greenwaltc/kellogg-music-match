@@ -21,8 +21,8 @@ class SpotifyService {
 
   // In Angular, redirectUri is window.origin + '/spotify/callback'.
   // For Flutter, use a custom scheme and have the backend accept it, or use a HTTPS callback that deep-links back.
-  // We'll use an app scheme: kmm://spotify/callback and register an intent filter on Android later if needed.
-  static const String callbackScheme = 'kmm';
+  // We'll use an app scheme: affyne://spotify/callback and register an intent filter on Android later if needed.
+  static const String callbackScheme = 'affyne';
   static const String callbackHost = 'spotify';
   static const String callbackPath = '/callback';
   static String get callbackUri =>

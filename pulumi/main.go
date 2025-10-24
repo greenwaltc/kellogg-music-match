@@ -53,7 +53,7 @@ func main() {
 		dbPassword := pulumiCfg.RequireSecret("dbPassword")
 		dbName := get("dbName", "kellogg_music_match")
 		dbSSLMode := get("dbSSLMode", "disable")
-		corsAllowedOrigins := get("corsAllowedOrigins", "http://localhost:4200,http://kmm-ui.traefik.me,https://kmm-ui.traefik.me")
+		corsAllowedOrigins := get("corsAllowedOrigins", "http://localhost:4200,http://affyne-ui.traefik.me,https://affyne-ui.traefik.me")
 		corsAllowedMethods := get("corsAllowedMethods", "GET, POST, PUT, DELETE, OPTIONS")
 		corsAllowedHeaders := get("corsAllowedHeaders", "Content-Type, Authorization, X-User-Username")
 		corsAllowCredentials := getBoolStr("corsAllowCredentials", true)
@@ -83,7 +83,7 @@ func main() {
 		emailEnabled := getBoolStr("emailEnabled", true)
 		emailProvider := get("emailProvider", "sendgrid")
 		emailFromEmail := get("emailFromEmail", "support@kelloggmatch.com")
-		emailFromName := get("emailFromName", "Kellogg Music Match")
+		emailFromName := get("emailFromName", "Affyne")
 		appBaseURL := get("appBaseUrl", "https://kelloggmatch.com")
 		// Optional geo search overrides (for broader metro search)
 		// Defaults now target downtown Chicago with a 50 mile radius to broaden concert discovery.
@@ -133,7 +133,7 @@ func main() {
 		tracingEnabled := getBoolStr("tracingEnabled", true)
 		tracingExporter := get("tracingExporter", "otlp")
 		otlpEndpoint := get("otlpEndpoint", "http://otel-collector:4318")
-		otelServiceName := get("otelServiceName", "kmm-backend")
+		otelServiceName := get("otelServiceName", "affyne-backend")
 		otelServiceVersion := get("otelServiceVersion", "1.0.0")
 		otelResourceAttributes := get("otelResourceAttributes", "environment=dev,team=matching")
 		otelTracesSampler := get("otelTracesSampler", "parentbased_traceidratio")
@@ -226,11 +226,11 @@ func main() {
 		// Store hash in context for later use (closure capture)
 		_ = flywayMigrationsHash
 		// Create the namespace
-		namespace, err := corev1.NewNamespace(ctx, "kmm", &corev1.NamespaceArgs{
+		namespace, err := corev1.NewNamespace(ctx, "affyne", &corev1.NamespaceArgs{
 			Metadata: &metav1.ObjectMetaArgs{
-				Name: pulumi.String("kmm"),
+				Name: pulumi.String("affyne"),
 				Labels: pulumi.StringMap{
-					"app": pulumi.String("kmm"),
+					"app": pulumi.String("affyne"),
 				},
 			},
 		})
@@ -239,12 +239,12 @@ func main() {
 		}
 
 		// Create the service account
-		serviceAccount, err := corev1.NewServiceAccount(ctx, "kmm-sa", &corev1.ServiceAccountArgs{
+		serviceAccount, err := corev1.NewServiceAccount(ctx, "affyne-sa", &corev1.ServiceAccountArgs{
 			Metadata: &metav1.ObjectMetaArgs{
-				Name:      pulumi.String("kmm"),
+				Name:      pulumi.String("affyne"),
 				Namespace: namespace.Metadata.Name(),
 				Labels: pulumi.StringMap{
-					"app": pulumi.String("kmm"),
+					"app": pulumi.String("affyne"),
 				},
 			},
 		})
@@ -255,10 +255,10 @@ func main() {
 		// Create ConfigMap for UI configuration with proxy-based backend URL
 		uiConfigMap, err := corev1.NewConfigMap(ctx, "ui-config", &corev1.ConfigMapArgs{
 			Metadata: &metav1.ObjectMetaArgs{
-				Name:      pulumi.String("kmm-ui-config"),
+				Name:      pulumi.String("affyne-ui-config"),
 				Namespace: namespace.Metadata.Name(),
 				Labels: pulumi.StringMap{
-					"app":       pulumi.String("kmm"),
+					"app":       pulumi.String("affyne"),
 					"component": pulumi.String("ui"),
 				},
 			},
@@ -286,11 +286,11 @@ func main() {
 				Name:      pulumi.String("flyway-config"),
 				Namespace: namespace.Metadata.Name(),
 				Labels: pulumi.StringMap{
-					"app":       pulumi.String("kmm"),
+					"app":       pulumi.String("affyne"),
 					"component": pulumi.String("flyway"),
 				},
 				Annotations: pulumi.StringMap{
-					"kmm.flyway/hash": pulumi.String(flywayMigrationsHash),
+					"affyne.flyway/hash": pulumi.String(flywayMigrationsHash),
 				},
 			},
 			Data: flywayConfigMapData,
@@ -306,7 +306,7 @@ func main() {
 				Name:      pulumi.String("backend-secret"),
 				Namespace: namespace.Metadata.Name(),
 				Labels: pulumi.StringMap{
-					"app":       pulumi.String("kmm"),
+					"app":       pulumi.String("affyne"),
 					"component": pulumi.String("backend"),
 				},
 			},
@@ -336,10 +336,10 @@ func main() {
 
 		backendDeployment, err := appsv1.NewDeployment(ctx, "backend-deployment", &appsv1.DeploymentArgs{
 			Metadata: &metav1.ObjectMetaArgs{
-				Name:      pulumi.String("kmm-backend"),
+				Name:      pulumi.String("affyne-backend"),
 				Namespace: namespace.Metadata.Name(),
 				Labels: pulumi.StringMap{
-					"app":       pulumi.String("kmm"),
+					"app":       pulumi.String("affyne"),
 					"component": pulumi.String("backend"),
 				},
 			},
@@ -347,18 +347,18 @@ func main() {
 				Replicas: pulumi.Int(backendReplicas),
 				Selector: &metav1.LabelSelectorArgs{
 					MatchLabels: pulumi.StringMap{
-						"app":       pulumi.String("kmm"),
+						"app":       pulumi.String("affyne"),
 						"component": pulumi.String("backend"),
 					},
 				},
 				Template: &corev1.PodTemplateSpecArgs{
 					Metadata: &metav1.ObjectMetaArgs{
 						Labels: pulumi.StringMap{
-							"app":       pulumi.String("kmm"),
+							"app":       pulumi.String("affyne"),
 							"component": pulumi.String("backend"),
 						},
 						Annotations: pulumi.StringMap{
-							"kmm.flyway/hash": pulumi.String(flywayMigrationsHash),
+							"affyne.flyway/hash": pulumi.String(flywayMigrationsHash),
 						},
 					},
 					Spec: &corev1.PodSpecArgs{
@@ -544,10 +544,10 @@ func main() {
 		// Create backend service
 		backendService, err := corev1.NewService(ctx, "backend-service", &corev1.ServiceArgs{
 			Metadata: &metav1.ObjectMetaArgs{
-				Name:      pulumi.String("kmm-backend"),
+				Name:      pulumi.String("affyne-backend"),
 				Namespace: namespace.Metadata.Name(),
 				Labels: pulumi.StringMap{
-					"app":       pulumi.String("kmm"),
+					"app":       pulumi.String("affyne"),
 					"component": pulumi.String("backend"),
 				},
 			},
@@ -562,7 +562,7 @@ func main() {
 					},
 				},
 				Selector: pulumi.StringMap{
-					"app":       pulumi.String("kmm"),
+					"app":       pulumi.String("affyne"),
 					"component": pulumi.String("backend"),
 				},
 			},
@@ -574,10 +574,10 @@ func main() {
 		// Create UI deployment with Kellogg student profile support
 		uiDeployment, err := appsv1.NewDeployment(ctx, "ui-deployment", &appsv1.DeploymentArgs{
 			Metadata: &metav1.ObjectMetaArgs{
-				Name:      pulumi.String("kmm-ui"),
+				Name:      pulumi.String("affyne-ui"),
 				Namespace: namespace.Metadata.Name(),
 				Labels: pulumi.StringMap{
-					"app":       pulumi.String("kmm"),
+					"app":       pulumi.String("affyne"),
 					"component": pulumi.String("ui"),
 				},
 			},
@@ -585,14 +585,14 @@ func main() {
 				Replicas: pulumi.Int(uiReplicas),
 				Selector: &metav1.LabelSelectorArgs{
 					MatchLabels: pulumi.StringMap{
-						"app":       pulumi.String("kmm"),
+						"app":       pulumi.String("affyne"),
 						"component": pulumi.String("ui"),
 					},
 				},
 				Template: &corev1.PodTemplateSpecArgs{
 					Metadata: &metav1.ObjectMetaArgs{
 						Labels: pulumi.StringMap{
-							"app":       pulumi.String("kmm"),
+							"app":       pulumi.String("affyne"),
 							"component": pulumi.String("ui"),
 						},
 					},
@@ -657,10 +657,10 @@ func main() {
 		// Create UI service
 		uiService, err := corev1.NewService(ctx, "ui-service", &corev1.ServiceArgs{
 			Metadata: &metav1.ObjectMetaArgs{
-				Name:      pulumi.String("kmm-ui"),
+				Name:      pulumi.String("affyne-ui"),
 				Namespace: namespace.Metadata.Name(),
 				Labels: pulumi.StringMap{
-					"app":       pulumi.String("kmm"),
+					"app":       pulumi.String("affyne"),
 					"component": pulumi.String("ui"),
 				},
 			},
@@ -675,7 +675,7 @@ func main() {
 					},
 				},
 				Selector: pulumi.StringMap{
-					"app":       pulumi.String("kmm"),
+					"app":       pulumi.String("affyne"),
 					"component": pulumi.String("ui"),
 				},
 			},
@@ -693,12 +693,12 @@ func main() {
 		}
 
 		// Create ingress for both UI and backend
-		ingress, err := networkingv1.NewIngress(ctx, "kmm-ingress", &networkingv1.IngressArgs{
+		ingress, err := networkingv1.NewIngress(ctx, "affyne-ingress", &networkingv1.IngressArgs{
 			Metadata: &metav1.ObjectMetaArgs{
-				Name:      pulumi.String("kmm"),
+				Name:      pulumi.String("affyne"),
 				Namespace: namespace.Metadata.Name(),
 				Labels: pulumi.StringMap{
-					"app": pulumi.String("kmm"),
+					"app": pulumi.String("affyne"),
 				},
 				Annotations: pulumi.StringMap{
 					// Allow the ingress class to be configured per-stack. Default is
@@ -715,7 +715,7 @@ func main() {
 				Rules: networkingv1.IngressRuleArray{
 					// UI ingress rule for traefik.me domain
 					&networkingv1.IngressRuleArgs{
-						Host: pulumi.String("kmm-ui.traefik.me"),
+						Host: pulumi.String("affyne-ui.traefik.me"),
 						Http: &networkingv1.HTTPIngressRuleValueArgs{
 							Paths: networkingv1.HTTPIngressPathArray{
 								&networkingv1.HTTPIngressPathArgs{
@@ -723,7 +723,7 @@ func main() {
 									PathType: pulumi.String("Prefix"),
 									Backend: &networkingv1.IngressBackendArgs{
 										Service: &networkingv1.IngressServiceBackendArgs{
-											Name: pulumi.String("kmm-ui"),
+											Name: pulumi.String("affyne-ui"),
 											Port: &networkingv1.ServiceBackendPortArgs{
 												Number: pulumi.Int(80),
 											},
@@ -735,7 +735,7 @@ func main() {
 					},
 					// Backend ingress rule
 					&networkingv1.IngressRuleArgs{
-						Host: pulumi.String("kmm-backend.traefik.me"),
+						Host: pulumi.String("affyne-backend.traefik.me"),
 						Http: &networkingv1.HTTPIngressRuleValueArgs{
 							Paths: networkingv1.HTTPIngressPathArray{
 								&networkingv1.HTTPIngressPathArgs{
@@ -743,7 +743,7 @@ func main() {
 									PathType: pulumi.String("Prefix"),
 									Backend: &networkingv1.IngressBackendArgs{
 										Service: &networkingv1.IngressServiceBackendArgs{
-											Name: pulumi.String("kmm-backend"),
+											Name: pulumi.String("affyne-backend"),
 											Port: &networkingv1.ServiceBackendPortArgs{
 												Number: pulumi.Int(8080),
 											},
@@ -766,7 +766,7 @@ func main() {
 				Name:      pulumi.String("postgres-secret"),
 				Namespace: namespace.Metadata.Name(),
 				Labels: pulumi.StringMap{
-					"app":       pulumi.String("kmm"),
+					"app":       pulumi.String("affyne"),
 					"component": pulumi.String("database"),
 				},
 			},
@@ -786,7 +786,7 @@ func main() {
 				Name:      pulumi.String("postgres-config"),
 				Namespace: namespace.Metadata.Name(),
 				Labels: pulumi.StringMap{
-					"app":       pulumi.String("kmm"),
+					"app":       pulumi.String("affyne"),
 					"component": pulumi.String("database"),
 				},
 			},
@@ -804,7 +804,7 @@ func main() {
 				Name:      pulumi.String("postgres"),
 				Namespace: namespace.Metadata.Name(),
 				Labels: pulumi.StringMap{
-					"app":       pulumi.String("kmm"),
+					"app":       pulumi.String("affyne"),
 					"component": pulumi.String("database"),
 				},
 			},
@@ -813,14 +813,14 @@ func main() {
 				Replicas:    pulumi.Int(1),
 				Selector: &metav1.LabelSelectorArgs{
 					MatchLabels: pulumi.StringMap{
-						"app":       pulumi.String("kmm"),
+						"app":       pulumi.String("affyne"),
 						"component": pulumi.String("database"),
 					},
 				},
 				Template: &corev1.PodTemplateSpecArgs{
 					Metadata: &metav1.ObjectMetaArgs{
 						Labels: pulumi.StringMap{
-							"app":       pulumi.String("kmm"),
+							"app":       pulumi.String("affyne"),
 							"component": pulumi.String("database"),
 						},
 					},
@@ -945,13 +945,13 @@ func main() {
 				Name:      pulumi.String("postgres"),
 				Namespace: namespace.Metadata.Name(),
 				Labels: pulumi.StringMap{
-					"app":       pulumi.String("kmm"),
+					"app":       pulumi.String("affyne"),
 					"component": pulumi.String("database"),
 				},
 			},
 			Spec: &corev1.ServiceSpecArgs{
 				Selector: pulumi.StringMap{
-					"app":       pulumi.String("kmm"),
+					"app":       pulumi.String("affyne"),
 					"component": pulumi.String("database"),
 				},
 				Ports: corev1.ServicePortArray{
@@ -972,7 +972,7 @@ func main() {
 		// 	Metadata: &metav1.ObjectMetaArgs{
 		// 		Name:      pulumi.String("otel-collector-config"),
 		// 		Namespace: namespace.Metadata.Name(),
-		// 		Labels:    pulumi.StringMap{"app": pulumi.String("kmm"), "component": pulumi.String("otel-collector")},
+		// 		Labels:    pulumi.StringMap{"app": pulumi.String("affyne"), "component": pulumi.String("otel-collector")},
 		// 	},
 		// 	Data: pulumi.StringMap{"collector.yaml": pulumi.String(collectorConfigContent)},
 		// })
@@ -984,13 +984,13 @@ func main() {
 		// 	Metadata: &metav1.ObjectMetaArgs{
 		// 		Name:      pulumi.String("otel-collector"),
 		// 		Namespace: namespace.Metadata.Name(),
-		// 		Labels:    pulumi.StringMap{"app": pulumi.String("kmm"), "component": pulumi.String("otel-collector")},
+		// 		Labels:    pulumi.StringMap{"app": pulumi.String("affyne"), "component": pulumi.String("otel-collector")},
 		// 	},
 		// 	Spec: &appsv1.DeploymentSpecArgs{
 		// 		Replicas: pulumi.Int(collectorReplicas),
-		// 		Selector: &metav1.LabelSelectorArgs{MatchLabels: pulumi.StringMap{"app": pulumi.String("kmm"), "component": pulumi.String("otel-collector")}},
+		// 		Selector: &metav1.LabelSelectorArgs{MatchLabels: pulumi.StringMap{"app": pulumi.String("affyne"), "component": pulumi.String("otel-collector")}},
 		// 		Template: &corev1.PodTemplateSpecArgs{
-		// 			Metadata: &metav1.ObjectMetaArgs{Labels: pulumi.StringMap{"app": pulumi.String("kmm"), "component": pulumi.String("otel-collector")}},
+		// 			Metadata: &metav1.ObjectMetaArgs{Labels: pulumi.StringMap{"app": pulumi.String("affyne"), "component": pulumi.String("otel-collector")}},
 		// 			Spec: &corev1.PodSpecArgs{
 		// 				ServiceAccountName: serviceAccount.Metadata.Name(),
 		// 				Containers: corev1.ContainerArray{
@@ -1022,21 +1022,21 @@ func main() {
 		// }
 
 		// collectorService, err := corev1.NewService(ctx, "otel-collector-svc", &corev1.ServiceArgs{
-		// 	Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String("otel-collector"), Namespace: namespace.Metadata.Name(), Labels: pulumi.StringMap{"app": pulumi.String("kmm"), "component": pulumi.String("otel-collector")}},
+		// 	Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String("otel-collector"), Namespace: namespace.Metadata.Name(), Labels: pulumi.StringMap{"app": pulumi.String("affyne"), "component": pulumi.String("otel-collector")}},
 		// 	Spec: &corev1.ServiceSpecArgs{
 		// 		Type: pulumi.String("ClusterIP"),
 		// 		Ports: corev1.ServicePortArray{
 		// 			&corev1.ServicePortArgs{Name: pulumi.String("otlp-http"), Port: pulumi.Int(4318), TargetPort: pulumi.String("otlp-http")},
 		// 			&corev1.ServicePortArgs{Name: pulumi.String("otlp-grpc"), Port: pulumi.Int(4317), TargetPort: pulumi.String("otlp-grpc")},
 		// 		},
-		// 		Selector: pulumi.StringMap{"app": pulumi.String("kmm"), "component": pulumi.String("otel-collector")},
+		// 		Selector: pulumi.StringMap{"app": pulumi.String("affyne"), "component": pulumi.String("otel-collector")},
 		// 	},
 		// })
 		// if err != nil {
 		// 	return err
 		// }
 
-		// Export useful information for Kellogg Music Match deployment
+		// Export useful information for Affyne deployment
 		ctx.Export("namespaceName", namespace.Metadata.Name())
 		ctx.Export("serviceAccountName", serviceAccount.Metadata.Name())
 		ctx.Export("backendDeploymentName", backendDeployment.Metadata.Name())
@@ -1051,12 +1051,12 @@ func main() {
 		// ctx.Export("otelCollectorService", collectorService.Metadata.Name())
 
 		// Export application URLs for easy access
-		ctx.Export("uiUrl", pulumi.String("http://kmm-ui.traefik.me"))
-		ctx.Export("backendUrl", pulumi.String("http://kmm-backend.traefik.me"))
-		ctx.Export("healthCheckUrl", pulumi.String("http://kmm-backend.traefik.me/health"))
+		ctx.Export("uiUrl", pulumi.String("http://affyne-ui.traefik.me"))
+		ctx.Export("backendUrl", pulumi.String("http://affyne-backend.traefik.me"))
+		ctx.Export("healthCheckUrl", pulumi.String("http://affyne-backend.traefik.me/health"))
 
 		// Export database connection information
-		ctx.Export("databaseHost", pulumi.String("postgres.kmm.svc.cluster.local"))
+		ctx.Export("databaseHost", pulumi.String("postgres.affyne.svc.cluster.local"))
 		ctx.Export("databasePort", pulumi.String("5432"))
 		ctx.Export("databaseName", pulumi.String("kellogg_music_match"))
 		ctx.Export("databaseUser", pulumi.String("kellogg_user"))

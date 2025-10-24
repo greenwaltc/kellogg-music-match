@@ -180,7 +180,7 @@ func NewPostgreSQLUserRepository(cfg *config.DatabaseConfig) (*PostgreSQLUserRep
 	// Enable testing-mode guard in the database session when running tests to avoid deadlocks
 	if os.Getenv("GO_WANT_HELPER_PROCESS") == "1" || strings.Contains(strings.ToLower(os.Args[0]), ".test") {
 		// Best-effort: set a custom GUC that our trigger reads
-		_, _ = pool.Exec(context.Background(), "SET kmm.testing_mode = 'on'")
+		_, _ = pool.Exec(context.Background(), "SET affyne.testing_mode = 'on'")
 	}
 
 	return &PostgreSQLUserRepository{

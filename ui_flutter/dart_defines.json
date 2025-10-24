@@ -2,5 +2,5 @@
 "API_BASE_URL": "https://twolegged-leonida-interchangeably.ngrok-free.dev",
 "ANDROID_PUSH_ENABLED": "true",
 "SPOTIFY_CLIENT_ID": "60770d55f3aa4e2cb4f2ab01d5a36a9c",
-"SPOTIFY_REDIRECT_URI": "kmm://spotify/callback"
+"SPOTIFY_REDIRECT_URI": "affyne://spotify/callback"
 }

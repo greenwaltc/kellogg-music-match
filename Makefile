@@ -1,4 +1,4 @@
-# Kellogg Music Match - Development Commands
+# Affyne - Development Commands
 
 # Image versioning
 IMAGE_TAG ?= $(shell date +%Y%m%d-%H%M%S)
@@ -8,7 +8,7 @@ IMAGE_VERSION ?= $(IMAGE_TAG)-$(GIT_SHA)
 .PHONY: help docs dev status events-status events-sample clean backend-test build docker-build docker-run docker-stop docker-logs docker-clean test infra-preview infra-deploy infra-destroy k3s-import k3s-build-import k3s-deploy k3s-status db-migrate db-connect generate-vapid-keys
 
 help:
-	@echo "🎵 Kellogg Music Match - Available Commands:"
+	@echo "🎵 Affyne - Available Commands:"
 	@echo ""
 	@echo "📋 General:"
 	@echo "  make help           Show this help"
@@ -173,7 +173,7 @@ k3s-build-import: docker-build k3s-import ## Build and import images to k3s
 
 k3s-deploy: k3s-build-import ## Deploy to k3s
 	@echo "🚀 Deploying to k3s..."
-	@kubectl apply -f pulumi/k8s/ -n kmm || echo "⚠️ Manual k8s deployment needed"
+	@kubectl apply -f pulumi/k8s/ -n affyne || echo "⚠️ Manual k8s deployment needed"
 	@echo "✅ k3s deployment complete!"
 
 k3s-status: ## Show k3s cluster status
@@ -183,10 +183,10 @@ k3s-status: ## Show k3s cluster status
 	@sudo k3s kubectl get nodes
 	@echo ""
 	@echo "🚀 Pods:"
-	@kubectl get pods -n kmm 2>/dev/null || echo "  No pods in kmm namespace"
+	@kubectl get pods -n affyne 2>/dev/null || echo "  No pods in affyne namespace"
 	@echo ""
 	@echo "🔧 Services:"
-	@kubectl get services -n kmm 2>/dev/null || echo "  No services in kmm namespace"
+	@kubectl get services -n affyne 2>/dev/null || echo "  No services in affyne namespace"
 
 # Forwarding Commands
 backend-%: ## Forward backend commands

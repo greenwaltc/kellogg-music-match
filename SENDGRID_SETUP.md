@@ -1,6 +1,6 @@
 # SendGrid Email Configuration Guide
 
-This guide will help you configure your Kellogg Music Match application to send password reset emails using SendGrid.
+This guide will help you configure your Affyne application to send password reset emails using SendGrid.
 
 ## ✅ Implementation Complete
 
@@ -54,7 +54,7 @@ export EMAIL_ENABLED=true
 export EMAIL_PROVIDER=sendgrid
 export SENDGRID_API_KEY=SG.your_actual_sendgrid_api_key_here
 export EMAIL_FROM_EMAIL=noreply@yourdomain.com
-export EMAIL_FROM_NAME="Kellogg Music Match"
+export EMAIL_FROM_NAME="Affyne"
 export APP_BASE_URL=http://localhost:4200
 ```
 
@@ -70,7 +70,7 @@ services:
       - EMAIL_PROVIDER=sendgrid
       - SENDGRID_API_KEY=SG.your_actual_sendgrid_api_key_here
       - EMAIL_FROM_EMAIL=noreply@yourdomain.com
-      - EMAIL_FROM_NAME=Kellogg Music Match
+      - EMAIL_FROM_NAME=Affyne
       - APP_BASE_URL=http://localhost:4200
 ```
 
@@ -132,7 +132,7 @@ The deployment will automatically use the configured environment variables.
 | `EMAIL_PROVIDER` | Email service provider | `sendgrid` |
 | `SENDGRID_API_KEY` | SendGrid API key | `SG.abc123...` |
 | `EMAIL_FROM_EMAIL` | Sender email address | `noreply@yourdomain.com` |
-| `EMAIL_FROM_NAME` | Sender display name | `Kellogg Music Match` |
+| `EMAIL_FROM_NAME` | Sender display name | `Affyne` |
 | `APP_BASE_URL` | Base URL for reset links | `https://yourdomain.com` |
 
 ## 🐛 Troubleshooting

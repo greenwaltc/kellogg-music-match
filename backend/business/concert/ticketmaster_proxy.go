@@ -206,7 +206,7 @@ func (p *TicketmasterProxy) FetchConcertsWithPagination(ctx context.Context, pag
 
 	// Set headers
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "KelloggMusicMatch/1.0")
+	req.Header.Set("User-Agent", "AffyneMusicMatch/1.0")
 
 	// Make the request
 	resp, err := p.httpClient.Do(req)
@@ -367,7 +367,7 @@ func (p *TicketmasterProxy) FetchConcertsByArtist(ctx context.Context, artistNam
 	}
 
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "KelloggMusicMatch/1.0")
+	req.Header.Set("User-Agent", "AffyneMusicMatch/1.0")
 
 	resp, err := p.httpClient.Do(req)
 	if err != nil {

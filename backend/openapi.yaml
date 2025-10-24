@@ -1,8 +1,8 @@
 openapi: 3.0.3
 info:
-  title: Kellogg Music Match API
+  title: Affyne API
   description: |
-    REST API for the Kellogg Music Match application that enables users to register, authenticate, 
+    REST API for the Affyne application that enables users to register, authenticate, 
     and find music taste matches based on favorite artists.
     
     ## Features
@@ -13,7 +13,7 @@ info:
     - In-memory data storage (suitable for prototyping)
   version: 1.0.0
   contact:
-    name: Kellogg Music Match Team
+    name: Affyne Team
     url: https://github.com/greenwaltc/kellogg-music-match
   license:
     name: MIT
@@ -91,7 +91,7 @@ paths:
                   code: "AQD123exampleAuthCode"
                   state: "randomStateValue16"
                   code_verifier: "bd7b2f0b5a0b4f8a8c1e3e8b3f1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7g8h9"
-                  redirect_uri: "kmm://spotify/callback"
+                  redirect_uri: "affyne://spotify/callback"
       responses:
         '202':
           description: Sync started (stubbed success)
@@ -131,7 +131,7 @@ paths:
                   code: "AQD456anotherCode"
                   state: "randomStateValue16"
                   code_verifier: "bd7b2f0b5a0b4f8a8c1e3e8b3f1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7g8h9"
-                  redirect_uri: "kmm://spotify/callback"
+                  redirect_uri: "affyne://spotify/callback"
       responses:
         '202':
           description: Retry accepted

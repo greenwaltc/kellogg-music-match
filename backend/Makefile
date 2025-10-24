@@ -1,11 +1,11 @@
-# Makefile for Kellogg Music Match Backend
+# Makefile for Affyne Backend
 # This Makefile provides targets for OpenAPI code generation, testing, and common development tasks
 
 .PHONY: help generate generate-sqlc clean build test test-ginkgo test-behavioral test-quick run docker-build docker-run docker-stop dev install-tools
 
 # Default target
 help: ## Show this help message
-	@echo "Kellogg Music Match Backend - Available targets:"
+	@echo "Affyne Backend - Available targets:"
 	@echo "Features: OpenAPI generation, Ticketmaster API, Chicago Events, PostgreSQL, Ginkgo testing"
 	@echo ""
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'

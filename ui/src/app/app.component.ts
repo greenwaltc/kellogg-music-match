@@ -21,7 +21,7 @@ import { NavStateService } from './nav-state.service';
   styleUrls: ['./app.component.css']
 })
 export class AppComponent implements OnInit {
-  title = 'Kellogg Music Match';
+  title = 'Affyne';
   user = signal<any>(null);
   isLoggedIn = computed(() => !!this.user());
   mobileMenuOpen = signal(false);
@@ -70,9 +70,9 @@ export class AppComponent implements OnInit {
     });
   }
 
-  // Debug visibility guard: enable by running in console `localStorage.setItem('kmm_debug_ui','1')`
+  // Debug visibility guard: enable by running in console `localStorage.setItem('affyne_debug_ui','1')`
   debugVisible(): boolean {
-    try { return !!localStorage.getItem('kmm_debug_ui'); } catch { return false; }
+    try { return !!localStorage.getItem('affyne_debug_ui'); } catch { return false; }
   }
 
   // Call backend VAPID debug endpoint and show summary
@@ -80,7 +80,7 @@ export class AppComponent implements OnInit {
     // Try to include bearer token if present; otherwise rely on cookies
     let headers: any = {};
     try {
-      const tok = localStorage.getItem('kmm_token');
+      const tok = localStorage.getItem('affyne_token');
       if (tok) headers['Authorization'] = `Bearer ${tok}`;
     } catch {}
     this.http.get<any>(this.api.url('/push/debug/vapid'), { headers, withCredentials: true }).subscribe({

@@ -3,7 +3,7 @@
 -- Description: Wrap invalidation in a testing-mode guard using a custom GUC to avoid deadlocks in tests.
 
 -- Ensure the custom GUC exists per session (no-op if not referenced)
-DO $$ BEGIN PERFORM set_config('kmm.testing_mode', current_setting('kmm.testing_mode', true), true); EXCEPTION WHEN others THEN NULL; END $$;
+DO $$ BEGIN PERFORM set_config('affyne.testing_mode', current_setting('affyne.testing_mode', true), true); EXCEPTION WHEN others THEN NULL; END $$;
 
 CREATE OR REPLACE FUNCTION invalidate_artist_neighbors()
 RETURNS TRIGGER AS $$
@@ -11,7 +11,7 @@ DECLARE
   testing boolean;
 BEGIN
   BEGIN
-    testing := current_setting('kmm.testing_mode') = 'on';
+    testing := current_setting('affyne.testing_mode') = 'on';
   EXCEPTION WHEN others THEN
     testing := false;
   END;

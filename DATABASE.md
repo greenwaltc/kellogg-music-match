@@ -1,6 +1,6 @@
 # 🗄️ Database Setup - PostgreSQL
 
-This document describes the PostgreSQL database setup for the Kellogg Music Match application, including local development and production deployment configurations.
+This document describes the PostgreSQL database setup for the Affyne application, including local development and production deployment configurations.
 
 ## 📋 Database Overview
 

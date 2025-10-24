@@ -44,7 +44,7 @@ class MainApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Kellogg Music Match',
+      title: 'Affyne',
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: ThemeMode.system,
@@ -361,6 +361,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   ? redirectDefine
                   : SpotifyService.callbackUri;
               if (clientId.isEmpty) {
+                if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Missing SPOTIFY_CLIENT_ID app config.'),
@@ -380,6 +381,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 scope: scopes,
               );
               // After starting auth, present syncing status and wait until complete
+              if (!mounted) return;
               final ok = await Navigator.of(context).push<bool>(
                 MaterialPageRoute(builder: (_) => const SpotifySyncingPage()),
               );
@@ -387,6 +389,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 await _loadSpotifyStatus();
               }
             } catch (e) {
+              if (!mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text('Spotify authorization failed: $e')),
               );
@@ -439,7 +442,7 @@ class RootScaffold extends StatelessWidget {
                   children: [
                     Image.asset('assets/icons/icon-192x192.png', height: 24),
                     const SizedBox(width: 8),
-                    const Text('Kellogg Music Match'),
+                    const Text('Affyne'),
                   ],
                 ),
               )
@@ -447,7 +450,7 @@ class RootScaffold extends StatelessWidget {
                 children: [
                   Image.asset('assets/icons/icon-192x192.png', height: 24),
                   const SizedBox(width: 8),
-                  const Text('Kellogg Music Match'),
+                  const Text('Affyne'),
                 ],
               ),
         actions: [

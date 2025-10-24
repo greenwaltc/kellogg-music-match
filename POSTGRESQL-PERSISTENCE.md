@@ -2,7 +2,7 @@
 
 ## 🎯 **Overview**
 
-Your Kellogg Music Match application now has **complete data persistence** configured for node restarts and system reboots. This document explains the entire setup and provides operational procedures.
+Your Affyne application now has **complete data persistence** configured for node restarts and system reboots. This document explains the entire setup and provides operational procedures.
 
 ## ✅ **Current Persistence Setup**
 
@@ -36,7 +36,7 @@ VolumeClaimTemplates: corev1.PersistentVolumeClaimTypeArray{
 - **Capacity**: 10Gi
 - **Access Mode**: ReadWriteOnce
 - **Reclaim Policy**: `Retain` (✅ **SECURED** - prevents accidental data loss)
-- **Physical Location**: `/var/lib/rancher/k3s/storage/pvc-088b2f83-b19d-43b0-bef3-226ea44cd4c0_kmm_postgres-storage-postgres-0`
+- **Physical Location**: `/var/lib/rancher/k3s/storage/pvc-088b2f83-b19d-43b0-bef3-226ea44cd4c0_affyne_postgres-storage-postgres-0`
 - **Mount Point**: `/var/lib/postgresql/data` (standard PostgreSQL data directory)
 
 ### **3. Verified Persistence**
@@ -66,8 +66,8 @@ VolumeClaimTemplates: corev1.PersistentVolumeClaimTypeArray{
 
 #### Check Database Status
 ```bash
-kubectl get pods -n kmm -l component=database
-kubectl get pv,pvc -n kmm
+kubectl get pods -n affyne -l component=database
+kubectl get pv,pvc -n affyne
 ```
 
 #### Create Manual Backup
@@ -77,7 +77,7 @@ kubectl get pv,pvc -n kmm
 
 #### View Database Statistics
 ```bash
-kubectl exec -n kmm postgres-0 -- psql -U kellogg_user -d kellogg_music_match -c "
+kubectl exec -n affyne postgres-0 -- psql -U kellogg_user -d kellogg_music_match -c "
 SELECT 
     'Users' as table_name, COUNT(*) as count FROM users
 UNION ALL
@@ -113,7 +113,7 @@ sudo ls -la /var/lib/rancher/k3s/storage/
 sudo systemctl restart k3s
 
 # 4. Force pod recreation
-kubectl delete pod -n kmm postgres-0
+kubectl delete pod -n affyne postgres-0
 ```
 
 ## 🔧 **Maintenance**
@@ -133,12 +133,12 @@ Current PVC is 10Gi. If you need more space:
 
 1. **Check current usage**:
 ```bash
-kubectl exec -n kmm postgres-0 -- df -h /var/lib/postgresql/data
+kubectl exec -n affyne postgres-0 -- df -h /var/lib/postgresql/data
 ```
 
 2. **Expand PVC** (k3s local-path supports expansion):
 ```bash
-kubectl patch pvc postgres-storage-postgres-0 -n kmm -p '{"spec":{"resources":{"requests":{"storage":"20Gi"}}}}'
+kubectl patch pvc postgres-storage-postgres-0 -n affyne -p '{"spec":{"resources":{"requests":{"storage":"20Gi"}}}}'
 ```
 
 ## 🚨 **Troubleshooting**
@@ -150,20 +150,20 @@ kubectl patch pvc postgres-storage-postgres-0 -n kmm -p '{"spec":{"resources":{"
 kubectl get nodes
 
 # Check volume status
-kubectl get pv,pvc -n kmm
+kubectl get pv,pvc -n affyne
 
 # Check pod events
-kubectl describe pod -n kmm postgres-0
+kubectl describe pod -n affyne postgres-0
 
 # Force recreation if needed
-kubectl delete pod -n kmm postgres-0
+kubectl delete pod -n affyne postgres-0
 ```
 
 ### **Problem**: Data appears lost
 **Solution**:
 ```bash
 # Check if volume is still bound
-kubectl get pvc -n kmm postgres-storage-postgres-0
+kubectl get pvc -n affyne postgres-storage-postgres-0
 
 # Check physical storage
 sudo ls -la /var/lib/rancher/k3s/storage/pvc-*
@@ -176,10 +176,10 @@ sudo ls -la /var/lib/rancher/k3s/storage/pvc-*
 **Solution**:
 ```bash
 # Check pod is running
-kubectl get pods -n kmm postgres-0
+kubectl get pods -n affyne postgres-0
 
 # Check database connectivity
-kubectl exec -n kmm postgres-0 -- pg_isready -U kellogg_user
+kubectl exec -n affyne postgres-0 -- pg_isready -U kellogg_user
 
 # Check backup directory permissions
 ls -la /home/cameron/backups/kellogg-music-match/
@@ -188,7 +188,7 @@ ls -la /home/cameron/backups/kellogg-music-match/
 ## 📊 **Current Status Summary**
 
 - ✅ **Persistent Storage**: 10Gi local-path volume with Retain policy
-- ✅ **Data Location**: `/var/lib/rancher/k3s/storage/pvc-088b2f83-b19d-43b0-bef3-226ea44cd4c0_kmm_postgres-storage-postgres-0`
+- ✅ **Data Location**: `/var/lib/rancher/k3s/storage/pvc-088b2f83-b19d-43b0-bef3-226ea44cd4c0_affyne_postgres-storage-postgres-0`
 - ✅ **Backup System**: Automated script with compression and cleanup
 - ✅ **Restore System**: Full restore capability with safety checks
 - ✅ **Tested**: Pod restart persistence verified (47,195 artists retained)

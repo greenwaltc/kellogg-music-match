@@ -3,10 +3,10 @@ import { test, expect } from '@playwright/test';
 // Sets an authenticated user in localStorage before the app loads
 async function primeAuth(page: any) {
   await page.addInitScript(() => {
-    localStorage.setItem('kmm_user', JSON.stringify({
+    localStorage.setItem('affyne_user', JSON.stringify({
       username: 'e2e', email: 'e2e@example.com', firstName: 'E2E', lastName: 'Test'
     }));
-    localStorage.setItem('kmm_token', 'dummy');
+    localStorage.setItem('affyne_token', 'dummy');
   });
 }
 

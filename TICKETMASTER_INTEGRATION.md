@@ -1,6 +1,6 @@
 # Ticketmaster Integration
 
-This document describes how the Ticketmaster API integration works in the Kellogg Music Match application, including the Chicago Events feature with automated synchronization and UI components.
+This document describes how the Ticketmaster API integration works in the Affyne application, including the Chicago Events feature with automated synchronization and UI components.
 
 ## Configuration
 
@@ -143,7 +143,7 @@ To test the integration:
 docker-compose up -d --build
 
 # Check logs for concert service initialization
-docker logs kmm-backend | grep -i concert
+docker logs affyne-backend | grep -i concert
 
 # Test API call (if you add an endpoint)
 curl http://localhost:8080/api/concerts/upcoming

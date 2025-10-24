@@ -1,4 +1,4 @@
-# Kellogg Music Match UI
+# Affyne UI
 
 Angular standalone (v17+) application for Kellogg student registration, authentication, and music taste matching with enhanced profile management.
 
@@ -128,7 +128,7 @@ Notes:
 ### API base URL
 - The UI uses a single `ApiBaseService` for all HTTP calls.
 - Base URL resolution order:
-  1) `window.__kmmConfig.apiBaseUrl` loaded from `/config.json` at runtime (written by the container entrypoint), otherwise
+  1) `window.__affyneConfig.apiBaseUrl` loaded from `/config.json` at runtime (written by the container entrypoint), otherwise
   2) `'/api'` fallback (default NGINX reverse proxy to backend).
 
 ### Runtime Configuration (config.json)

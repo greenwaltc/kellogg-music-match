@@ -9,7 +9,7 @@
     <!-- Recommended for reliable delivery/background -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <application
-        android:label="Kellogg Music Match"
+        android:label="Affyne"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="false">
@@ -43,8 +43,8 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <!-- Match any kmm://* callback to avoid host/path mismatches across devices/browsers -->
-                <data android:scheme="kmm" />
+                <!-- Match any affyne://* callback to avoid host/path mismatches across devices/browsers -->
+                <data android:scheme="affyne" />
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

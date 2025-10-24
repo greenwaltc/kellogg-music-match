@@ -4,7 +4,7 @@ services:
     build:
       context: .
       dockerfile: postgres.dockerfile
-    container_name: kmm-postgres
+    container_name: affyne-postgres
     environment:
       POSTGRES_USER: kellogg_user
       POSTGRES_PASSWORD: kellogg_secure_pass_2024
@@ -26,7 +26,7 @@ services:
   # Flyway migration service
   flyway:
     image: flyway/flyway:10-alpine
-    container_name: kmm-flyway
+    container_name: affyne-flyway
     command: migrate
     volumes:
       - ./backend/db/schema/migrations:/flyway/sql:ro
@@ -50,7 +50,7 @@ services:
       args:
         DEBUG: "false"
     image: kellogg-music-match-backend:latest
-    container_name: kmm-backend
+    container_name: affyne-backend
     environment:
       # Database connection environment variables
       DB_HOST: postgres
@@ -88,7 +88,7 @@ services:
       EMAIL_ENABLED: "true"
       EMAIL_PROVIDER: sendgrid
       EMAIL_FROM_EMAIL: support@kelloggmatch.com
-      EMAIL_FROM_NAME: Kellogg Music Match
+      EMAIL_FROM_NAME: Affyne
       APP_BASE_URL: https://kelloggmatch.com
       SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}
       # Feature flags
@@ -132,7 +132,7 @@ services:
     build: 
       context: ./ui
     image: kellogg-music-match-ui:latest
-    container_name: kmm-ui
+    container_name: affyne-ui
     environment:
       - NGINX_PORT=80
       - API_BASE_URL=/api

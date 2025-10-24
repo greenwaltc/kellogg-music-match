@@ -2,8 +2,8 @@ import { Injectable, signal } from '@angular/core';
 
 @Injectable({ providedIn: 'root' })
 export class NavStateService {
-  private readonly kMatches = 'kmmVisitedMatches';
-  private readonly kEvents = 'kmmVisitedEvents';
+  private readonly kMatches = 'affyneVisitedMatches';
+  private readonly kEvents = 'affyneVisitedEvents';
 
   visitedMatches = signal<boolean>(false);
   visitedEvents = signal<boolean>(false);

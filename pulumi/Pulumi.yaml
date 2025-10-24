@@ -1,5 +1,5 @@
 name: kellogg-music-match
-description: Pulumi program for Kellogg Music Match - Enhanced student music matching with scientific similarity algorithms
+description: Pulumi program for Affyne - Enhanced student music matching with scientific similarity algorithms
 runtime: go
 config:
   pulumi:tags:

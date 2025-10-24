@@ -136,10 +136,10 @@ func (s *EmailService) SendPasswordResetEmail(ctx context.Context, email, userna
 	baseURL := getEnvWithDefault("APP_BASE_URL", "http://localhost:4200")
 	resetURL := fmt.Sprintf("%s/reset-password?token=%s", baseURL, resetToken)
 
-	subject := "Password Reset - Kellogg Music Match"
+	subject := "Password Reset - Affyne"
 	body := fmt.Sprintf(`Hi %s,
 
-You recently requested to reset your password for your Kellogg Music Match account.
+You recently requested to reset your password for your Affyne account.
 
 Click the link below to reset your password:
 %s
@@ -149,7 +149,7 @@ This link will expire in 1 hour for security reasons.
 If you didn't request this password reset, please ignore this email or contact support if you have concerns.
 
 Best regards,
-The Kellogg Music Match Team`, username, resetURL)
+The Affyne Team`, username, resetURL)
 
 	message := EmailMessage{
 		To:      email,

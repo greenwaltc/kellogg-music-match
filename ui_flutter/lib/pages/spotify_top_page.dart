@@ -333,9 +333,11 @@ class _SpotifyTopPageState extends State<SpotifyTopPage> {
       _syncCountdown = 30; // seconds
       _canCancel = true;
     });
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Starting Spotify sync…')));
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Starting Spotify sync…')));
+    }
     try {
       await _svc!.refreshFromSpotify();
       await _pollSyncStatus(timeoutSeconds: 30);
@@ -343,19 +345,23 @@ class _SpotifyTopPageState extends State<SpotifyTopPage> {
     } catch (e) {
       // If no stored tokens, prompt user to reconnect Spotify instead of generic failure
       if (e is ApiException && e.status == 404) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'No stored Spotify tokens found. Please connect Spotify first.',
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'No stored Spotify tokens found. Please connect Spotify first.',
+              ),
             ),
-          ),
-        );
+          );
+        }
         widget.onNeedConnect?.call();
       } else {
-        setState(() => _error = e.toString());
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Spotify sync failed: $e')));
+        if (mounted) {
+          setState(() => _error = e.toString());
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Spotify sync failed: $e')));
+        }
       }
     } finally {
       if (mounted) setState(() => _syncing = false);
@@ -369,13 +375,17 @@ class _SpotifyTopPageState extends State<SpotifyTopPage> {
       setState(() {
         _canCancel = false;
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Sync cancelled')));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Sync cancelled')));
+      }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to cancel: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to cancel: $e')));
+      }
     }
   }
 
@@ -582,7 +592,7 @@ class _SpotifyRow extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceVariant,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(6),
       ),
       child: Icon(

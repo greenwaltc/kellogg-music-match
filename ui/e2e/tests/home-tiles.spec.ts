@@ -2,19 +2,19 @@ import { test, expect, Page } from '@playwright/test';
 
 async function primeAuth(page: Page, username = 'e2e') {
   await page.addInitScript(({ username }) => {
-    localStorage.setItem('kmm_user', JSON.stringify({
+    localStorage.setItem('affyne_user', JSON.stringify({
       username,
       email: username + '@example.com',
       firstName: 'E2E',
       lastName: 'Test'
     }));
-    localStorage.setItem('kmm_token', 'dummy');
+    localStorage.setItem('affyne_token', 'dummy');
     // Ensure per-user spotify readiness is cleared unless explicitly set by the test
-    localStorage.removeItem(`kmmSpotifyReady:${username}`);
-    localStorage.removeItem(`kmmSpotifyReadyTs:${username}`);
+    localStorage.removeItem(`affyneSpotifyReady:${username}`);
+    localStorage.removeItem(`affyneSpotifyReadyTs:${username}`);
     // Clear visited flags so menu items are hidden initially
-    localStorage.removeItem('kmmVisitedMatches');
-    localStorage.removeItem('kmmVisitedEvents');
+    localStorage.removeItem('affyneVisitedMatches');
+    localStorage.removeItem('affyneVisitedEvents');
   }, { username });
 }
 
@@ -45,19 +45,19 @@ test.describe('Home tiles and menu visibility', () => {
     const url = baseURL ?? 'http://localhost:4200';
     const username = 'linkeduser';
     await page.addInitScript(({ username }) => {
-      localStorage.setItem('kmm_user', JSON.stringify({
+      localStorage.setItem('affyne_user', JSON.stringify({
         username,
         email: username + '@example.com',
         firstName: 'E2E',
         lastName: 'Test'
       }));
-      localStorage.setItem('kmm_token', 'dummy');
+      localStorage.setItem('affyne_token', 'dummy');
       // Simulate that this user has already linked Spotify
-      localStorage.setItem(`kmmSpotifyReady:${username}`, 'true');
-      localStorage.setItem(`kmmSpotifyReadyTs:${username}`, Date.now().toString());
+      localStorage.setItem(`affyneSpotifyReady:${username}`, 'true');
+      localStorage.setItem(`affyneSpotifyReadyTs:${username}`, Date.now().toString());
       // Clear visited flags
-      localStorage.removeItem('kmmVisitedMatches');
-      localStorage.removeItem('kmmVisitedEvents');
+      localStorage.removeItem('affyneVisitedMatches');
+      localStorage.removeItem('affyneVisitedEvents');
     }, { username });
 
     await page.goto(url + '/home');

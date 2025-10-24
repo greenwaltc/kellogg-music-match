@@ -65,10 +65,11 @@ class _SpotifyConnectPromptState extends State<SpotifyConnectPrompt> {
         _error = e.toString();
       });
     } finally {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _loading = false;
         });
+      }
     }
   }
 
