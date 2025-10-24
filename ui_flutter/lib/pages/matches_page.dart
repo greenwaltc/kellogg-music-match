@@ -467,9 +467,9 @@ class _MatchUserTile extends StatelessWidget {
               dense: true,
               leading: CircleAvatar(
                 radius: 14,
-        backgroundColor: isOverlap
-          ? Theme.of(context).colorScheme.primaryContainer
-          : Theme.of(context).colorScheme.surfaceContainerHighest,
+                backgroundColor: isOverlap
+                    ? Theme.of(context).colorScheme.primaryContainer
+                    : Theme.of(context).colorScheme.surfaceContainerHighest,
                 child: Text(
                   rk != null ? '$rk' : '•',
                   style: const TextStyle(fontSize: 12),
