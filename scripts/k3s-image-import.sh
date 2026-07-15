@@ -33,9 +33,6 @@ IMAGES=(
     "kellogg-music-match-backend:latest"
     "kellogg-music-match-ui:latest"
     "kellogg-music-match-postgres:latest"
-    # Both underscore (compose default) and hyphen variants if present
-    "kellogg-music-match_musicbrainz-loader:latest"
-    "kellogg-music-match-musicbrainz:latest"
 )
 
 # External (upstream) images we rely on at runtime but do not build locally.

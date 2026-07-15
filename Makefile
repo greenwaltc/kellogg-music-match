@@ -103,7 +103,7 @@ build: ## Build all components
 # Docker Commands
 docker-build: ## Build all Docker images
 	@echo "🐳 Building all Docker images..."
-	docker-compose build postgres backend ui musicbrainz-loader
+	docker-compose build postgres backend ui
 	@echo "✅ All Docker images built!"
 
 docker-run: ## Start all services with Docker Compose

@@ -19,7 +19,6 @@
 - **[docker-compose.yml](docker-compose.yml)** - Local development environment
 - **[pulumi/](pulumi/)** - Infrastructure as Code for cloud deployment
 - **[K3S_LOCAL_IMAGES_GUIDE.md](K3S_LOCAL_IMAGES_GUIDE.md)** - Local Kubernetes development
-- **[KUBERNETES_MUSICBRAINZ_SETUP.md](KUBERNETES_MUSICBRAINZ_SETUP.md)** - K8s-specific setup
 
 ### 🎵 **Spotify Integration (Current Focus)**
 The system now derives artist preferences from users' Spotify profiles (top artists & listening data). Legacy MusicBrainz ingestion has been retired and archived.

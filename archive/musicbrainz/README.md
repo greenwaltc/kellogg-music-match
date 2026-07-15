@@ -12,6 +12,8 @@ Contents:
 - README_musicbrainz.md
 - README_integration.md
 - requirements.txt (Python deps for the above)
+- Dockerfile.musicbrainz (data loader container definition)
+- KUBERNETES_MUSICBRAINZ_SETUP.md (K8s init-container setup guide)
 - Sample datasets (if retained): musicbrainz_artists_50k_deduplicated.csv (removed unless explicitly restored)
 
 Retention Rationale:
